@@ -38,11 +38,7 @@ export function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <motion.div
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
-      whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-      viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.12 }}
-      transition={{ duration: shouldReduceMotion ? 0 : 0.35, ease: [0.16, 1, 0.3, 1] }}
+    <div
       style={{
         display: "flex",
         flexDirection: "column",
@@ -292,6 +288,6 @@ export function ProductCard({ product }: ProductCardProps) {
           }
         }
       `}</style>
-    </motion.div>
+    </div>
   );
 }

@@ -14,108 +14,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Heart,
+  Eye,
 } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
 import { useStore, ProductItem } from "@/components/store-context";
-
-// Best Selling Products matching reference image with Indian Rupee pricing
-const BEST_SELLERS: (ProductItem & { badgeColor?: string; slug: string })[] = [
-  {
-    id: "bs-1",
-    slug: "oversized-essential-tee",
-    title: "Oversized Essential Tee",
-    price: 799,
-    image: "/images/nxtvie/product-oversized-tee-hd.jpg",
-    badge: "Bestseller",
-    category: "T-Shirts",
-    colors: [
-      { name: "Pitch Black", hex: "#181818" },
-      { name: "Mineral Grey", hex: "#7A7670" },
-      { name: "Bone White", hex: "#EDEAE1" },
-    ],
-    sizes: ["S", "M", "L", "XL"],
-    description: "Heavyweight 280 GSM combed organic cotton oversized tee with signature raw cut hem and drop shoulder fit.",
-  },
-  {
-    id: "bs-2",
-    slug: "minimal-logo-tee",
-    title: "Minimal Logo Tee",
-    price: 899,
-    image: "/images/nxtvie/product-minimal-logo-tee-hd.jpg",
-    badge: "New",
-    category: "T-Shirts",
-    colors: [
-      { name: "Sand Beige", hex: "#E5E0D5" },
-      { name: "Deep Black", hex: "#181818" },
-      { name: "Vintage Green", hex: "#596052" },
-    ],
-    sizes: ["S", "M", "L", "XL"],
-    description: "Sand beige minimalist tee with subtle embroidered tonal logo and pre-shrunk luxury Japanese cotton weave.",
-  },
-  {
-    id: "bs-3",
-    slug: "relaxed-fit-shirt",
-    title: "Relaxed Fit Shirt",
-    price: 1299,
-    image: "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg",
-    badge: "Trending",
-    category: "Shirts",
-    colors: [
-      { name: "Olive Green", hex: "#636D56" },
-      { name: "Oatmeal", hex: "#D7D0C5" },
-      { name: "Dark Slate", hex: "#1F1E1D" },
-    ],
-    sizes: ["M", "L", "XL"],
-    description: "Olive green camp collar relaxed short-sleeve overshirt in breathable linen-cotton blend with utility pockets.",
-  },
-  {
-    id: "bs-4",
-    slug: "core-hoodie",
-    title: "Core Hoodie",
-    price: 1499,
-    image: "/images/nxtvie/product-core-hoodie-hd.jpg",
-    badge: "Bestseller",
-    category: "Hoodies",
-    colors: [
-      { name: "Forest Moss", hex: "#4D5344" },
-      { name: "Pitch Black", hex: "#202020" },
-      { name: "Washed Oatmeal", hex: "#BDB7AB" },
-    ],
-    sizes: ["S", "M", "L", "XL"],
-    description: "Washed heavyweight 450 GSM French terry hoodie with double-layer hood, hidden phone pouch, and custom ribbed cuffs.",
-  },
-  {
-    id: "bs-5",
-    slug: "cargo-pants",
-    title: "Cargo Pants",
-    price: 1399,
-    image: "/images/nxtvie/product-cargo-pants-hd.jpg",
-    category: "Bottoms",
-    colors: [
-      { name: "Military Olive", hex: "#5C654E" },
-      { name: "Stealth Black", hex: "#2B2926" },
-      { name: "Stone Grey", hex: "#8F897E" },
-    ],
-    sizes: ["30", "32", "34", "36"],
-    description: "Multi-pocket relaxed tactical cargo pants in heavy ripstop cotton with articulated knee darts and adjustable hem cords.",
-  },
-  {
-    id: "bs-6",
-    slug: "nxtvie-cap",
-    title: "NXTVIE Cap",
-    price: 599,
-    image: "/images/nxtvie/product-cap-hd.jpg",
-    badge: "New",
-    category: "Accessories",
-    colors: [
-      { name: "Black", hex: "#151413" },
-      { name: "Olive", hex: "#4A4D44" },
-      { name: "Khaki", hex: "#D5CEC2" },
-    ],
-    sizes: ["One Size"],
-    description: "Structured 6-panel dad cap featuring high-density 3D white embroidered lightning bolt crest and antique brass buckle closure.",
-  },
-];
+import { MOCK_PRODUCTS, Product } from "@/constants/mock-products";
 
 // 5 Categories from reference
 const CATEGORIES = [
@@ -126,7 +29,86 @@ const CATEGORIES = [
   { name: "Accessories", image: "/images/nxtvie/cat-accessories.jpg", href: "/categories/accessories" },
 ];
 
-// Social gallery photos use clean campaign/product imagery without embedded UI copy.
+// Category sections with 2 featured cards per category
+interface CategorySectionConfig {
+  slug: string;
+  name: string;
+  eyebrow: string;
+  tagline: string;
+  href: string;
+  products: Product[];
+}
+
+const CATEGORY_SECTIONS: CategorySectionConfig[] = [
+  {
+    slug: "t-shirts",
+    name: "T-Shirts",
+    eyebrow: "Core Drop 01",
+    tagline: "Heavyweight 260-300 GSM combed organic cotton tees with architectural drop shoulders.",
+    href: "/categories/t-shirts",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "oversized-essential-tee") || MOCK_PRODUCTS[0],
+      MOCK_PRODUCTS.find((p) => p.slug === "minimal-logo-tee") || MOCK_PRODUCTS[1],
+    ],
+  },
+  {
+    slug: "hoodies",
+    name: "Hoodies",
+    eyebrow: "Heavyweight Volume",
+    tagline: "Substantial 450 GSM French terry loopback pullovers with double-layered hoods.",
+    href: "/categories/hoodies",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "core-hoodie") || MOCK_PRODUCTS[3],
+      MOCK_PRODUCTS.find((p) => p.slug === "asian-minimal-modern-hoodie") || MOCK_PRODUCTS[7],
+    ],
+  },
+  {
+    slug: "shirts",
+    name: "Shirts",
+    eyebrow: "Summer Layering",
+    tagline: "Breathable linen-cotton camp shirts and workwear overshirts for effortless everyday styling.",
+    href: "/categories/shirts",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "relaxed-fit-shirt") || MOCK_PRODUCTS[2],
+      MOCK_PRODUCTS.find((p) => p.slug === "camp-collar-linen-shirt") || MOCK_PRODUCTS[2],
+    ],
+  },
+  {
+    slug: "bottoms",
+    name: "Bottoms",
+    eyebrow: "Urban Movement",
+    tagline: "Articulated ripstop tactical cargo pants and relaxed wide-leg brushed fleece track pants.",
+    href: "/categories/bottoms",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "cargo-pants") || MOCK_PRODUCTS[4],
+      MOCK_PRODUCTS.find((p) => p.slug === "urban-runner-relaxed-sweats") || MOCK_PRODUCTS[4],
+    ],
+  },
+  {
+    slug: "jackets",
+    name: "Jackets",
+    eyebrow: "Specialized Fabrics",
+    tagline: "Technical weather-resistant memory nylon windbreakers engineered with Aquaguard zips.",
+    href: "/categories/jackets",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "jackets-for-every-journey") || MOCK_PRODUCTS[6],
+      MOCK_PRODUCTS.find((p) => p.slug === "specialized-technical-jacket") || MOCK_PRODUCTS[6],
+    ],
+  },
+  {
+    slug: "accessories",
+    name: "Accessories",
+    eyebrow: "Signature Details",
+    tagline: "Structured 6-panel low-profile dad caps and heavyweight 16oz organic canvas daily carry totes.",
+    href: "/categories/accessories",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "nxtvie-cap") || MOCK_PRODUCTS[5],
+      MOCK_PRODUCTS.find((p) => p.slug === "heavyweight-canvas-tote") || MOCK_PRODUCTS[5],
+    ],
+  },
+];
+
+// Social gallery photos
 const GALLERY_PHOTOS = [
   { id: 1, image: "/images/nxtvie/hero-model.jpg", alt: "NXTVIE relaxed streetwear look on concrete steps" },
   { id: 2, image: "/images/nxtvie/promo-jackets-hd.jpg", alt: "NXTVIE technical jacket editorial look" },
@@ -153,7 +135,7 @@ const CINEMATIC_HERO_SLIDES = [
     image: "/images/cinematic/banner-urban-movement.jpg",
     alt: "NXTVIE Urban Movement Indian Roots Modern Style Collection",
     scriptTag: "For\nNew\nGenerations",
-    accentColor: "var(--accent-next)",
+    accentColor: "var(--accent-next, #C78D4E)",
     badge: "New Season AW26",
     objectPosition: "center 30%",
   },
@@ -213,12 +195,137 @@ const CINEMATIC_HERO_SLIDES = [
   },
 ];
 
-export default function HomePage() {
-  const { addToCart } = useStore();
-  const shouldReduceMotion = useReducedMotion();
-  const [selectedColorIndex, setSelectedColorIndex] = useState<Record<string, number>>({});
+// Dedicated 2-Card Layout Product Item (Instant render without framer-motion delay)
+function TwoCardProduct({ product }: { product: Product }) {
+  const { addToCart, toggleWishlist, isInWishlist, setQuickViewProduct } = useStore();
+  const [selectedColorIdx, setSelectedColorIdx] = useState(0);
 
-  // Full-width cinematic hero carousel state
+  const inWishlist = isInWishlist(product.id);
+  const activeColor = product.colors?.[selectedColorIdx]?.name || "Original";
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addToCart(product, "M", activeColor, 1);
+  };
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWishlist(product.id);
+  };
+
+  const handleQuickView = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setQuickViewProduct(product);
+  };
+
+  return (
+    <div className="two-card-item">
+      {/* Media Box */}
+      <div className="two-card-media-box">
+        <Link href={`/products/${product.slug || product.id}`} className="two-card-img-link">
+          <img
+            src={product.image}
+            alt={product.title}
+            loading="lazy"
+            decoding="async"
+            className="two-card-img"
+          />
+        </Link>
+
+        {/* Badge */}
+        {product.badge && (
+          <div className="two-card-badge">
+            {product.badge}
+          </div>
+        )}
+
+        {/* Wishlist Button */}
+        <button
+          type="button"
+          onClick={handleWishlist}
+          aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          className="two-card-wishlist-btn"
+        >
+          <Heart size={16} fill={inWishlist ? "#E63946" : "none"} color={inWishlist ? "#E63946" : "#121110"} strokeWidth={2} />
+        </button>
+
+        {/* Quick View Button (hover) */}
+        <button
+          type="button"
+          onClick={handleQuickView}
+          aria-label={`Quick view ${product.title}`}
+          className="two-card-quick-view-btn"
+        >
+          <Eye size={13} />
+          <span>Quick View</span>
+        </button>
+      </div>
+
+      {/* Info Content */}
+      <div className="two-card-content">
+        <div className="two-card-meta-row">
+          <h3 className="two-card-title">
+            <Link href={`/products/${product.slug || product.id}`}>
+              {product.title}
+            </Link>
+          </h3>
+          <div className="two-card-price-row">
+            <span className="two-card-price">₹ {product.price.toLocaleString("en-IN")}</span>
+            {product.originalPrice && product.originalPrice > product.price && (
+              <span className="two-card-original-price">
+                ₹ {product.originalPrice.toLocaleString("en-IN")}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Bar: Color Swatches + Add To Bag */}
+        <div className="two-card-action-bar">
+          <div className="two-card-colors">
+            {product.colors?.map((color, idx) => {
+              const isSelected = selectedColorIdx === idx;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSelectedColorIdx(idx);
+                  }}
+                  aria-label={`Select ${color.name}`}
+                  aria-pressed={isSelected}
+                  title={color.name}
+                  className="two-card-color-dot"
+                  style={{
+                    backgroundColor: color.hex,
+                    border: isSelected ? "2px solid #111110" : "1px solid rgba(0,0,0,0.18)",
+                    outline: isSelected ? "1px solid #111110" : "none",
+                    outlineOffset: "1.5px",
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            aria-label={`Add ${product.title} to bag`}
+            className="two-card-add-cart-btn"
+          >
+            <ShoppingBag size={15} />
+            <span className="add-cart-text">Add to Bag</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const touchStartXRef = useRef<number | null>(null);
 
@@ -253,15 +360,11 @@ export default function HomePage() {
     touchStartXRef.current = null;
   };
 
-  const handleColorSelect = (productId: string, idx: number) => {
-    setSelectedColorIndex((prev) => ({ ...prev, [productId]: idx }));
-  };
-
   const currentSlide = CINEMATIC_HERO_SLIDES[activeSlide];
 
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "100vh" }}>
-      {/* 1. CINEMATIC FULL-WIDTH HERO BANNER CAROUSEL */}
+    <div style={{ backgroundColor: "var(--bg-sand, #F6F4EE)", minHeight: "100vh" }}>
+      {/* 1. CINEMATIC FULL-WIDTH HERO BANNER CAROUSEL (Instant render, no framer-motion delay) */}
       <section
         style={{
           position: "relative",
@@ -300,7 +403,7 @@ export default function HomePage() {
                 inset: 0,
                 opacity: isActive ? 1 : 0,
                 pointerEvents: isActive ? "auto" : "none",
-                transition: shouldReduceMotion ? "none" : "opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: "opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
                 zIndex: isActive ? 1 : 0,
               }}
               className="hero-slide-pane"
@@ -319,13 +422,11 @@ export default function HomePage() {
                   height: "100%",
                   objectFit: "cover",
                   objectPosition: slide.objectPosition,
-                   transform: shouldReduceMotion ? "none" : isActive ? "scale(1.02)" : "scale(1.08)",
-                   transition: shouldReduceMotion ? "none" : "transform 6s cubic-bezier(0.25, 1, 0.5, 1)",
                   filter: "brightness(0.92)",
                 }}
               />
 
-              {/* Gradient Scrim Overlays for Cinematic Readability */}
+              {/* Gradient Scrim Overlays */}
               <div
                 style={{
                   position: "absolute",
@@ -346,7 +447,7 @@ export default function HomePage() {
                 }}
               />
 
-              {/* Handwritten Script Tag on Right */}
+              {/* Script Tag on Right */}
               <div
                 style={{
                   position: "absolute",
@@ -358,14 +459,13 @@ export default function HomePage() {
                   alignItems: "flex-end",
                   pointerEvents: "none",
                   opacity: isActive ? 1 : 0,
-                   transform: shouldReduceMotion ? "none" : isActive ? "translateY(0)" : "translateY(10px)",
-                   transition: shouldReduceMotion ? "none" : "all 0.8s ease 0.3s",
+                  transition: "opacity 0.5s ease",
                 }}
                 className="hero-script-tag"
               >
                 <div
                   style={{
-                    fontFamily: "var(--font-script)",
+                    fontFamily: "var(--font-script, Caveat, cursive)",
                     fontSize: "clamp(30px, 3.4vw, 44px)",
                     fontWeight: 600,
                     color: "#FFFFFF",
@@ -378,7 +478,6 @@ export default function HomePage() {
                 >
                   {slide.scriptTag}
                 </div>
-                {/* Curved chalk arrow */}
                 <svg
                   width="70"
                   height="45"
@@ -410,7 +509,7 @@ export default function HomePage() {
           );
         })}
 
-        {/* Foreground Content Container */}
+        {/* Foreground Content Container (Rendered immediately with opacity 1) */}
         <div
           className="container"
           style={{
@@ -421,13 +520,9 @@ export default function HomePage() {
             paddingBottom: "80px",
           }}
         >
-          <motion.div
-            key={`hero-content-${activeSlide}`}
-            style={{ maxWidth: "600px" }}
+          <div
+            style={{ maxWidth: "600px", opacity: 1 }}
             className="hero-content-col"
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
-            animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
           >
             {/* Tag / Eyebrow Pill */}
             <div
@@ -466,9 +561,8 @@ export default function HomePage() {
 
             {/* Main Headline */}
             <h1
-              key={`headline-${activeSlide}`}
               style={{
-                fontFamily: "var(--font-body)",
+                fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
                 fontSize: "clamp(44px, 5.6vw, 76px)",
                 fontWeight: 900,
                 lineHeight: 0.94,
@@ -488,7 +582,6 @@ export default function HomePage() {
 
             {/* Subtitle */}
             <p
-              key={`sub-${activeSlide}`}
               style={{
                 fontSize: "15px",
                 lineHeight: 1.6,
@@ -502,7 +595,7 @@ export default function HomePage() {
               {currentSlide.subtitle}
             </p>
 
-            {/* Dual CTA Buttons */}
+            {/* Dual CTA Buttons (Instant, high-priority visibility) */}
             <div
               style={{
                 display: "flex",
@@ -528,6 +621,7 @@ export default function HomePage() {
                   letterSpacing: "0.01em",
                   transition: "all 0.25s ease",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)",
+                  textDecoration: "none",
                 }}
                 className="banner-cta-white"
               >
@@ -551,16 +645,17 @@ export default function HomePage() {
                   fontWeight: 600,
                   letterSpacing: "0.01em",
                   transition: "all 0.25s ease",
+                  textDecoration: "none",
                 }}
                 className="hero-secondary-btn"
               >
                 <span>{currentSlide.secondaryCta}</span>
               </Link>
             </div>
-          </motion.div>
+          </div>
         </div>
 
-        {/* Carousel Arrow Controls (Left & Right) */}
+        {/* Carousel Arrow Controls */}
         <button
           onClick={prevSlide}
           type="button"
@@ -581,6 +676,7 @@ export default function HomePage() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 20,
+            cursor: "pointer",
             transition: "all 0.25s ease",
           }}
           className="carousel-arrow-btn"
@@ -608,16 +704,16 @@ export default function HomePage() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 20,
+            cursor: "pointer",
             transition: "all 0.25s ease",
           }}
           className="carousel-arrow-btn"
         >
           <ChevronRight size={22} />
         </button>
-
       </section>
 
-      {/* LUXURY TRUST STRIP (Directly Beneath Full-Width Hero) */}
+      {/* LUXURY TRUST STRIP (Beneath Hero) */}
       <section
         style={{
           backgroundColor: "#EDE8DE",
@@ -671,32 +767,27 @@ export default function HomePage() {
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#1E1C1A", display: "block" }}>
                   Original Quality
                 </span>
-                <span style={{ fontSize: "10.5px", color: "#6A655D" }}>Heavyweight 280-450 GSM</span>
+                <span style={{ fontSize: "10.5px", color: "#6A655D" }}>Heavyweight 260-450 GSM</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 2. CATEGORY CARDS SECTION (Row of 5) */}
-      <motion.section
-        style={{ padding: "16px 0 54px 0" }}
-        className="categories-section"
-        initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
-        whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-        viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.12 }}
-        transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
-      >
+      {/* 2. CATEGORY TILES BAR (Quick Navigation Row of 5) */}
+      <section style={{ padding: "28px 0 20px 0" }} className="categories-preview-section">
         <div className="container">
-          <div className="mobile-section-heading">
+          <div className="section-title-wrap">
             <div>
-              <h2>SHOP BY CATEGORY</h2>
-              <p>Build your everyday rotation.</p>
+              <span className="section-eyebrow">BROWSE DEPARTMENTS</span>
+              <h2 className="section-heading-sm">SHOP BY CATEGORY</h2>
             </div>
-            <Link href="/categories" aria-label="View all categories">
-              View all <ArrowRight size={14} />
+            <Link href="/categories" className="view-all-text-link">
+              <span>View all</span>
+              <ArrowRight size={14} />
             </Link>
           </div>
+
           <div
             style={{
               display: "grid",
@@ -705,90 +796,99 @@ export default function HomePage() {
             }}
             className="categories-grid"
           >
-            {CATEGORIES.map((cat, idx) => (
-              <motion.div
-                key={`${cat.name}-motion`}
-                className="category-card-motion"
-                initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
-                whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-                viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.2 }}
-                transition={{
-                  duration: shouldReduceMotion ? 0 : 0.35,
-                  delay: shouldReduceMotion ? 0 : idx * 0.05,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-              >
+            {CATEGORIES.map((cat) => (
               <Link
                 key={cat.name}
                 href={cat.href}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  borderRadius: "10px",
-                  overflow: "hidden",
-                  backgroundColor: "var(--bg-sand-bar)",
-                  border: "1px solid rgba(0, 0, 0, 0.04)",
-                  transition: "transform 0.25s ease, box-shadow 0.25s ease",
-                  textDecoration: "none",
-                }}
                 className="category-card"
               >
-                {/* Image Container */}
-                <div
-                  style={{
-                    width: "100%",
-                    height: "155px",
-                    overflow: "hidden",
-                    backgroundColor: "#DDD8CE",
-                  }}
-                  className="category-card-media"
-                >
+                <div className="category-card-media">
                   <img
                     src={cat.image}
                     alt={cat.name}
                     loading="lazy"
                     decoding="async"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      transition: "transform 0.4s ease",
-                    }}
                     className="cat-img"
                   />
                 </div>
-
-                {/* Bottom Bar */}
-                <div
-                  style={{
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    backgroundColor: "var(--bg-sand-bar)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "13.5px",
-                      fontWeight: 700,
-                      color: "#181716",
-                      letterSpacing: "0.01em",
-                    }}
-                  >
-                    {cat.name}
-                  </span>
-                  <ArrowRight size={15} color="#181716" className="cat-arrow" />
+                <div className="category-card-footer">
+                  <span className="cat-name">{cat.name}</span>
+                  <ArrowRight size={14} className="cat-arrow" />
                 </div>
               </Link>
-              </motion.div>
             ))}
           </div>
         </div>
-      </motion.section>
+      </section>
 
-      {/* 3. COLLECTION BANNERS (Asymmetric Split: Urban Essentials & Premium Basics) */}
-      <section style={{ padding: "0 0 64px 0" }} className="collections-section">
+      {/* 3. CATEGORY SECTIONS WITH 2-CARD LAYOUT & "SEE ALL" NAVIGATION */}
+
+      {/* Section A: T-SHIRTS (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[0].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[0].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[0].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[0].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[0].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[0].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          {/* 2-Card Layout Grid */}
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[0].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section B: HOODIES (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[1].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[1].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[1].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[1].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[1].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[1].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          {/* 2-Card Layout Grid */}
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[1].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4. EDITORIAL COLLECTION BANNERS (Urban Essentials & Premium Basics) */}
+      <section style={{ padding: "16px 0 44px 0" }} className="collections-section">
         <div className="container">
           <div
             style={{
@@ -799,26 +899,13 @@ export default function HomePage() {
             className="collections-split-grid"
           >
             {/* Left: Urban Essentials Dark Banner */}
-            <div
-              style={{
-                position: "relative",
-                borderRadius: "12px",
-                overflow: "hidden",
-                minHeight: "360px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "flex-end",
-                padding: "44px 40px",
-              }}
-              className="urban-banner"
-            >
-              {/* Background Image */}
-                <img
-                  src="/images/nxtvie/banner-urban-essentials-hd.jpg"
-                  alt="NXTVIE Urban Essentials Collection"
-                  loading="lazy"
-                  decoding="async"
-                  style={{
+            <div className="urban-banner">
+              <img
+                src="/images/nxtvie/banner-urban-essentials-hd.jpg"
+                alt="NXTVIE Urban Essentials Collection"
+                loading="lazy"
+                decoding="async"
+                style={{
                   position: "absolute",
                   inset: 0,
                   width: "100%",
@@ -828,8 +915,6 @@ export default function HomePage() {
                   zIndex: 0,
                 }}
               />
-
-              {/* Gradient Overlay for Legibility */}
               <div
                 style={{
                   position: "absolute",
@@ -839,8 +924,6 @@ export default function HomePage() {
                   zIndex: 1,
                 }}
               />
-
-              {/* Content */}
               <div style={{ position: "relative", zIndex: 2, maxWidth: "380px" }}>
                 <span
                   style={{
@@ -853,12 +936,11 @@ export default function HomePage() {
                     marginBottom: "8px",
                   }}
                 >
-                  NEW COLLECTION
+                  NEW DROP
                 </span>
-
                 <h2
                   style={{
-                    fontFamily: "var(--font-body)",
+                    fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
                     fontSize: "clamp(32px, 3.8vw, 46px)",
                     fontWeight: 900,
                     lineHeight: 1.0,
@@ -871,7 +953,6 @@ export default function HomePage() {
                   URBAN<br />
                   ESSENTIALS
                 </h2>
-
                 <p
                   style={{
                     fontSize: "13.5px",
@@ -879,11 +960,11 @@ export default function HomePage() {
                     marginBottom: "24px",
                   }}
                 >
-                  Clean fits for everyday movement.
+                  Clean fits engineered for everyday city movement.
                 </p>
-
                 <Link
                   href="/categories/urban-essentials"
+                  className="banner-cta-white"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -895,9 +976,8 @@ export default function HomePage() {
                     fontSize: "13px",
                     fontWeight: 700,
                     letterSpacing: "0.01em",
-                    transition: "all 0.2s ease",
+                    textDecoration: "none",
                   }}
-                  className="banner-cta-white"
                 >
                   <span>Explore Collection</span>
                   <ArrowRight size={14} />
@@ -906,18 +986,7 @@ export default function HomePage() {
             </div>
 
             {/* Right: Premium Basics Stack Banner */}
-            <div
-              style={{
-                borderRadius: "12px",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                backgroundColor: "var(--bg-sand-bar)",
-                border: "1px solid rgba(0, 0, 0, 0.05)",
-              }}
-              className="premium-basics-banner"
-            >
-              {/* Stack Image */}
+            <div className="premium-basics-banner">
               <div
                 style={{
                   position: "relative",
@@ -941,7 +1010,6 @@ export default function HomePage() {
                 />
               </div>
 
-              {/* Bottom Text Card */}
               <div
                 style={{
                   padding: "24px 28px",
@@ -953,7 +1021,7 @@ export default function HomePage() {
               >
                 <h3
                   style={{
-                    fontFamily: "var(--font-body)",
+                    fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
                     fontSize: "24px",
                     fontWeight: 900,
                     lineHeight: 1.05,
@@ -966,7 +1034,6 @@ export default function HomePage() {
                   PREMIUM<br />
                   BASICS
                 </h3>
-
                 <p
                   style={{
                     fontSize: "12.5px",
@@ -978,7 +1045,6 @@ export default function HomePage() {
                   Timeless pieces.<br />
                   Better everyday.
                 </p>
-
                 <div>
                   <Link
                     href="/categories/premium-basics"
@@ -1004,243 +1070,132 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. BEST SELLING PRODUCTS SECTION (6 Items) */}
-      <motion.section
-        style={{ padding: "0 0 68px 0" }}
-        className="best-sellers-section"
-        initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
-        whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-        viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.08 }}
-        transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
-      >
+      {/* Section C: SHIRTS (2 Cards + See All) */}
+      <section className="category-showcase-section">
         <div className="container">
-          {/* Section Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "space-between",
-              marginBottom: "26px",
-            }}
-            className="product-section-header"
-          >
+          <div className="category-showcase-header">
             <div>
-              <h2
-                style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: "24px",
-                  fontWeight: 900,
-                  letterSpacing: "0.02em",
-                  color: "#121110",
-                  textTransform: "uppercase",
-                  lineHeight: 1.1,
-                }}
-              >
-                BEST SELLING
-              </h2>
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "#736D66",
-                  marginTop: "4px",
-                }}
-              >
-                Most loved by the NXTVIE community.
-              </p>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[2].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[2].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[2].tagline}</p>
             </div>
 
             <Link
-              href="/categories/best-sellers"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#121110",
-                transition: "opacity 0.2s ease",
-              }}
-              className="view-all-link"
+              href={CATEGORY_SECTIONS[2].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[2].name}`}
             >
-              <span>View All</span>
-              <ArrowRight size={14} />
+              <span>See All {CATEGORY_SECTIONS[2].name}</span>
+              <ArrowRight size={15} />
             </Link>
           </div>
 
-          {/* 6 Products Grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(6, 1fr)",
-              gap: "14px",
-            }}
-            className="best-sellers-grid"
-          >
-            {BEST_SELLERS.map((prod, idx) => (
-              <motion.div
-                key={prod.id}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  position: "relative",
-                }}
-                className="product-card"
-                initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
-                whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-                viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.12 }}
-                transition={{
-                  duration: shouldReduceMotion ? 0 : 0.35,
-                  delay: shouldReduceMotion ? 0 : idx * 0.045,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-              >
-                {/* Image Container with Badge */}
-                <Link
-                  href={`/products/${prod.slug}`}
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    aspectRatio: "3 / 4",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                    backgroundColor: "#DDD8CE",
-                    marginBottom: "10px",
-                    display: "block",
-                  }}
-                >
-                  <img
-                    src={prod.image}
-                    alt={prod.title}
-                    loading="lazy"
-                    decoding="async"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      transition: "transform 0.35s ease",
-                    }}
-                    className="product-img"
-                  />
-
-                  {/* Badge (Bestseller, New, Trending) */}
-                  {prod.badge && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "8px",
-                        left: "8px",
-                        backgroundColor: "#FFFFFF",
-                        color: "#151413",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        padding: "3px 8px",
-                        borderRadius: "9999px",
-                        letterSpacing: "0.02em",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-                      }}
-                    >
-                      {prod.badge}
-                    </div>
-                  )}
-                </Link>
-
-                {/* Title */}
-                <Link href={`/products/${prod.slug}`} style={{ textDecoration: "none" }}>
-                  <h3
-                    style={{
-                      fontSize: "12.5px",
-                      fontWeight: 600,
-                      color: "#181715",
-                      marginBottom: "3px",
-                      lineHeight: 1.3,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {prod.title}
-                  </h3>
-                </Link>
-
-                {/* Price */}
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#181715",
-                    marginBottom: "8px",
-                  }}
-                >
-                  ₹ {prod.price.toLocaleString("en-IN")}
-                </div>
-
-                {/* Bottom Row: Color Swatches + Cart Button */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginTop: "auto",
-                  }}
-                >
-                  {/* 3 Color Dots */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                    {prod.colors?.map((color, idx) => {
-                      const isSelected = (selectedColorIndex[prod.id] || 0) === idx;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => handleColorSelect(prod.id, idx)}
-                          aria-label={`Select ${color.name}`}
-                          aria-pressed={isSelected}
-                          title={color.name}
-                          style={{
-                            width: "28px",
-                            height: "28px",
-                            borderRadius: "50%",
-                            backgroundColor: color.hex,
-                            border: isSelected ? "1.5px solid #111110" : "1px solid rgba(0,0,0,0.15)",
-                            outline: isSelected ? "1px solid #111110" : "none",
-                            outlineOffset: "1px",
-                            padding: 0,
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* Add to Cart Button */}
-                  <button
-                    type="button"
-                    onClick={() => addToCart(prod, "M")}
-                    aria-label={`Add ${prod.title} to bag`}
-                    style={{
-                      width: "44px",
-                      height: "44px",
-                      borderRadius: "5px",
-                      backgroundColor: "#111110",
-                      color: "#FFFFFF",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "transform 0.15s ease, background-color 0.15s ease",
-                    }}
-                    className="add-to-cart-btn"
-                  >
-                    <ShoppingBag size={14} />
-                  </button>
-                </div>
-              </motion.div>
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[2].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
             ))}
           </div>
         </div>
-      </motion.section>
+      </section>
+
+      {/* Section D: BOTTOMS (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[3].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[3].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[3].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[3].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[3].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[3].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[3].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section E: JACKETS (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[4].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[4].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[4].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[4].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[4].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[4].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[4].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section F: ACCESSORIES (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[5].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[5].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[5].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[5].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[5].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[5].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[5].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* 5. TRUST / FEATURES STRIP (4 Pillars) */}
-      <section style={{ padding: "0 0 64px 0" }} className="features-section">
+      <section style={{ padding: "16px 0 54px 0" }} className="features-section">
         <div className="container">
           <div
             style={{
@@ -1248,13 +1203,12 @@ export default function HomePage() {
               gridTemplateColumns: "repeat(4, 1fr)",
               gap: "24px",
               padding: "24px 32px",
-              backgroundColor: "rgba(255, 255, 255, 0.65)",
+              backgroundColor: "rgba(255, 255, 255, 0.75)",
               borderRadius: "12px",
               border: "1px solid rgba(0, 0, 0, 0.05)",
             }}
             className="features-strip-grid"
           >
-            {/* Feature 1 */}
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <Gem size={24} strokeWidth={1.7} color="#151413" />
               <div>
@@ -1262,12 +1216,11 @@ export default function HomePage() {
                   Premium Fabrics
                 </h4>
                 <p style={{ fontSize: "11px", color: "#78726A" }}>
-                  Soft, durable & breathable
+                  Heavyweight 260-450 GSM
                 </p>
               </div>
             </div>
 
-            {/* Feature 2 */}
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <Feather size={24} strokeWidth={1.7} color="#151413" />
               <div>
@@ -1280,7 +1233,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Feature 3 */}
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <Package size={24} strokeWidth={1.7} color="#151413" />
               <div>
@@ -1293,7 +1245,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Feature 4 */}
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <ShieldCheck size={25} strokeWidth={1.7} color="#151413" />
               <div>
@@ -1318,12 +1269,11 @@ export default function HomePage() {
               gridTemplateColumns: "1.1fr 1fr",
               borderRadius: "14px",
               overflow: "hidden",
-              backgroundColor: "var(--bg-sand-bar)",
+              backgroundColor: "var(--bg-sand-bar, #EFECE4)",
               border: "1px solid rgba(0, 0, 0, 0.05)",
             }}
             className="brand-story-grid"
           >
-            {/* Left Content */}
             <div
               style={{
                 padding: "clamp(36px, 5vw, 60px)",
@@ -1334,7 +1284,7 @@ export default function HomePage() {
             >
               <h2
                 style={{
-                  fontFamily: "var(--font-body)",
+                  fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
                   fontSize: "clamp(32px, 4vw, 44px)",
                   fontWeight: 900,
                   lineHeight: 1.0,
@@ -1347,7 +1297,6 @@ export default function HomePage() {
                 MORE THAN<br />
                 CLOTHING.
               </h2>
-
               <p
                 style={{
                   fontSize: "14px",
@@ -1359,7 +1308,6 @@ export default function HomePage() {
               >
                 NXTVIE is a mindset — inspired by Asian culture, built for the new generation. Minimal. Modern. Always Evolving.
               </p>
-
               <div>
                 <Link
                   href="/about"
@@ -1374,6 +1322,7 @@ export default function HomePage() {
                     fontSize: "13px",
                     fontWeight: 600,
                     letterSpacing: "0.01em",
+                    textDecoration: "none",
                     transition: "all 0.2s ease",
                   }}
                   className="story-cta-btn"
@@ -1384,7 +1333,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right Architectural Back-Print Image */}
             <div
               style={{
                 position: "relative",
@@ -1410,10 +1358,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 7. FOLLOW @NXTVIE / INSTAGRAM SOCIAL GALLERY (7 Photos) */}
+      {/* 7. FOLLOW @NXTVIE / INSTAGRAM SOCIAL GALLERY */}
       <section style={{ padding: "0 0 76px 0" }} className="gallery-section">
         <div className="container">
-          {/* Header */}
           <div
             style={{
               display: "flex",
@@ -1426,7 +1373,7 @@ export default function HomePage() {
             <div>
               <h2
                 style={{
-                  fontFamily: "var(--font-body)",
+                  fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
                   fontSize: "20px",
                   fontWeight: 900,
                   letterSpacing: "0.04em",
@@ -1459,6 +1406,7 @@ export default function HomePage() {
                 fontSize: "12.5px",
                 fontWeight: 600,
                 color: "#121110",
+                textDecoration: "none",
                 transition: "opacity 0.2s ease",
               }}
               className="view-all-link"
@@ -1468,7 +1416,6 @@ export default function HomePage() {
             </a>
           </div>
 
-          {/* 7 Photos Grid */}
           <div
             style={{
               display: "grid",
@@ -1512,44 +1459,37 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Global Scoped Page Styles */}
+      {/* Optimized Stylesheet (Instant First Paint + 2-Card Layout + Responsive) */}
       <style jsx global>{`
-        /* Hero Interactions & Animations */
+        /* Global Page Smoothness */
+        .cinematic-hero-section {
+          content-visibility: auto;
+        }
+
+        /* Hero Interactions */
         @media (hover: hover) and (pointer: fine) {
           .carousel-arrow-btn:hover {
             background-color: rgba(255, 255, 255, 0.25) !important;
             border-color: rgba(255, 255, 255, 0.5) !important;
             transform: translateY(-50%) scale(1.08) !important;
           }
-
           .hero-secondary-btn:hover {
             background-color: rgba(255, 255, 255, 0.2) !important;
             border-color: rgba(255, 255, 255, 0.6) !important;
             transform: translateY(-2px);
           }
-
-          .banner-cta-outline:hover {
-            background-color: rgba(255, 255, 255, 0.22) !important;
-            border-color: rgba(255, 255, 255, 0.6) !important;
-            transform: translateY(-2px);
-          }
-
           .banner-cta-white:hover {
             background-color: #F0EDE6 !important;
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
           }
-
           .story-cta-btn:hover {
             background-color: #2D2A26 !important;
             transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
           }
-
-          /* Category Card Hover */
           .category-card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
           }
           .category-card:hover .cat-img {
             transform: scale(1.05);
@@ -1557,34 +1497,403 @@ export default function HomePage() {
           .category-card:hover .cat-arrow {
             transform: translateX(3px);
           }
+          .gallery-item:hover .gallery-img {
+            transform: scale(1.06);
+          }
+        }
 
-          /* Product Card Hover */
-          .product-card:hover .product-img {
+        /* Category Preview Bar */
+        .section-title-wrap {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        }
+        .section-eyebrow {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          color: #8C8478;
+          text-transform: uppercase;
+          display: block;
+          margin-bottom: 4px;
+        }
+        .section-heading-sm {
+          font-family: var(--font-body, 'Plus Jakarta Sans', sans-serif);
+          font-size: 20px;
+          font-weight: 900;
+          letter-spacing: 0.02em;
+          color: #121110;
+          text-transform: uppercase;
+          line-height: 1.1;
+          margin: 0;
+        }
+        .view-all-text-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #121110;
+          text-decoration: none;
+          transition: opacity 0.2s ease;
+        }
+        .view-all-text-link:hover {
+          opacity: 0.7;
+        }
+
+        .category-card {
+          display: flex;
+          flex-direction: column;
+          border-radius: 10px;
+          overflow: hidden;
+          background-color: var(--bg-sand-bar, #EFECE4);
+          border: 1px solid rgba(0, 0, 0, 0.05);
+          text-decoration: none;
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .category-card-media {
+          width: 100%;
+          height: 145px;
+          overflow: hidden;
+          background-color: #DDD8CE;
+        }
+        .cat-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.35s ease;
+        }
+        .category-card-footer {
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background-color: var(--bg-sand-bar, #EFECE4);
+        }
+        .cat-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: #181716;
+        }
+        .cat-arrow {
+          color: #181716;
+          transition: transform 0.2s ease;
+        }
+
+        /* ---------------------------------------------------- */
+        /* CATEGORY SHOWCASE SECTION & 2-CARD LAYOUT STYLES     */
+        /* ---------------------------------------------------- */
+        .category-showcase-section {
+          padding: 38px 0 46px 0;
+          border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .category-showcase-header {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 22px;
+        }
+
+        .category-badge-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background-color: rgba(0, 0, 0, 0.05);
+          padding: 4px 12px;
+          border-radius: 9999px;
+          font-size: 10.5px;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          color: #4A453F;
+          text-transform: uppercase;
+          margin-bottom: 6px;
+        }
+        .badge-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background-color: var(--accent-next, #C78D4E);
+        }
+
+        .category-showcase-title {
+          font-family: var(--font-body, 'Plus Jakarta Sans', sans-serif);
+          font-size: clamp(24px, 3vw, 32px);
+          font-weight: 900;
+          letter-spacing: -0.01em;
+          color: #121110;
+          text-transform: uppercase;
+          line-height: 1.05;
+          margin: 0;
+        }
+
+        .category-showcase-tagline {
+          font-size: 13.5px;
+          color: #6C665E;
+          margin-top: 5px;
+          max-width: 540px;
+          line-height: 1.45;
+        }
+
+        .see-all-cta-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background-color: #121110;
+          color: #FFFFFF;
+          padding: 10px 22px;
+          border-radius: 9999px;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .see-all-cta-btn:hover {
+          background-color: var(--accent-next, #C78D4E);
+          color: #FFFFFF;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        }
+
+        /* 2-CARD LAYOUT GRID */
+        .two-card-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 24px;
+        }
+
+        .two-card-item {
+          display: flex;
+          flex-direction: column;
+          background-color: #FFFFFF;
+          border-radius: 14px;
+          overflow: hidden;
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+          .two-card-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+          }
+          .two-card-item:hover .two-card-img {
             transform: scale(1.04);
           }
-          .add-to-cart-btn:hover {
-            background-color: var(--accent-next) !important;
-            transform: scale(1.08);
+          .two-card-item:hover .two-card-quick-view-btn {
+            opacity: 1 !important;
+            transform: translateX(-50%) translateY(0) !important;
+            pointer-events: auto !important;
           }
-          .view-all-link:hover {
-            opacity: 0.7;
-            transform: translateX(2px);
-          }
-          .shop-now-link:hover {
-            opacity: 0.75;
-          }
+        }
 
-          /* Gallery Hover */
-          .gallery-item:hover .gallery-img {
-            transform: scale(1.08);
-          }
+        .two-card-media-box {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 3.8;
+          overflow: hidden;
+          background-color: #E2DDD4;
+        }
+
+        .two-card-img-link {
+          display: block;
+          width: 100%;
+          height: 100%;
+        }
+
+        .two-card-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center top;
+          display: block;
+          transition: transform 0.4s ease;
+        }
+
+        .two-card-badge {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          background-color: #FFFFFF;
+          color: #121110;
+          font-size: 11px;
+          font-weight: 800;
+          padding: 4px 10px;
+          border-radius: 9999px;
+          letter-spacing: 0.02em;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+          pointer-events: none;
+        }
+
+        .two-card-wishlist-btn {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background-color: rgba(255, 255, 255, 0.92);
+          border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          transition: transform 0.2s ease, background-color 0.2s ease;
+          z-index: 2;
+        }
+        .two-card-wishlist-btn:hover {
+          transform: scale(1.1);
+          background-color: #FFFFFF;
+        }
+
+        .two-card-quick-view-btn {
+          position: absolute;
+          bottom: 12px;
+          left: 50%;
+          transform: translateX(-50%) translateY(10px);
+          background-color: #FFFFFF;
+          color: #111110;
+          border: none;
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 8px 16px;
+          border-radius: 9999px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.25s ease;
+          cursor: pointer;
+          white-space: nowrap;
+          z-index: 2;
+        }
+
+        .two-card-content {
+          padding: 16px 18px 18px;
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+        }
+
+        .two-card-meta-row {
+          margin-bottom: 12px;
+        }
+
+        .two-card-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #181715;
+          margin: 0 0 6px 0;
+          line-height: 1.35;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .two-card-title a {
+          color: inherit;
+          text-decoration: none;
+        }
+        .two-card-title a:hover {
+          color: var(--accent-next, #C78D4E);
+        }
+
+        .two-card-price-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .two-card-price {
+          font-size: 15px;
+          font-weight: 800;
+          color: #151413;
+        }
+        .two-card-original-price {
+          font-size: 12.5px;
+          font-weight: 500;
+          color: #8C867E;
+          text-decoration: line-through;
+        }
+
+        .two-card-action-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-top: auto;
+          padding-top: 10px;
+          border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .two-card-colors {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .two-card-color-dot {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          cursor: pointer;
+          transition: transform 0.15s ease;
+          padding: 0;
+        }
+        .two-card-color-dot:hover {
+          transform: scale(1.15);
+        }
+
+        .two-card-add-cart-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background-color: #111110;
+          color: #FFFFFF;
+          border: none;
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background-color 0.2s ease, transform 0.15s ease;
+        }
+        .two-card-add-cart-btn:hover {
+          background-color: var(--accent-next, #C78D4E);
+          transform: translateY(-1px);
+        }
+
+        /* Collections Split Banners */
+        .urban-banner {
+          position: relative;
+          border-radius: 12px;
+          overflow: hidden;
+          min-height: 360px;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
+          padding: 44px 40px;
+        }
+
+        .premium-basics-banner {
+          border-radius: 12px;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          background-color: var(--bg-sand-bar, #EFECE4);
+          border: 1px solid rgba(0, 0, 0, 0.05);
         }
 
         /* Responsive Breakpoints */
         @media (max-width: 1024px) {
-          .best-sellers-grid {
+          .categories-grid {
             grid-template-columns: repeat(3, 1fr) !important;
-            gap: 16px !important;
           }
           .gallery-grid {
             grid-template-columns: repeat(4, 1fr) !important;
@@ -1596,9 +1905,6 @@ export default function HomePage() {
         }
 
         @media (max-width: 860px) {
-          .categories-grid {
-            grid-template-columns: repeat(3, 1fr) !important;
-          }
           .collections-split-grid {
             grid-template-columns: 1fr !important;
           }
@@ -1621,400 +1927,149 @@ export default function HomePage() {
         }
 
         @media (max-width: 580px) {
-          .categories-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-          .best-sellers-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-          .best-sellers-grid > .product-card {
-            min-width: 0;
-          }
-          .gallery-grid {
-            grid-template-columns: repeat(3, 1fr) !important;
-          }
-          .features-strip-grid {
-            grid-template-columns: 1fr !important;
-          }
-          .hero-trust-bar-grid {
-            grid-template-columns: 1fr !important;
-            gap: 12px !important;
-          }
-          .hero-content-col {
-            padding-top: 20px;
-          }
-        }
-
-        /* Phone layout: keep the opening view focused and make repeated content scannable. */
-        .mobile-section-heading {
-          display: none;
-        }
-
-        @media (max-width: 580px) {
           .cinematic-hero-section {
-            min-height: clamp(540px, 82svh, 680px) !important;
+            min-height: clamp(520px, 80svh, 660px) !important;
             align-items: flex-end !important;
           }
-
           .cinematic-hero-section > .container {
-            padding-top: 28px !important;
-            padding-bottom: 76px !important;
+            padding-top: 24px !important;
+            padding-bottom: 68px !important;
           }
-
-          .hero-slide-pane > img {
-            object-position: center 28% !important;
-          }
-
           .hero-script-tag {
             display: none !important;
           }
-
-          .hero-content-col {
-            max-width: none !important;
-            padding-top: 0 !important;
-          }
-
           .hero-headline {
-            font-size: clamp(40px, 11.5vw, 56px) !important;
+            font-size: clamp(38px, 11vw, 52px) !important;
             line-height: 0.96 !important;
-            letter-spacing: -0.045em !important;
+            letter-spacing: -0.04em !important;
             margin-bottom: 14px !important;
           }
-
           .hero-subtext {
-            max-width: 30rem !important;
             font-size: 13px !important;
-            line-height: 1.5 !important;
-            margin-bottom: 22px !important;
+            margin-bottom: 20px !important;
           }
-
           .hero-cta-row {
-            display: flex !important;
             flex-direction: column !important;
             align-items: stretch !important;
-            gap: 6px !important;
-            margin-bottom: 0 !important;
+            gap: 8px !important;
           }
-
           .hero-cta-row > a {
             width: 100% !important;
             justify-content: center !important;
           }
 
-          .hero-cta-row > a:first-child {
-            padding: 13px 18px !important;
-            min-height: 44px;
-          }
-
-          .hero-cta-row > a:last-child {
-            border-color: transparent !important;
-            background-color: transparent !important;
-            padding: 8px 16px !important;
-            font-size: 12px !important;
-            text-decoration: underline;
-            text-underline-offset: 4px;
-            min-height: 44px;
-          }
-
+          /* Trust bar mobile */
           .hero-trust-bar-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 0 !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
           }
-
           .hero-trust-bar-grid > div {
-            min-height: 58px;
-            padding: 10px 8px;
-            gap: 8px !important;
+            padding: 6px 4px;
           }
-
-          .hero-trust-bar-grid > div:nth-child(odd) {
-            border-right: 1px solid rgba(0, 0, 0, 0.08);
-          }
-
-          .hero-trust-bar-grid > div:nth-child(-n + 2) {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-          }
-
-          .hero-trust-bar-grid svg {
-            width: 18px !important;
-            height: 18px !important;
-            flex: 0 0 auto;
-          }
-
           .hero-trust-bar-grid span:first-child {
-            font-size: 10.5px !important;
+            font-size: 11px !important;
           }
-
           .hero-trust-bar-grid span:last-child {
             display: none;
           }
 
-          .categories-section {
-            padding: 26px 0 42px !important;
-          }
-
-          .mobile-section-heading {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 14px;
-          }
-
-          .mobile-section-heading h2 {
-            color: #121110;
-            font-size: 18px;
-            font-weight: 900;
-            letter-spacing: 0.02em;
-            line-height: 1.1;
-          }
-
-          .mobile-section-heading p {
-            color: #736d66;
-            font-size: 11.5px;
-            margin-top: 4px;
-          }
-
-          .mobile-section-heading a {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            color: #121110;
-            flex: 0 0 auto;
-            font-size: 11.5px;
-            font-weight: 700;
-            min-height: 44px;
-          }
-
+          /* Category horizontal scroll bar */
           .categories-grid {
             display: flex !important;
-            grid-template-columns: none !important;
             gap: 10px !important;
             margin: 0 -16px !important;
             padding: 0 16px 8px !important;
             overflow-x: auto;
             scroll-snap-type: x mandatory;
-            scroll-padding-inline: 16px;
-            overscroll-behavior-x: contain;
-            touch-action: pan-x;
             scrollbar-width: none;
           }
+          .categories-grid::-webkit-scrollbar {
+            display: none;
+          }
+          .category-card {
+            flex: 0 0 135px !important;
+            scroll-snap-align: start;
+          }
+          .category-card-media {
+            height: 130px !important;
+          }
 
-          .categories-grid::-webkit-scrollbar,
-          .gallery-grid::-webkit-scrollbar {
+          /* 2-Card Layout on Mobile */
+          .two-card-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+          }
+          .two-card-media-box {
+            aspect-ratio: 3 / 3.8;
+          }
+          .two-card-content {
+            padding: 12px 10px 14px;
+          }
+          .two-card-title {
+            font-size: 13px;
+          }
+          .two-card-price {
+            font-size: 13.5px;
+          }
+          .two-card-original-price {
+            font-size: 11px;
+          }
+          .two-card-color-dot {
+            width: 20px;
+            height: 20px;
+          }
+          .two-card-add-cart-btn {
+            padding: 6px 10px;
+            font-size: 11px;
+          }
+          .add-cart-text {
             display: none;
           }
 
-           .category-card {
-             flex: 0 0 148px !important;
-             scroll-snap-align: start;
-             border-radius: 12px !important;
-           }
-
-           .category-card-motion {
-             flex: 0 0 148px !important;
-             min-width: 0;
-           }
-
-          .category-card-media {
-            height: 168px !important;
-          }
-
-          .category-card > div:last-child {
-            padding: 10px !important;
-          }
-
-          .category-card > div:last-child span {
-            font-size: 12px !important;
-          }
-
-          .collections-section,
-          .best-sellers-section,
-          .features-section,
-          .brand-story-section,
-          .gallery-section {
-            padding-bottom: 48px !important;
-          }
-
-          .collections-split-grid {
-            gap: 12px !important;
-          }
-
-          .urban-banner {
-            min-height: 294px !important;
-            padding: 26px 22px !important;
-            border-radius: 12px !important;
-          }
-
-          .urban-banner h2 {
-            font-size: clamp(25px, 8.5vw, 34px) !important;
-          }
-
-          .urban-banner p {
-            font-size: 12px !important;
-            line-height: 1.45 !important;
-          }
-
-          .premium-basics-banner {
-            min-height: 0 !important;
-          }
-
-          .premium-basics-banner > div:first-child {
-            height: 168px !important;
-          }
-
-          .premium-basics-banner > div:last-child {
-            padding: 20px 22px !important;
-          }
-
-          .product-section-header {
+          .category-showcase-header {
             align-items: flex-start !important;
-            gap: 12px;
-            margin-bottom: 18px !important;
+            gap: 10px;
+            margin-bottom: 14px;
           }
-
-          .product-section-header h2 {
+          .category-showcase-title {
             font-size: 20px !important;
           }
-
-          .product-section-header p {
-            font-size: 11.5px !important;
-            line-height: 1.4;
-            max-width: 190px;
+          .category-showcase-tagline {
+            display: none;
+          }
+          .see-all-cta-btn {
+            padding: 6px 14px;
+            font-size: 11.5px;
           }
 
-          .best-sellers-grid {
-            gap: 22px 10px !important;
+          /* Urban banner */
+          .urban-banner {
+            min-height: 280px !important;
+            padding: 24px 20px !important;
+          }
+          .urban-banner h2 {
+            font-size: 28px !important;
           }
 
-          .product-card h3 {
-            min-height: 32px;
-            white-space: normal !important;
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
-            overflow: hidden;
-            font-size: 12px !important;
-          }
-
-          .product-card .add-to-cart-btn {
-            width: 44px !important;
-            height: 44px !important;
-          }
-
-          .product-card button[aria-label^="Select"] {
-            width: 28px !important;
-            height: 28px !important;
-          }
-
+          /* Features strip */
           .features-strip-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 0 !important;
-            padding: 8px !important;
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+            padding: 16px !important;
           }
 
-          .features-strip-grid > div {
-            min-height: 58px;
-            padding: 10px 8px;
-            gap: 8px !important;
-          }
-
-          .features-strip-grid > div:nth-child(odd) {
-            border-right: 1px solid rgba(0, 0, 0, 0.08);
-          }
-
-          .features-strip-grid > div:nth-child(-n + 2) {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-          }
-
-          .features-strip-grid svg {
-            width: 20px !important;
-            height: 20px !important;
-            flex: 0 0 auto;
-          }
-
-          .features-strip-grid h4 {
-            font-size: 10.5px !important;
-          }
-
-          .features-strip-grid p {
-            font-size: 9.5px !important;
-            line-height: 1.3;
-          }
-
-          .brand-story-grid > div:first-child {
-            padding: 28px 22px !important;
-          }
-
-          .brand-story-grid > div:last-child {
-            min-height: 230px !important;
-          }
-
-          .gallery-section-header {
-            align-items: flex-start !important;
-            flex-direction: column;
-            gap: 10px;
-          }
-
-          .gallery-section-header > a {
-            font-size: 11.5px !important;
-          }
-
+          /* Gallery */
           .gallery-grid {
             display: flex !important;
-            grid-template-columns: none !important;
-            gap: 10px !important;
-            margin-right: -16px;
-            padding-right: 16px;
-            padding-bottom: 6px;
             overflow-x: auto;
-            scroll-snap-type: x mandatory;
-            scroll-padding-inline: 16px;
-            overscroll-behavior-x: contain;
-            touch-action: pan-x;
+            gap: 10px !important;
             scrollbar-width: none;
           }
-
+          .gallery-grid::-webkit-scrollbar {
+            display: none;
+          }
           .gallery-item {
-            flex: 0 0 150px !important;
-            aspect-ratio: 4 / 5 !important;
-            scroll-snap-align: start;
-          }
-        }
-
-        @media (max-width: 360px) {
-          .cinematic-hero-section {
-            min-height: 540px !important;
-          }
-
-          .hero-headline {
-            font-size: 38px !important;
-          }
-
-           .category-card {
-             flex-basis: 140px !important;
-           }
-
-           .category-card-motion {
-             flex-basis: 140px !important;
-           }
-
-           .product-section-header > a {
-             font-size: 11px !important;
-           }
-        }
-
-        @media (min-width: 480px) and (max-width: 580px) {
-          .categories-grid {
-            margin-inline: -20px !important;
-            padding-inline: 20px !important;
-            scroll-padding-inline: 20px;
-          }
-
-          .gallery-grid {
-            margin-right: -20px;
-            padding-right: 20px;
-            scroll-padding-inline: 20px;
+            flex: 0 0 140px !important;
           }
         }
       `}</style>
