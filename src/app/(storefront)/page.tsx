@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowRight,
   ShoppingBag,
@@ -12,11 +11,11 @@ import {
   Gem,
   Feather,
   Package,
-  Check,
   ChevronLeft,
   ChevronRight,
   Sparkles,
 } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useStore, ProductItem } from "@/components/store-context";
 
 // Best Selling Products matching reference image with Indian Rupee pricing
@@ -127,15 +126,15 @@ const CATEGORIES = [
   { name: "Accessories", image: "/images/nxtvie/cat-accessories.jpg", href: "/categories/accessories" },
 ];
 
-// 7 Social Gallery Photos from reference
+// Social gallery photos use clean campaign/product imagery without embedded UI copy.
 const GALLERY_PHOTOS = [
-  { id: 1, image: "/images/nxtvie/gallery-1.jpg", alt: "NXTVIE black essential tee on brutalist steps" },
-  { id: 2, image: "/images/nxtvie/gallery-2.jpg", alt: "NXTVIE cream hoodie minimal styling" },
-  { id: 3, image: "/images/nxtvie/gallery-3.jpg", alt: "NXTVIE black cap lightning crest close up" },
-  { id: 4, image: "/images/nxtvie/gallery-4.jpg", alt: "NXTVIE streetwear lookbook cargo pants" },
-  { id: 5, image: "/images/nxtvie/gallery-5.jpg", alt: "NXTVIE oversized hoodie relaxed fit" },
-  { id: 6, image: "/images/nxtvie/gallery-6.jpg", alt: "NXTVIE cream tee oversized lightning back print" },
-  { id: 7, image: "/images/nxtvie/gallery-7.jpg", alt: "NXTVIE washed hoodie with minimal chest branding" },
+  { id: 1, image: "/images/nxtvie/hero-model.jpg", alt: "NXTVIE relaxed streetwear look on concrete steps" },
+  { id: 2, image: "/images/nxtvie/promo-jackets-hd.jpg", alt: "NXTVIE technical jacket editorial look" },
+  { id: 3, image: "/images/nxtvie/promo-asian-minimal-hd.jpg", alt: "NXTVIE minimal hoodie editorial look" },
+  { id: 4, image: "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg", alt: "NXTVIE relaxed olive shirt and cargo styling" },
+  { id: 5, image: "/images/nxtvie/product-core-hoodie-hd.jpg", alt: "NXTVIE heavyweight hoodie streetwear look" },
+  { id: 6, image: "/images/nxtvie/product-cargo-pants-hd.jpg", alt: "NXTVIE cargo pants urban styling" },
+  { id: 7, image: "/images/nxtvie/product-cap-hd.jpg", alt: "NXTVIE black lightning cap detail" },
 ];
 
 // Cinematic Full-Width 16:9 Hero Banner Slides
@@ -215,13 +214,13 @@ const CINEMATIC_HERO_SLIDES = [
 ];
 
 export default function HomePage() {
-  const { addToCart, showToast } = useStore();
+  const { addToCart } = useStore();
+  const shouldReduceMotion = useReducedMotion();
   const [selectedColorIndex, setSelectedColorIndex] = useState<Record<string, number>>({});
 
   // Full-width cinematic hero carousel state
   const [activeSlide, setActiveSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
   const nextSlide = useCallback(() => {
     setActiveSlide((prev) => (prev + 1) % CINEMATIC_HERO_SLIDES.length);
@@ -231,27 +230,27 @@ export default function HomePage() {
     setActiveSlide((prev) => (prev - 1 + CINEMATIC_HERO_SLIDES.length) % CINEMATIC_HERO_SLIDES.length);
   }, []);
 
-  // Auto-play timer (5.5s per slide)
-  useEffect(() => {
-    if (isPaused) return;
-    const interval = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % CINEMATIC_HERO_SLIDES.length);
-    }, 5500);
-    return () => clearInterval(interval);
-  }, [isPaused]);
-
   // Touch swipe support for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
+    touchStartXRef.current = e.touches[0]?.clientX ?? null;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchStartX = touchStartXRef.current;
     if (touchStartX === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndX = e.changedTouches[0]?.clientX;
+    if (touchEndX === undefined) {
+      touchStartXRef.current = null;
+      return;
+    }
     const diff = touchStartX - touchEndX;
     if (diff > 50) nextSlide();
     else if (diff < -50) prevSlide();
-    setTouchStartX(null);
+    touchStartXRef.current = null;
+  };
+
+  const handleTouchCancel = () => {
+    touchStartXRef.current = null;
   };
 
   const handleColorSelect = (productId: string, idx: number) => {
@@ -269,28 +268,39 @@ export default function HomePage() {
           width: "100%",
           minHeight: "clamp(540px, 80vh, 760px)",
           overflow: "hidden",
+          touchAction: "pan-y",
+          overscrollBehaviorX: "contain",
           backgroundColor: "#0D0C0A",
           display: "flex",
           alignItems: "center",
         }}
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
+        aria-roledescription="carousel"
+        aria-label="NXTVIE seasonal collections"
         className="cinematic-hero-section"
       >
+        <span className="sr-only" aria-live="polite">
+          Slide {activeSlide + 1} of {CINEMATIC_HERO_SLIDES.length}: {currentSlide.tag}
+        </span>
+
         {/* Slides Stack */}
         {CINEMATIC_HERO_SLIDES.map((slide, idx) => {
           const isActive = idx === activeSlide;
           return (
             <div
               key={slide.id}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${idx + 1} of ${CINEMATIC_HERO_SLIDES.length}: ${slide.tag}`}
+              aria-hidden={!isActive}
               style={{
                 position: "absolute",
                 inset: 0,
                 opacity: isActive ? 1 : 0,
                 pointerEvents: isActive ? "auto" : "none",
-                transition: "opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: shouldReduceMotion ? "none" : "opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1)",
                 zIndex: isActive ? 1 : 0,
               }}
               className="hero-slide-pane"
@@ -299,6 +309,9 @@ export default function HomePage() {
               <img
                 src={slide.image}
                 alt={slide.alt}
+                loading={idx === 0 ? "eager" : "lazy"}
+                fetchPriority={idx === 0 ? "high" : "low"}
+                decoding="async"
                 style={{
                   position: "absolute",
                   inset: 0,
@@ -306,8 +319,8 @@ export default function HomePage() {
                   height: "100%",
                   objectFit: "cover",
                   objectPosition: slide.objectPosition,
-                  transform: isActive ? "scale(1.02)" : "scale(1.08)",
-                  transition: "transform 6s cubic-bezier(0.25, 1, 0.5, 1)",
+                   transform: shouldReduceMotion ? "none" : isActive ? "scale(1.02)" : "scale(1.08)",
+                   transition: shouldReduceMotion ? "none" : "transform 6s cubic-bezier(0.25, 1, 0.5, 1)",
                   filter: "brightness(0.92)",
                 }}
               />
@@ -345,8 +358,8 @@ export default function HomePage() {
                   alignItems: "flex-end",
                   pointerEvents: "none",
                   opacity: isActive ? 1 : 0,
-                  transform: isActive ? "translateY(0)" : "translateY(10px)",
-                  transition: "all 0.8s ease 0.3s",
+                   transform: shouldReduceMotion ? "none" : isActive ? "translateY(0)" : "translateY(10px)",
+                   transition: shouldReduceMotion ? "none" : "all 0.8s ease 0.3s",
                 }}
                 className="hero-script-tag"
               >
@@ -408,7 +421,14 @@ export default function HomePage() {
             paddingBottom: "80px",
           }}
         >
-          <div style={{ maxWidth: "600px" }} className="hero-content-col">
+          <motion.div
+            key={`hero-content-${activeSlide}`}
+            style={{ maxWidth: "600px" }}
+            className="hero-content-col"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
+          >
             {/* Tag / Eyebrow Pill */}
             <div
               style={{
@@ -427,6 +447,7 @@ export default function HomePage() {
                 marginBottom: "20px",
                 border: "1px solid rgba(255, 255, 255, 0.18)",
               }}
+              className="hero-transparent-pill"
             >
               <span
                 style={{
@@ -456,7 +477,6 @@ export default function HomePage() {
                 textTransform: "uppercase",
                 marginBottom: "20px",
                 textShadow: "0 2px 16px rgba(0, 0, 0, 0.45)",
-                animation: "heroTextFadeIn 0.6s ease forwards",
               }}
               className="hero-headline"
             >
@@ -476,7 +496,6 @@ export default function HomePage() {
                 maxWidth: "460px",
                 marginBottom: "36px",
                 textShadow: "0 1px 4px rgba(0, 0, 0, 0.4)",
-                animation: "heroTextFadeIn 0.7s ease forwards",
               }}
               className="hero-subtext"
             >
@@ -492,6 +511,7 @@ export default function HomePage() {
                 flexWrap: "wrap",
                 marginBottom: "28px",
               }}
+              className="hero-cta-row"
             >
               <Link
                 href={currentSlide.primaryHref}
@@ -537,12 +557,13 @@ export default function HomePage() {
                 <span>{currentSlide.secondaryCta}</span>
               </Link>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Carousel Arrow Controls (Left & Right) */}
         <button
           onClick={prevSlide}
+          type="button"
           aria-label="Previous slide"
           style={{
             position: "absolute",
@@ -569,6 +590,7 @@ export default function HomePage() {
 
         <button
           onClick={nextSlide}
+          type="button"
           aria-label="Next slide"
           style={{
             position: "absolute",
@@ -593,67 +615,6 @@ export default function HomePage() {
           <ChevronRight size={22} />
         </button>
 
-        {/* Bottom Pagination & Progress Controls */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: "28px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 20,
-            display: "flex",
-            alignItems: "center",
-            gap: "16px",
-            backgroundColor: "rgba(18, 17, 16, 0.75)",
-            backdropFilter: "blur(14px)",
-            padding: "8px 20px",
-            borderRadius: "9999px",
-            border: "1px solid rgba(255, 255, 255, 0.15)",
-          }}
-          className="carousel-bottom-nav"
-        >
-          <span
-            style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              color: "rgba(255, 255, 255, 0.6)",
-              letterSpacing: "0.1em",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            0{activeSlide + 1} / 0{CINEMATIC_HERO_SLIDES.length}
-          </span>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {CINEMATIC_HERO_SLIDES.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveSlide(i)}
-                aria-label={`Go to slide ${i + 1}`}
-                style={{
-                  height: "4px",
-                  width: i === activeSlide ? "32px" : "10px",
-                  borderRadius: "9999px",
-                  backgroundColor: i === activeSlide ? "#FFFFFF" : "rgba(255, 255, 255, 0.3)",
-                  transition: "all 0.3s ease",
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
-
-          <span
-            style={{
-              fontSize: "10px",
-              color: isPaused ? "rgba(255, 255, 255, 0.4)" : "#4ADE80",
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            {isPaused ? "Paused" : "Live"}
-          </span>
-        </div>
       </section>
 
       {/* LUXURY TRUST STRIP (Directly Beneath Full-Width Hero) */}
@@ -718,8 +679,24 @@ export default function HomePage() {
       </section>
 
       {/* 2. CATEGORY CARDS SECTION (Row of 5) */}
-      <section style={{ padding: "16px 0 54px 0" }}>
+      <motion.section
+        style={{ padding: "16px 0 54px 0" }}
+        className="categories-section"
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
+        whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.12 }}
+        transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
+      >
         <div className="container">
+          <div className="mobile-section-heading">
+            <div>
+              <h2>SHOP BY CATEGORY</h2>
+              <p>Build your everyday rotation.</p>
+            </div>
+            <Link href="/categories" aria-label="View all categories">
+              View all <ArrowRight size={14} />
+            </Link>
+          </div>
           <div
             style={{
               display: "grid",
@@ -728,7 +705,19 @@ export default function HomePage() {
             }}
             className="categories-grid"
           >
-            {CATEGORIES.map((cat) => (
+            {CATEGORIES.map((cat, idx) => (
+              <motion.div
+                key={`${cat.name}-motion`}
+                className="category-card-motion"
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+                whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+                viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.2 }}
+                transition={{
+                  duration: shouldReduceMotion ? 0 : 0.35,
+                  delay: shouldReduceMotion ? 0 : idx * 0.05,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              >
               <Link
                 key={cat.name}
                 href={cat.href}
@@ -752,10 +741,13 @@ export default function HomePage() {
                     overflow: "hidden",
                     backgroundColor: "#DDD8CE",
                   }}
+                  className="category-card-media"
                 >
                   <img
                     src={cat.image}
                     alt={cat.name}
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       width: "100%",
                       height: "100%",
@@ -789,13 +781,14 @@ export default function HomePage() {
                   <ArrowRight size={15} color="#181716" className="cat-arrow" />
                 </div>
               </Link>
+              </motion.div>
             ))}
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* 3. COLLECTION BANNERS (Asymmetric Split: Urban Essentials & Premium Basics) */}
-      <section style={{ padding: "0 0 64px 0" }}>
+      <section style={{ padding: "0 0 64px 0" }} className="collections-section">
         <div className="container">
           <div
             style={{
@@ -820,10 +813,12 @@ export default function HomePage() {
               className="urban-banner"
             >
               {/* Background Image */}
-              <img
-                src="/images/nxtvie/banner-urban-essentials-hd.jpg"
-                alt="NXTVIE Urban Essentials Collection"
-                style={{
+                <img
+                  src="/images/nxtvie/banner-urban-essentials-hd.jpg"
+                  alt="NXTVIE Urban Essentials Collection"
+                  loading="lazy"
+                  decoding="async"
+                  style={{
                   position: "absolute",
                   inset: 0,
                   width: "100%",
@@ -934,6 +929,8 @@ export default function HomePage() {
                 <img
                   src="/images/nxtvie/banner-premium-basics-stack-hd.jpg"
                   alt="NXTVIE Premium Folded Basics"
+                  loading="lazy"
+                  decoding="async"
                   style={{
                     width: "100%",
                     height: "100%",
@@ -1008,7 +1005,14 @@ export default function HomePage() {
       </section>
 
       {/* 4. BEST SELLING PRODUCTS SECTION (6 Items) */}
-      <section style={{ padding: "0 0 68px 0" }}>
+      <motion.section
+        style={{ padding: "0 0 68px 0" }}
+        className="best-sellers-section"
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
+        whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.08 }}
+        transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
+      >
         <div className="container">
           {/* Section Header */}
           <div
@@ -1018,6 +1022,7 @@ export default function HomePage() {
               justifyContent: "space-between",
               marginBottom: "26px",
             }}
+            className="product-section-header"
           >
             <div>
               <h2
@@ -1071,8 +1076,8 @@ export default function HomePage() {
             }}
             className="best-sellers-grid"
           >
-            {BEST_SELLERS.map((prod) => (
-              <div
+            {BEST_SELLERS.map((prod, idx) => (
+              <motion.div
                 key={prod.id}
                 style={{
                   display: "flex",
@@ -1080,6 +1085,14 @@ export default function HomePage() {
                   position: "relative",
                 }}
                 className="product-card"
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
+                whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+                viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.12 }}
+                transition={{
+                  duration: shouldReduceMotion ? 0 : 0.35,
+                  delay: shouldReduceMotion ? 0 : idx * 0.045,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
               >
                 {/* Image Container with Badge */}
                 <Link
@@ -1098,6 +1111,8 @@ export default function HomePage() {
                   <img
                     src={prod.image}
                     alt={prod.title}
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       width: "100%",
                       height: "100%",
@@ -1175,12 +1190,14 @@ export default function HomePage() {
                       return (
                         <button
                           key={idx}
+                          type="button"
                           onClick={() => handleColorSelect(prod.id, idx)}
                           aria-label={`Select ${color.name}`}
+                          aria-pressed={isSelected}
                           title={color.name}
                           style={{
-                            width: "9px",
-                            height: "9px",
+                            width: "28px",
+                            height: "28px",
                             borderRadius: "50%",
                             backgroundColor: color.hex,
                             border: isSelected ? "1.5px solid #111110" : "1px solid rgba(0,0,0,0.15)",
@@ -1197,11 +1214,12 @@ export default function HomePage() {
 
                   {/* Add to Cart Button */}
                   <button
+                    type="button"
                     onClick={() => addToCart(prod, "M")}
                     aria-label={`Add ${prod.title} to bag`}
                     style={{
-                      width: "28px",
-                      height: "28px",
+                      width: "44px",
+                      height: "44px",
                       borderRadius: "5px",
                       backgroundColor: "#111110",
                       color: "#FFFFFF",
@@ -1215,337 +1233,14 @@ export default function HomePage() {
                     <ShoppingBag size={14} />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      {/* 4.5 FULL-WIDTH CINEMATIC CAMPAIGN BANNER: MADE BY SPECIALIZED FABRICS */}
-      <section style={{ padding: "0 0 68px 0", width: "100%", overflow: "hidden" }}>
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            minHeight: "clamp(380px, 48vw, 520px)",
-            display: "flex",
-            alignItems: "center",
-            overflow: "hidden",
-            backgroundColor: "#0D0C0A",
-          }}
-          className="cinematic-specialized-banner"
-        >
-          <img
-            src="/images/cinematic/banner-outerwear-fabrics.jpg"
-            alt="NXTVIE Made By Specialized Fabrics Campaign"
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "center 30%",
-              zIndex: 0,
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "linear-gradient(to right, rgba(12, 11, 10, 0.94) 0%, rgba(12, 11, 10, 0.68) 45%, rgba(12, 11, 10, 0.25) 100%)",
-              zIndex: 1,
-            }}
-          />
-          <div className="container" style={{ position: "relative", zIndex: 2 }}>
-            <div style={{ maxWidth: "560px", padding: "40px 0" }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  backgroundColor: "rgba(255, 255, 255, 0.12)",
-                  backdropFilter: "blur(10px)",
-                  padding: "6px 14px",
-                  borderRadius: "9999px",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  letterSpacing: "0.14em",
-                  color: "#FFFFFF",
-                  textTransform: "uppercase",
-                  marginBottom: "16px",
-                  border: "1px solid rgba(255, 255, 255, 0.18)",
-                }}
-              >
-                <Sparkles size={12} color="#F2AC24" />
-                <span>Specialized Textiles // AW26</span>
-              </div>
-              <h2
-                style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: "clamp(34px, 4.6vw, 56px)",
-                  fontWeight: 900,
-                  lineHeight: 0.98,
-                  letterSpacing: "-0.03em",
-                  color: "#FFFFFF",
-                  textTransform: "uppercase",
-                  marginBottom: "16px",
-                }}
-              >
-                MADE BY<br />
-                <span style={{ color: "#E29D52" }}>SPECIALIZED</span><br />
-                FABRICS.
-              </h2>
-              <p
-                style={{
-                  fontSize: "14px",
-                  lineHeight: 1.6,
-                  color: "rgba(255, 255, 255, 0.85)",
-                  marginBottom: "28px",
-                }}
-              >
-                Crafted with 450 GSM French Terry, pre-shrunk luxury Japanese cotton, and weather-resistant ripstop weaves engineered for modern life in motion.
-              </p>
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                <Link
-                  href="/categories/jackets"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    backgroundColor: "#FFFFFF",
-                    color: "#111110",
-                    padding: "12px 28px",
-                    borderRadius: "9999px",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    letterSpacing: "0.01em",
-                    transition: "all 0.2s ease",
-                  }}
-                  className="banner-cta-white"
-                >
-                  <span>Shop Outerwear</span>
-                  <ArrowRight size={14} />
-                </Link>
-                <Link
-                  href="/about"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    backgroundColor: "rgba(255, 255, 255, 0.12)",
-                    color: "#FFFFFF",
-                    border: "1px solid rgba(255, 255, 255, 0.3)",
-                    padding: "12px 24px",
-                    borderRadius: "9999px",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    backdropFilter: "blur(8px)",
-                    transition: "all 0.2s ease",
-                  }}
-                  className="banner-cta-outline"
-                >
-                  <span>Explore The Fabric Story</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. SPLIT PROMOTIONAL BANNERS (Jackets & Asian Minimal Modern) */}
-      <section style={{ padding: "0 0 68px 0" }}>
-        <div className="container">
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "16px",
-            }}
-            className="promos-split-grid"
-          >
-            {/* Promo 1: Jackets for Every Journey */}
-            <div
-              style={{
-                position: "relative",
-                borderRadius: "12px",
-                overflow: "hidden",
-                minHeight: "340px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "flex-end",
-                padding: "36px 32px",
-              }}
-              className="promo-card"
-            >
-              <img
-                src="/images/cinematic/banner-outerwear-fabrics.jpg"
-                alt="NXTVIE Jackets for Every Journey"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  objectPosition: "center 25%",
-                  zIndex: 0,
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background:
-                    "linear-gradient(to right, rgba(10, 9, 8, 0.85) 0%, rgba(10, 9, 8, 0.45) 55%, transparent 100%)",
-                  zIndex: 1,
-                }}
-              />
-
-              <div style={{ position: "relative", zIndex: 2, maxWidth: "320px" }}>
-                <h3
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: "clamp(26px, 3.2vw, 36px)",
-                    fontWeight: 900,
-                    lineHeight: 1.05,
-                    letterSpacing: "-0.02em",
-                    color: "#FFFFFF",
-                    textTransform: "uppercase",
-                    marginBottom: "8px",
-                  }}
-                >
-                  JACKETS<br />
-                  FOR EVERY<br />
-                  JOURNEY
-                </h3>
-
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "rgba(255, 255, 255, 0.85)",
-                    marginBottom: "20px",
-                  }}
-                >
-                  Built for the streets, made for more.
-                </p>
-
-                <Link
-                  href="/categories/jackets"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    backgroundColor: "#FFFFFF",
-                    color: "#111110",
-                    padding: "10px 22px",
-                    borderRadius: "9999px",
-                    fontSize: "12.5px",
-                    fontWeight: 700,
-                    letterSpacing: "0.01em",
-                    transition: "all 0.2s ease",
-                  }}
-                  className="banner-cta-white"
-                >
-                  <span>Shop Jackets</span>
-                  <ArrowRight size={13} />
-                </Link>
-              </div>
-            </div>
-
-            {/* Promo 2: Asian Minimal Modern */}
-            <div
-              style={{
-                position: "relative",
-                borderRadius: "12px",
-                overflow: "hidden",
-                minHeight: "340px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "flex-end",
-                alignItems: "flex-end",
-                padding: "36px 32px",
-              }}
-              className="promo-card"
-            >
-              <img
-                src="/images/cinematic/banner-asian-minimal-night.jpg"
-                alt="NXTVIE Asian Minimal Modern Collection"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  objectPosition: "center 30%",
-                  zIndex: 0,
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background:
-                    "linear-gradient(to left, rgba(10, 9, 8, 0.85) 0%, rgba(10, 9, 8, 0.45) 55%, transparent 100%)",
-                  zIndex: 1,
-                }}
-              />
-
-              <div style={{ position: "relative", zIndex: 2, maxWidth: "320px", textAlign: "left" }}>
-                <h3
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: "clamp(26px, 3.2vw, 36px)",
-                    fontWeight: 900,
-                    lineHeight: 1.05,
-                    letterSpacing: "-0.02em",
-                    color: "#FFFFFF",
-                    textTransform: "uppercase",
-                    marginBottom: "8px",
-                  }}
-                >
-                  ASIAN<br />
-                  MINIMAL<br />
-                  MODERN
-                </h3>
-
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "rgba(255, 255, 255, 0.85)",
-                    marginBottom: "20px",
-                  }}
-                >
-                  Style that moves with you.
-                </p>
-
-                <Link
-                  href="/categories/hoodies"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    backgroundColor: "#FFFFFF",
-                    color: "#111110",
-                    padding: "10px 22px",
-                    borderRadius: "9999px",
-                    fontSize: "12.5px",
-                    fontWeight: 700,
-                    letterSpacing: "0.01em",
-                    transition: "all 0.2s ease",
-                  }}
-                  className="banner-cta-white"
-                >
-                  <span>Shop Hoodies</span>
-                  <ArrowRight size={13} />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. TRUST / FEATURES STRIP (4 Pillars) */}
-      <section style={{ padding: "0 0 64px 0" }}>
+      {/* 5. TRUST / FEATURES STRIP (4 Pillars) */}
+      <section style={{ padding: "0 0 64px 0" }} className="features-section">
         <div className="container">
           <div
             style={{
@@ -1614,8 +1309,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 7. BRAND STORY SECTION (More Than Clothing) */}
-      <section style={{ padding: "0 0 68px 0" }}>
+      {/* 6. BRAND STORY SECTION (More Than Clothing) */}
+      <section style={{ padding: "0 0 68px 0" }} className="brand-story-section">
         <div className="container">
           <div
             style={{
@@ -1700,6 +1395,8 @@ export default function HomePage() {
               <img
                 src="/images/nxtvie/story-back-print-hd.jpg"
                 alt="NXTVIE Mindset Philosophy Editorial"
+                loading="lazy"
+                decoding="async"
                 style={{
                   width: "100%",
                   height: "100%",
@@ -1713,8 +1410,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 8. FOLLOW @NXTVIE / INSTAGRAM SOCIAL GALLERY (7 Photos) */}
-      <section style={{ padding: "0 0 76px 0" }}>
+      {/* 7. FOLLOW @NXTVIE / INSTAGRAM SOCIAL GALLERY (7 Photos) */}
+      <section style={{ padding: "0 0 76px 0" }} className="gallery-section">
         <div className="container">
           {/* Header */}
           <div
@@ -1724,6 +1421,7 @@ export default function HomePage() {
               justifyContent: "space-between",
               marginBottom: "20px",
             }}
+            className="gallery-section-header"
           >
             <div>
               <h2
@@ -1798,6 +1496,8 @@ export default function HomePage() {
                 <img
                   src={photo.image}
                   alt={photo.alt}
+                  loading="lazy"
+                  decoding="async"
                   style={{
                     width: "100%",
                     height: "100%",
@@ -1815,78 +1515,69 @@ export default function HomePage() {
       {/* Global Scoped Page Styles */}
       <style jsx global>{`
         /* Hero Interactions & Animations */
-        @keyframes heroTextFadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(12px);
+        @media (hover: hover) and (pointer: fine) {
+          .carousel-arrow-btn:hover {
+            background-color: rgba(255, 255, 255, 0.25) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+            transform: translateY(-50%) scale(1.08) !important;
           }
-          to {
-            opacity: 1;
-            transform: translateY(0);
+
+          .hero-secondary-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+            border-color: rgba(255, 255, 255, 0.6) !important;
+            transform: translateY(-2px);
           }
-        }
 
-        .carousel-arrow-btn:hover {
-          background-color: rgba(255, 255, 255, 0.25) !important;
-          border-color: rgba(255, 255, 255, 0.5) !important;
-          transform: translateY(-50%) scale(1.08) !important;
-        }
+          .banner-cta-outline:hover {
+            background-color: rgba(255, 255, 255, 0.22) !important;
+            border-color: rgba(255, 255, 255, 0.6) !important;
+            transform: translateY(-2px);
+          }
 
-        .hero-secondary-btn:hover {
-          background-color: rgba(255, 255, 255, 0.2) !important;
-          border-color: rgba(255, 255, 255, 0.6) !important;
-          transform: translateY(-2px);
-        }
+          .banner-cta-white:hover {
+            background-color: #F0EDE6 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+          }
 
-        .banner-cta-outline:hover {
-          background-color: rgba(255, 255, 255, 0.22) !important;
-          border-color: rgba(255, 255, 255, 0.6) !important;
-          transform: translateY(-2px);
-        }
+          .story-cta-btn:hover {
+            background-color: #2D2A26 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+          }
 
-        .banner-cta-white:hover {
-          background-color: #F0EDE6 !important;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
-        }
+          /* Category Card Hover */
+          .category-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+          }
+          .category-card:hover .cat-img {
+            transform: scale(1.05);
+          }
+          .category-card:hover .cat-arrow {
+            transform: translateX(3px);
+          }
 
-        .story-cta-btn:hover {
-          background-color: #2D2A26 !important;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
-        }
+          /* Product Card Hover */
+          .product-card:hover .product-img {
+            transform: scale(1.04);
+          }
+          .add-to-cart-btn:hover {
+            background-color: var(--accent-next) !important;
+            transform: scale(1.08);
+          }
+          .view-all-link:hover {
+            opacity: 0.7;
+            transform: translateX(2px);
+          }
+          .shop-now-link:hover {
+            opacity: 0.75;
+          }
 
-        /* Category Card Hover */
-        .category-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-        }
-        .category-card:hover .cat-img {
-          transform: scale(1.05);
-        }
-        .category-card:hover .cat-arrow {
-          transform: translateX(3px);
-        }
-
-        /* Product Card Hover */
-        .product-card:hover .product-img {
-          transform: scale(1.04);
-        }
-        .add-to-cart-btn:hover {
-          background-color: var(--accent-next) !important;
-          transform: scale(1.08);
-        }
-        .view-all-link:hover {
-          opacity: 0.7;
-          transform: translateX(2px);
-        }
-        .shop-now-link:hover {
-          opacity: 0.75;
-        }
-
-        /* Gallery Hover */
-        .gallery-item:hover .gallery-img {
-          transform: scale(1.08);
+          /* Gallery Hover */
+          .gallery-item:hover .gallery-img {
+            transform: scale(1.08);
+          }
         }
 
         /* Responsive Breakpoints */
@@ -1911,9 +1602,6 @@ export default function HomePage() {
           .collections-split-grid {
             grid-template-columns: 1fr !important;
           }
-          .promos-split-grid {
-            grid-template-columns: 1fr !important;
-          }
           .features-strip-grid {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 20px !important;
@@ -1927,6 +1615,9 @@ export default function HomePage() {
           .hero-left-scrim {
             background: linear-gradient(to top, rgba(10, 9, 8, 0.95) 0%, rgba(10, 9, 8, 0.7) 60%, rgba(10, 9, 8, 0.3) 100%) !important;
           }
+          .hero-transparent-pill {
+            display: none !important;
+          }
         }
 
         @media (max-width: 580px) {
@@ -1935,6 +1626,9 @@ export default function HomePage() {
           }
           .best-sellers-grid {
             grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .best-sellers-grid > .product-card {
+            min-width: 0;
           }
           .gallery-grid {
             grid-template-columns: repeat(3, 1fr) !important;
@@ -1948,6 +1642,379 @@ export default function HomePage() {
           }
           .hero-content-col {
             padding-top: 20px;
+          }
+        }
+
+        /* Phone layout: keep the opening view focused and make repeated content scannable. */
+        .mobile-section-heading {
+          display: none;
+        }
+
+        @media (max-width: 580px) {
+          .cinematic-hero-section {
+            min-height: clamp(540px, 82svh, 680px) !important;
+            align-items: flex-end !important;
+          }
+
+          .cinematic-hero-section > .container {
+            padding-top: 28px !important;
+            padding-bottom: 76px !important;
+          }
+
+          .hero-slide-pane > img {
+            object-position: center 28% !important;
+          }
+
+          .hero-script-tag {
+            display: none !important;
+          }
+
+          .hero-content-col {
+            max-width: none !important;
+            padding-top: 0 !important;
+          }
+
+          .hero-headline {
+            font-size: clamp(40px, 11.5vw, 56px) !important;
+            line-height: 0.96 !important;
+            letter-spacing: -0.045em !important;
+            margin-bottom: 14px !important;
+          }
+
+          .hero-subtext {
+            max-width: 30rem !important;
+            font-size: 13px !important;
+            line-height: 1.5 !important;
+            margin-bottom: 22px !important;
+          }
+
+          .hero-cta-row {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 6px !important;
+            margin-bottom: 0 !important;
+          }
+
+          .hero-cta-row > a {
+            width: 100% !important;
+            justify-content: center !important;
+          }
+
+          .hero-cta-row > a:first-child {
+            padding: 13px 18px !important;
+            min-height: 44px;
+          }
+
+          .hero-cta-row > a:last-child {
+            border-color: transparent !important;
+            background-color: transparent !important;
+            padding: 8px 16px !important;
+            font-size: 12px !important;
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            min-height: 44px;
+          }
+
+          .hero-trust-bar-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 0 !important;
+          }
+
+          .hero-trust-bar-grid > div {
+            min-height: 58px;
+            padding: 10px 8px;
+            gap: 8px !important;
+          }
+
+          .hero-trust-bar-grid > div:nth-child(odd) {
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
+          }
+
+          .hero-trust-bar-grid > div:nth-child(-n + 2) {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+          }
+
+          .hero-trust-bar-grid svg {
+            width: 18px !important;
+            height: 18px !important;
+            flex: 0 0 auto;
+          }
+
+          .hero-trust-bar-grid span:first-child {
+            font-size: 10.5px !important;
+          }
+
+          .hero-trust-bar-grid span:last-child {
+            display: none;
+          }
+
+          .categories-section {
+            padding: 26px 0 42px !important;
+          }
+
+          .mobile-section-heading {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+          }
+
+          .mobile-section-heading h2 {
+            color: #121110;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 0.02em;
+            line-height: 1.1;
+          }
+
+          .mobile-section-heading p {
+            color: #736d66;
+            font-size: 11.5px;
+            margin-top: 4px;
+          }
+
+          .mobile-section-heading a {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #121110;
+            flex: 0 0 auto;
+            font-size: 11.5px;
+            font-weight: 700;
+            min-height: 44px;
+          }
+
+          .categories-grid {
+            display: flex !important;
+            grid-template-columns: none !important;
+            gap: 10px !important;
+            margin: 0 -16px !important;
+            padding: 0 16px 8px !important;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            scroll-padding-inline: 16px;
+            overscroll-behavior-x: contain;
+            touch-action: pan-x;
+            scrollbar-width: none;
+          }
+
+          .categories-grid::-webkit-scrollbar,
+          .gallery-grid::-webkit-scrollbar {
+            display: none;
+          }
+
+           .category-card {
+             flex: 0 0 148px !important;
+             scroll-snap-align: start;
+             border-radius: 12px !important;
+           }
+
+           .category-card-motion {
+             flex: 0 0 148px !important;
+             min-width: 0;
+           }
+
+          .category-card-media {
+            height: 168px !important;
+          }
+
+          .category-card > div:last-child {
+            padding: 10px !important;
+          }
+
+          .category-card > div:last-child span {
+            font-size: 12px !important;
+          }
+
+          .collections-section,
+          .best-sellers-section,
+          .features-section,
+          .brand-story-section,
+          .gallery-section {
+            padding-bottom: 48px !important;
+          }
+
+          .collections-split-grid {
+            gap: 12px !important;
+          }
+
+          .urban-banner {
+            min-height: 294px !important;
+            padding: 26px 22px !important;
+            border-radius: 12px !important;
+          }
+
+          .urban-banner h2 {
+            font-size: clamp(25px, 8.5vw, 34px) !important;
+          }
+
+          .urban-banner p {
+            font-size: 12px !important;
+            line-height: 1.45 !important;
+          }
+
+          .premium-basics-banner {
+            min-height: 0 !important;
+          }
+
+          .premium-basics-banner > div:first-child {
+            height: 168px !important;
+          }
+
+          .premium-basics-banner > div:last-child {
+            padding: 20px 22px !important;
+          }
+
+          .product-section-header {
+            align-items: flex-start !important;
+            gap: 12px;
+            margin-bottom: 18px !important;
+          }
+
+          .product-section-header h2 {
+            font-size: 20px !important;
+          }
+
+          .product-section-header p {
+            font-size: 11.5px !important;
+            line-height: 1.4;
+            max-width: 190px;
+          }
+
+          .best-sellers-grid {
+            gap: 22px 10px !important;
+          }
+
+          .product-card h3 {
+            min-height: 32px;
+            white-space: normal !important;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+            font-size: 12px !important;
+          }
+
+          .product-card .add-to-cart-btn {
+            width: 44px !important;
+            height: 44px !important;
+          }
+
+          .product-card button[aria-label^="Select"] {
+            width: 28px !important;
+            height: 28px !important;
+          }
+
+          .features-strip-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 0 !important;
+            padding: 8px !important;
+          }
+
+          .features-strip-grid > div {
+            min-height: 58px;
+            padding: 10px 8px;
+            gap: 8px !important;
+          }
+
+          .features-strip-grid > div:nth-child(odd) {
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
+          }
+
+          .features-strip-grid > div:nth-child(-n + 2) {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+          }
+
+          .features-strip-grid svg {
+            width: 20px !important;
+            height: 20px !important;
+            flex: 0 0 auto;
+          }
+
+          .features-strip-grid h4 {
+            font-size: 10.5px !important;
+          }
+
+          .features-strip-grid p {
+            font-size: 9.5px !important;
+            line-height: 1.3;
+          }
+
+          .brand-story-grid > div:first-child {
+            padding: 28px 22px !important;
+          }
+
+          .brand-story-grid > div:last-child {
+            min-height: 230px !important;
+          }
+
+          .gallery-section-header {
+            align-items: flex-start !important;
+            flex-direction: column;
+            gap: 10px;
+          }
+
+          .gallery-section-header > a {
+            font-size: 11.5px !important;
+          }
+
+          .gallery-grid {
+            display: flex !important;
+            grid-template-columns: none !important;
+            gap: 10px !important;
+            margin-right: -16px;
+            padding-right: 16px;
+            padding-bottom: 6px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            scroll-padding-inline: 16px;
+            overscroll-behavior-x: contain;
+            touch-action: pan-x;
+            scrollbar-width: none;
+          }
+
+          .gallery-item {
+            flex: 0 0 150px !important;
+            aspect-ratio: 4 / 5 !important;
+            scroll-snap-align: start;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .cinematic-hero-section {
+            min-height: 540px !important;
+          }
+
+          .hero-headline {
+            font-size: 38px !important;
+          }
+
+           .category-card {
+             flex-basis: 140px !important;
+           }
+
+           .category-card-motion {
+             flex-basis: 140px !important;
+           }
+
+           .product-section-header > a {
+             font-size: 11px !important;
+           }
+        }
+
+        @media (min-width: 480px) and (max-width: 580px) {
+          .categories-grid {
+            margin-inline: -20px !important;
+            padding-inline: 20px !important;
+            scroll-padding-inline: 20px;
+          }
+
+          .gallery-grid {
+            margin-right: -20px;
+            padding-right: 20px;
+            scroll-padding-inline: 20px;
           }
         }
       `}</style>

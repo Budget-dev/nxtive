@@ -89,7 +89,7 @@ const SIDEBAR_ITEMS: NavSection[] = [
     icon: Star,
     href: "/admin/reviews",
     children: [
-      { label: "Pending Reviews", href: "/admin/reviews?status=pending", badge: "7" },
+      { label: "Pending Reviews", href: "/admin/reviews?status=pending" },
       { label: "Approved Reviews", href: "/admin/reviews?status=approved" },
       { label: "Rejected Reviews", href: "/admin/reviews?status=rejected" },
     ],

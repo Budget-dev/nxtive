@@ -26,8 +26,8 @@ export function OrderDetailClient({ orderId }: Props) {
   const { orders, addToCart, showToast } = useStore();
   const [copied, setCopied] = useState(false);
 
-  // Find order in store or fallback to first order matching ID pattern
-  const order = orders.find((o) => o.id.toLowerCase() === orderId.toLowerCase()) || orders[0];
+  // Never fall back to another order: an unknown id must not reveal a different customer's data.
+  const order = orders.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
 
   const handleShareTracking = () => {
     if (typeof window !== "undefined") {
@@ -58,10 +58,10 @@ export function OrderDetailClient({ orderId }: Props) {
         <div className="container" style={{ maxWidth: "560px", textAlign: "center" }}>
           <AlertCircle size={44} color="#D97706" style={{ margin: "0 auto 16px auto" }} />
           <h1 style={{ fontSize: "28px", fontWeight: 900, textTransform: "uppercase", color: "#111110" }}>
-            Order Not Found
+             Order Not Found
           </h1>
           <p style={{ fontSize: "14px", color: "#6A645C", marginTop: "8px", marginBottom: "28px" }}>
-            We couldn't locate an order with reference #{orderId}. It may have been placed in another session.
+            We couldn't locate this order in your account. Sign in with the account used at checkout and try again.
           </p>
           <Link
             href="/orders"

@@ -107,7 +107,6 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
             title="Operational Notifications"
           >
             <Bell size={19} />
-            <span className="admin-badge-count">3</span>
           </button>
 
           {showNotifications && (
@@ -146,7 +145,7 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
                     borderRadius: "9999px",
                   }}
                 >
-                  3 Action Items
+                  Live data views
                 </span>
               </div>
 
@@ -180,7 +179,7 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
                     <Package size={16} />
                   </div>
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700 }}>18 Pending Orders</div>
+                    <div style={{ fontSize: "13px", fontWeight: 700 }}>Pending orders</div>
                     <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>
                       Awaiting warehouse picking & dispatch
                     </div>
@@ -216,7 +215,7 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
                     <Star size={16} />
                   </div>
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700 }}>7 Pending Reviews</div>
+                    <div style={{ fontSize: "13px", fontWeight: 700 }}>Pending reviews</div>
                     <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>
                       Customer submissions awaiting approval
                     </div>
@@ -252,7 +251,7 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
                     <AlertTriangle size={16} />
                   </div>
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700 }}>12 Low Stock Apparel</div>
+                    <div style={{ fontSize: "13px", fontWeight: 700 }}>Low-stock inventory</div>
                     <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>
                       Items reaching reorder thresholds
                     </div>

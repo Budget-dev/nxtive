@@ -21,9 +21,7 @@ function OrderSuccessContent() {
   const orderId = searchParams.get("orderId");
   const { orders } = useStore();
 
-  const currentOrder = orderId
-    ? orders.find((o) => o.id === orderId) || orders[0]
-    : orders[0];
+  const currentOrder = orderId ? orders.find((o) => o.id === orderId) : undefined;
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "60px 0 90px 0" }}>
@@ -58,7 +56,7 @@ function OrderSuccessContent() {
               marginBottom: "8px",
             }}
           >
-            Payment Confirmed
+            {currentOrder ? "Order Confirmed" : "Order Received"}
           </span>
 
           <h1
@@ -75,8 +73,9 @@ function OrderSuccessContent() {
           </h1>
 
           <p style={{ fontSize: "14.5px", color: "#666057", maxWidth: "520px", margin: "0 auto" }}>
-            We've received your request and our fulfillment team is preparing your package. A confirmation has been dispatched to{" "}
-            <strong>{currentOrder?.shippingAddress.email || "your email"}</strong>.
+            {currentOrder
+              ? <>We've received your request and our fulfillment team is preparing your package. A confirmation has been dispatched to <strong>{currentOrder.shippingAddress.email}</strong>.</>
+              : "Your order was received. Sign in with the account used at checkout to view the protected order details."}
           </p>
         </div>
 

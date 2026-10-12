@@ -37,18 +37,20 @@ import {
 } from "@/features/admin-dashboard/server/actions";
 import type { DashboardStats } from "@/features/admin-dashboard/server/admin-data";
 import type { Product } from "@/types/product";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("Products");
   const [productSearch, setProductSearch] = useState("");
-  const [dateRange, setDateRange] = useState("1 Oct 2026 - 31 Oct 2026");
-  const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [reviewActionLoading, setReviewActionLoading] = useState<string | null>(null);
 
   const loadData = async () => {
+    setError(null);
+    setLoading(true);
     try {
       const [dashStats, prods] = await Promise.all([
         getDashboardStats(),
@@ -58,6 +60,9 @@ export default function AdminDashboardPage() {
       setProducts(prods);
     } catch (err) {
       console.error("Failed to load dashboard data", err);
+      setStats(null);
+      setProducts([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -72,8 +77,8 @@ export default function AdminDashboardPage() {
     try {
       await approveReview(id);
       await loadData();
-    } catch {
-      alert("Failed to approve review");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setReviewActionLoading(null);
     }
@@ -84,8 +89,8 @@ export default function AdminDashboardPage() {
     try {
       await rejectReview(id);
       await loadData();
-    } catch {
-      alert("Failed to reject review");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setReviewActionLoading(null);
     }
@@ -97,6 +102,17 @@ export default function AdminDashboardPage() {
         <div style={{ height: "100px", borderRadius: "12px", backgroundColor: "#FFFFFF", border: "1px solid #E8E5DF", animation: "pulse 1.2s infinite" }} />
         <div style={{ height: "340px", borderRadius: "12px", backgroundColor: "#FFFFFF", border: "1px solid #E8E5DF", animation: "pulse 1.2s infinite" }} />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <AdminDataState
+        title="Dashboard data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadData}
+      />
     );
   }
 
@@ -114,6 +130,15 @@ export default function AdminDashboardPage() {
 
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Dashboard operation failed" message={error} /></div>}
+      {stats.dataState === "empty" && (
+        <div style={{ marginBottom: "24px" }}>
+          <AdminDataState
+            title="No Firestore data yet"
+            message="Products, orders, customers, and reviews will appear here after they are created in Firestore."
+          />
+        </div>
+      )}
       {/* ─── Top Header: Title & Date Range Selector ───────────────── */}
       <div
         style={{
@@ -134,73 +159,7 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        {/* Date range picker dropdown matching reference */}
-        <div style={{ position: "relative" }}>
-          <button
-            onClick={() => setShowDateDropdown((prev) => !prev)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 14px",
-              borderRadius: "8px",
-              border: "1px solid var(--adm-border)",
-              backgroundColor: "#FFFFFF",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--adm-text-primary)",
-              cursor: "pointer",
-            }}
-          >
-            <Calendar size={14} color="var(--adm-text-muted)" />
-            <span>{dateRange}</span>
-            <ChevronDown size={14} color="var(--adm-text-muted)" />
-          </button>
-
-          {showDateDropdown && (
-            <div
-              style={{
-                position: "absolute",
-                right: 0,
-                top: "42px",
-                width: "220px",
-                backgroundColor: "#FFFFFF",
-                border: "1px solid var(--adm-border)",
-                borderRadius: "10px",
-                boxShadow: "var(--adm-shadow-dropdown)",
-                zIndex: 50,
-                padding: "6px",
-              }}
-            >
-              {[
-                "1 Oct 2026 - 31 Oct 2026",
-                "Last 7 Days",
-                "Last 30 Days",
-                "Previous Month (Sep 2026)",
-                "Year to Date (2026)",
-              ].map((range) => (
-                <div
-                  key={range}
-                  onClick={() => {
-                    setDateRange(range);
-                    setShowDateDropdown(false);
-                  }}
-                  style={{
-                    padding: "8px 12px",
-                    fontSize: "12.5px",
-                    fontWeight: range === dateRange ? 700 : 500,
-                    color: range === dateRange ? "#121110" : "var(--adm-text-secondary)",
-                    backgroundColor: range === dateRange ? "var(--adm-surface-subtle)" : "transparent",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                  }}
-                >
-                  {range}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <span style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>All recorded data</span>
       </div>
 
       {/* ─── 6 Metric Summary Cards Matching Reference ─────────────── */}
@@ -214,9 +173,8 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <div className="admin-kpi-value">{formatCurrency(stats.totalRevenue)}</div>
-          <div className="admin-kpi-trend positive">
-            <span>↑ 12%</span>
-            <span className="admin-kpi-trend-note">vs last month</span>
+          <div className="admin-kpi-trend">
+            <span className="admin-kpi-trend-note">Recorded paid orders</span>
           </div>
         </div>
 
@@ -229,9 +187,8 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <div className="admin-kpi-value">{stats.totalOrders}</div>
-          <div className="admin-kpi-trend positive">
-            <span>↑ 8%</span>
-            <span className="admin-kpi-trend-note">vs last month</span>
+          <div className="admin-kpi-trend">
+            <span className="admin-kpi-trend-note">All recorded orders</span>
           </div>
         </div>
 
@@ -244,9 +201,8 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <div className="admin-kpi-value">{stats.totalCustomers.toLocaleString()}</div>
-          <div className="admin-kpi-trend positive">
-            <span>↑ 15%</span>
-            <span className="admin-kpi-trend-note">vs last month</span>
+          <div className="admin-kpi-trend">
+            <span className="admin-kpi-trend-note">Registered customer records</span>
           </div>
         </div>
 
@@ -334,7 +290,13 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {stats.recentOrders.map((ord) => {
+                {stats.recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "28px", color: "var(--adm-text-muted)" }}>
+                      No orders have been recorded in Firestore.
+                    </td>
+                  </tr>
+                ) : stats.recentOrders.map((ord) => {
                   let badgeClass = "amber";
                   if (ord.status === "delivered") badgeClass = "green";
                   else if (ord.status === "shipped") badgeClass = "blue";
@@ -397,7 +359,11 @@ export default function AdminDashboardPage() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            {stats.pendingReviews.map((rev) => (
+            {stats.pendingReviews.length === 0 ? (
+              <div style={{ color: "var(--adm-text-muted)", fontSize: "13px", padding: "20px 0" }}>
+                No pending reviews have been recorded in Firestore.
+              </div>
+            ) : stats.pendingReviews.map((rev) => (
               <div
                 key={rev.id}
                 style={{
@@ -441,7 +407,11 @@ export default function AdminDashboardPage() {
                       ))}
                     </div>
                     <span style={{ fontSize: "11px", color: "var(--adm-text-muted)" }}>
-                      2 days ago
+                       {new Date(rev.createdAt).toLocaleDateString("en-GB", {
+                         day: "2-digit",
+                         month: "short",
+                         year: "numeric",
+                       })}
                     </span>
                   </div>
 
@@ -509,7 +479,11 @@ export default function AdminDashboardPage() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {stats.stockOverview.map((item) => {
+            {stats.stockOverview.length === 0 ? (
+              <div style={{ color: "var(--adm-text-muted)", fontSize: "13px", padding: "20px 0" }}>
+                No products with recorded stock levels are available.
+              </div>
+            ) : stats.stockOverview.map((item) => {
               let badgeClass = "green";
               if (item.status === "Low Stock") badgeClass = "amber";
               else if (item.status === "Out of Stock") badgeClass = "red";
@@ -527,7 +501,7 @@ export default function AdminDashboardPage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <img
-                      src={item.image}
+                      src={item.image || "/images/nxtvie/product-oversized-tee-hd.jpg"}
                       alt={item.name}
                       style={{
                         width: "36px",
@@ -656,9 +630,15 @@ export default function AdminDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.slice(0, 5).map((p) => {
-                    const isLow = (p.totalStock ?? 10) <= (p.lowStockThreshold ?? 10) && (p.totalStock ?? 10) > 0;
-                    const isOut = (p.totalStock ?? 10) <= 0;
+            {filteredProducts.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ textAlign: "center", padding: "28px", color: "var(--adm-text-muted)" }}>
+                  No products have been recorded in Firestore.
+                </td>
+              </tr>
+            ) : filteredProducts.slice(0, 5).map((p) => {
+                    const isLow = typeof p.totalStock === "number" && p.totalStock > 0 && typeof p.lowStockThreshold === "number" && p.totalStock <= p.lowStockThreshold;
+                    const isOut = typeof p.totalStock === "number" && p.totalStock <= 0;
 
                     return (
                       <tr key={p.id}>
@@ -692,7 +672,7 @@ export default function AdminDashboardPage() {
                         <td style={{ fontWeight: 700 }}>{formatCurrency(p.price)}</td>
                         <td>
                           <span style={{ fontWeight: 700, color: isOut ? "#C5221F" : isLow ? "#B06000" : "#121110" }}>
-                            {p.totalStock ?? 15}
+                            {typeof p.totalStock === "number" ? p.totalStock : "—"}
                           </span>
                         </td>
                         <td>
@@ -701,11 +681,13 @@ export default function AdminDashboardPage() {
                           </span>
                         </td>
                         <td style={{ fontSize: "12px", color: "var(--adm-text-muted)", whiteSpace: "nowrap" }}>
-                          {new Date(p.createdAt || Date.now()).toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {p.createdAt
+                            ? new Date(p.createdAt).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
                         </td>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -734,18 +716,11 @@ export default function AdminDashboardPage() {
             {/* Pagination matching reference image */}
             <div className="admin-pagination">
               <span style={{ fontSize: "12.5px", color: "var(--adm-text-muted)" }}>
-                Showing 1 to 5 of {products.length} products
+                Showing {Math.min(filteredProducts.length, 5)} of {filteredProducts.length} matching products
               </span>
-              <div className="admin-pagination-pages">
-                <button className="admin-page-number">‹</button>
-                <button className="admin-page-number active">1</button>
-                <button className="admin-page-number">2</button>
-                <button className="admin-page-number">3</button>
-                <button className="admin-page-number">4</button>
-                <button className="admin-page-number">5</button>
-                <span style={{ padding: "0 4px", color: "var(--adm-text-muted)" }}>...</span>
-                <button className="admin-page-number">›</button>
-              </div>
+              {filteredProducts.length > 5 && (
+                <Link href="/admin/products" className="admin-overview-link">View full catalog →</Link>
+              )}
             </div>
           </div>
 
@@ -836,7 +811,7 @@ export default function AdminDashboardPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div>
               <h3 style={{ fontSize: "18px", fontWeight: 800 }}>Customer Reviews Moderation</h3>
-              <p style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>7 reviews awaiting your approval before being displayed publicly</p>
+               <p style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>{stats.pendingReviewsCount} reviews awaiting your approval before being displayed publicly</p>
             </div>
             <Link href="/admin/reviews" className="admin-btn-primary admin-btn-sm">
               Moderate Reviews →

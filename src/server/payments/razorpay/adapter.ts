@@ -14,6 +14,13 @@ import type { RazorpayOrderResponse, RazorpayRefundResponse } from "@/types/paym
 
 export class RazorpayAdapter implements PaymentProvider {
   async createOrder(input: CreateOrderInput): Promise<RazorpayOrderResponse> {
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!key_id || !key_secret) {
+      throw new Error("Razorpay credentials are not configured");
+    }
+
     const razorpay = getRazorpayInstance();
     const order = await razorpay.orders.create({
       amount: input.amount,
@@ -26,9 +33,7 @@ export class RazorpayAdapter implements PaymentProvider {
 
   verifyPayment(input: VerifyPaymentInput): Promise<boolean> {
     const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (!secret) {
-      throw new Error("RAZORPAY_KEY_SECRET is required for signature verification");
-    }
+    if (!secret) return Promise.resolve(false);
 
     const body = `${input.orderId}|${input.paymentId}`;
     const expectedSignature = crypto
@@ -36,7 +41,9 @@ export class RazorpayAdapter implements PaymentProvider {
       .update(body)
       .digest("hex");
 
-    const isValid = expectedSignature === input.signature;
+    const expected = Buffer.from(expectedSignature, "utf8");
+    const received = Buffer.from(input.signature, "utf8");
+    const isValid = expected.length === received.length && crypto.timingSafeEqual(expected, received);
     return Promise.resolve(isValid);
   }
 
@@ -61,7 +68,9 @@ export class RazorpayAdapter implements PaymentProvider {
       .update(body)
       .digest("hex");
 
-    return expectedSignature === signature;
+    const expected = Buffer.from(expectedSignature, "utf8");
+    const received = Buffer.from(signature, "utf8");
+    return expected.length === received.length && crypto.timingSafeEqual(expected, received);
   }
 }
 

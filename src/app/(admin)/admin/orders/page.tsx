@@ -19,6 +19,7 @@ import { formatCurrency } from "@/utils/format-currency";
 import { getAdminOrders } from "@/features/admin-dashboard/server/actions";
 import { ORDER_STATUS_LABELS } from "@/constants/order-status";
 import type { Order, OrderStatus } from "@/types/order";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: "all", label: "All Orders" },
@@ -33,19 +34,24 @@ const STATUS_TABS: { key: string; label: string }[] = [
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
 
   const loadOrders = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminOrders({
         status: activeTab !== "all" ? activeTab : undefined,
         search: search.trim() ? search.trim() : undefined,
       });
+
       setOrders(data);
     } catch (err) {
       console.error("Failed to load orders", err);
+      setOrders([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -59,6 +65,17 @@ export default function AdminOrdersPage() {
     e.preventDefault();
     loadOrders();
   };
+
+  if (error && orders.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Order data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadOrders}
+      />
+    );
+  }
 
   return (
     <div>
@@ -157,7 +174,7 @@ export default function AdminOrdersPage() {
               ) : orders.length === 0 ? (
                 <tr>
                   <td colSpan={9} style={{ textAlign: "center", padding: "40px" }}>
-                    <div style={{ color: "var(--adm-text-muted)" }}>No customer orders found.</div>
+                    <div style={{ color: "var(--adm-text-muted)" }}>No customer orders have been recorded in Firestore.</div>
                   </td>
                 </tr>
               ) : (

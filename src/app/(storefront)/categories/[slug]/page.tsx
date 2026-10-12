@@ -4,9 +4,8 @@ import { notFound } from "next/navigation";
 import { CATEGORIES_LIST, getProductsByCategory } from "@/constants/mock-products";
 import { ProductCard } from "@/components/ui/product-card";
 
-export function generateStaticParams() {
-  return CATEGORIES_LIST.map((c) => ({ slug: c.slug }));
-}
+export const dynamic = "force-dynamic";
+export const dynamicParams = true;
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;

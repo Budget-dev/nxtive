@@ -22,18 +22,25 @@ import {
   deleteReview,
 } from "@/features/admin-dashboard/server/actions";
 import type { Review, ReviewStatus } from "@/types/review";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
+  // Modal states
+  const [approveModal, setApproveModal] = useState<Review | null>(null);
   const [rejectModal, setRejectModal] = useState<Review | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [deleteModal, setDeleteModal] = useState<Review | null>(null);
 
   const loadReviews = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminReviews({
         status: statusFilter !== "all" ? statusFilter : undefined,
@@ -42,6 +49,8 @@ export default function AdminReviewsPage() {
       setReviews(data);
     } catch (err) {
       console.error(err);
+      setReviews([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -56,15 +65,19 @@ export default function AdminReviewsPage() {
     loadReviews();
   };
 
-  const handleApprove = async (id: string) => {
+  const handleConfirmApprove = async () => {
+    if (!approveModal) return;
+    const id = approveModal.id;
     setActionLoading(id);
+    setApproveModal(null);
     try {
-      await approveReview(id);
+      const result = await approveReview(id);
+      if (!result.success) throw new Error(result.error || "Failed to approve review");
       setReviews((prev) =>
         prev.map((r) => (r.id === id ? { ...r, status: "approved" as ReviewStatus } : r))
       );
-    } catch {
-      alert("Failed to approve review");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
@@ -78,27 +91,31 @@ export default function AdminReviewsPage() {
     setRejectModal(null);
     setRejectReason("");
     try {
-      await rejectReview(id, "Venkatesh", reason);
+      const result = await rejectReview(id, "Admin", reason);
+      if (!result.success) throw new Error(result.error || "Failed to reject review");
       setReviews((prev) =>
         prev.map((r) =>
           r.id === id ? { ...r, status: "rejected" as ReviewStatus, moderationNotes: reason } : r
         )
       );
-    } catch {
-      alert("Failed to reject review");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this review?")) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteModal) return;
+    const id = deleteModal.id;
     setActionLoading(id);
+    setDeleteModal(null);
     try {
-      await deleteReview(id);
+      const result = await deleteReview(id);
+      if (!result.success) throw new Error(result.error || "Failed to delete review");
       setReviews((prev) => prev.filter((r) => r.id !== id));
-    } catch {
-      alert("Failed to delete review");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
@@ -106,8 +123,20 @@ export default function AdminReviewsPage() {
 
   const pendingCount = reviews.filter((r) => r.status === "pending").length;
 
+  if (error && reviews.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Review data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadReviews}
+      />
+    );
+  }
+
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Review operation failed" message={error} /></div>}
       {/* Header */}
       <div
         style={{
@@ -269,7 +298,7 @@ export default function AdminReviewsPage() {
               ) : reviews.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: "center", padding: "40px" }}>
-                    <div style={{ color: "var(--adm-text-muted)" }}>No reviews found for this filter.</div>
+                    <div style={{ color: "var(--adm-text-muted)" }}>No reviews have been recorded in Firestore for this filter.</div>
                   </td>
                 </tr>
               ) : (
@@ -355,7 +384,7 @@ export default function AdminReviewsPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           {r.status !== "approved" && (
                             <button
-                              onClick={() => handleApprove(r.id)}
+                              onClick={() => setApproveModal(r)}
                               disabled={actionLoading === r.id}
                               style={{
                                 padding: "4px 8px",
@@ -394,10 +423,10 @@ export default function AdminReviewsPage() {
                           )}
 
                           <button
-                            onClick={() => handleDelete(r.id)}
+                            onClick={() => setDeleteModal(r)}
                             className="admin-icon-button"
                             style={{ width: "28px", height: "28px", color: "var(--adm-text-muted)" }}
-                            title="Delete"
+                            title="Delete Review"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -418,14 +447,14 @@ export default function AdminReviewsPage() {
         </div>
       </div>
 
-      {/* Reject Moderation Modal */}
-      {rejectModal && (
+      {/* ── Approve Confirmation Modal ── */}
+      {approveModal && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(18, 17, 16, 0.45)",
-            backdropFilter: "blur(2px)",
+            backgroundColor: "rgba(18, 17, 16, 0.5)",
+            backdropFilter: "blur(3px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -440,53 +469,243 @@ export default function AdminReviewsPage() {
               padding: "24px",
               maxWidth: "460px",
               width: "100%",
-              boxShadow: "var(--adm-shadow-dropdown)",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+              border: "1px solid var(--adm-border)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
               <div
                 style={{
-                  width: "36px",
-                  height: "36px",
+                  width: "40px",
+                  height: "40px",
                   borderRadius: "50%",
-                  backgroundColor: "var(--adm-badge-red-bg)",
-                  color: "var(--adm-badge-red-text)",
+                  backgroundColor: "#E6F4EA",
+                  color: "#137333",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                <AlertTriangle size={18} />
+                <CheckCircle2 size={22} />
               </div>
-              <h3 style={{ fontSize: "16px", fontWeight: 800 }}>Reject Customer Review</h3>
+              <div>
+                <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#121110", margin: 0 }}>
+                  Approve Customer Review?
+                </h3>
+                <span style={{ fontSize: "12px", color: "#137333", fontWeight: 600 }}>
+                  Will publish to live storefront
+                </span>
+              </div>
             </div>
 
-            <p style={{ fontSize: "13px", color: "var(--adm-text-secondary)", marginBottom: "14px", lineHeight: 1.4 }}>
-              Provide an internal moderation reason. The review will remain hidden from the storefront.
+            <p style={{ fontSize: "13.5px", color: "var(--adm-text-secondary)", lineHeight: 1.5, marginBottom: "16px" }}>
+              Are you sure you want to approve this review by <strong>"{approveModal.userName}"</strong> for <strong>"{approveModal.productTitle}"</strong>?
             </p>
 
-            <div className="admin-form-group">
-              <label className="admin-label">Reason / Notes</label>
+            <div
+              style={{
+                backgroundColor: "#FAF9F6",
+                borderRadius: "8px",
+                padding: "12px 14px",
+                border: "1px solid rgba(0,0,0,0.06)",
+                marginBottom: "20px",
+              }}
+            >
+              <div style={{ display: "flex", color: "#F2AC24", marginBottom: "4px" }}>
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={12} fill={i < approveModal.rating ? "#F2AC24" : "none"} stroke="#F2AC24" />
+                ))}
+              </div>
+              <p style={{ fontSize: "12.5px", color: "#444", margin: 0, fontStyle: "italic", lineHeight: 1.4 }}>
+                "{approveModal.comment.length > 120 ? approveModal.comment.slice(0, 120) + "..." : approveModal.comment}"
+              </p>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button onClick={() => setApproveModal(null)} className="admin-btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmApprove}
+                style={{
+                  padding: "9px 18px",
+                  backgroundColor: "#137333",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontWeight: 700,
+                  fontSize: "13.5px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <Check size={15} />
+                <span>Confirm & Publish</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reject Confirmation Modal ── */}
+      {rejectModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(18, 17, 16, 0.5)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "14px",
+              padding: "24px",
+              maxWidth: "460px",
+              width: "100%",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+              border: "1px solid var(--adm-border)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  backgroundColor: "#FCE8E6",
+                  color: "#C5221F",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <XCircle size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#121110", margin: 0 }}>
+                  Reject Customer Review?
+                </h3>
+                <span style={{ fontSize: "12px", color: "#C5221F", fontWeight: 600 }}>
+                  Review will remain hidden
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: "13.5px", color: "var(--adm-text-secondary)", lineHeight: 1.5, marginBottom: "14px" }}>
+              Are you sure you want to reject the review by <strong>"{rejectModal.userName}"</strong>?
+            </p>
+
+            <div className="admin-form-group" style={{ marginBottom: "20px" }}>
+              <label className="admin-label">Reason / Notes (Optional)</label>
               <textarea
-                rows={3}
+                rows={2}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="e.g. Spam text, unrelated courier complaint, inappropriate language..."
+                placeholder="e.g. Inappropriate content, spam, unrelated shipping issue..."
                 className="admin-textarea"
               />
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-              <button
-                onClick={() => setRejectModal(null)}
-                className="admin-btn-secondary"
-              >
+              <button onClick={() => setRejectModal(null)} className="admin-btn-secondary">
                 Cancel
               </button>
               <button
                 onClick={handleConfirmReject}
                 style={{
-                  padding: "9px 16px",
+                  padding: "9px 18px",
+                  backgroundColor: "#C5221F",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontWeight: 700,
+                  fontSize: "13.5px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <X size={15} />
+                <span>Confirm Rejection</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(18, 17, 16, 0.5)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "14px",
+              padding: "24px",
+              maxWidth: "420px",
+              width: "100%",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+              border: "1px solid var(--adm-border)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  backgroundColor: "#FCE8E6",
+                  color: "#C5221F",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#121110", margin: 0 }}>
+                  Delete Review Permanently?
+                </h3>
+              </div>
+            </div>
+
+            <p style={{ fontSize: "13.5px", color: "var(--adm-text-secondary)", lineHeight: 1.5, marginBottom: "20px" }}>
+              Are you sure you want to delete this review by <strong>"{deleteModal.userName}"</strong>? This action cannot be undone.
+            </p>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button onClick={() => setDeleteModal(null)} className="admin-btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                style={{
+                  padding: "9px 18px",
                   backgroundColor: "#C5221F",
                   color: "#FFFFFF",
                   border: "none",
@@ -496,7 +715,7 @@ export default function AdminReviewsPage() {
                   cursor: "pointer",
                 }}
               >
-                Confirm Rejection
+                Delete Permanently
               </button>
             </div>
           </div>

@@ -6,12 +6,10 @@ import {
   Settings,
   Store,
   Bell,
-  Database,
   Check,
   Save,
   ShieldCheck,
   AlertTriangle,
-  RefreshCw,
   ExternalLink,
 } from "lucide-react";
 import {
@@ -19,23 +17,60 @@ import {
   saveAdminSettings,
 } from "@/features/admin-dashboard/server/actions";
 import type { AdminAppSettings } from "@/types/settings";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
+
+function blankSettings(): AdminAppSettings {
+  return {
+    general: {
+      storeName: "",
+      storeTagline: "",
+      storeLogoUrl: "",
+      supportEmail: "",
+      supportPhone: "",
+      storeAddress: "",
+      currency: "INR",
+      currencySymbol: "₹",
+      taxRatePercent: 0,
+      taxIncludedInPrice: false,
+    },
+    store: {
+      lowStockThreshold: 0,
+      freeShippingThreshold: 0,
+      standardShippingFee: 0,
+      priorityShippingFee: 0,
+      codAvailable: false,
+      returnWindowDays: 0,
+      autoApproveReviews: false,
+      maxOrderQuantityPerItem: 0,
+    },
+    notifications: {
+      emailOnNewOrder: false,
+      emailOnDelivered: false,
+      smsOnShipping: false,
+      alertOnLowStock: false,
+      alertOnPaymentFailure: false,
+      adminNotificationEmail: "",
+      notifyOnPendingReview: false,
+    },
+  };
+}
 
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<"general" | "store" | "notifications" | "database">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "store" | "notifications">("general");
   const [settings, setSettings] = useState<AdminAppSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [seeding, setSeeding] = useState(false);
-  const [seedMessage, setSeedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
         const data = await getAdminSettings();
-        setSettings(data);
+        setSettings(data ?? blankSettings());
       } catch (err) {
         console.error(err);
+        setError(adminErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -51,38 +86,26 @@ export default function AdminSettingsPage() {
       await saveAdminSettings(settings);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch {
-      alert("Failed to save settings");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSeedProducts = async () => {
-    setSeeding(true);
-    setSeedMessage(null);
-    try {
-      const res = await fetch("/api/seed-products");
-      const json = await res.json();
-      if (json.success) {
-        setSeedMessage("Successfully initialized apparel catalog and synced with Firestore!");
-      } else {
-        setSeedMessage("Notice: " + (json.error || "Seeding complete"));
-      }
-    } catch (err: any) {
-      setSeedMessage("Seeding complete: catalog cached locally.");
-    } finally {
-      setSeeding(false);
-    }
-  };
+  if (error && !settings && !loading) {
+    return <AdminDataState title="Settings unavailable" message={error} actionLabel="Retry" onAction={() => window.location.reload()} />;
+  }
 
-  if (loading || !settings) {
+  if (loading) {
     return (
       <div style={{ padding: "40px", color: "var(--adm-text-muted)" }}>
         Loading configuration...
       </div>
     );
   }
+
+  if (!settings) return null;
 
   return (
     <div style={{ maxWidth: "1000px" }}>
@@ -146,12 +169,6 @@ export default function AdminSettingsPage() {
           className={`admin-tab-btn ${activeTab === "notifications" ? "active" : ""}`}
         >
           Notification Settings
-        </button>
-        <button
-          onClick={() => setActiveTab("database")}
-          className={`admin-tab-btn ${activeTab === "database" ? "active" : ""}`}
-        >
-          Database &amp; Seed Tools
         </button>
       </div>
 
@@ -480,45 +497,7 @@ export default function AdminSettingsPage() {
           </div>
         )}
 
-        {/* TAB 4: Database Tools */}
-        {activeTab === "database" && (
-          <div className="admin-card" style={{ padding: "24px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: 800, marginBottom: "8px" }}>Database Synchronization</h3>
-            <p style={{ fontSize: "13px", color: "var(--adm-text-muted)", marginBottom: "20px" }}>
-              Sync local mock apparel models and orders to Firestore collections.
-            </p>
-
-            {seedMessage && (
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderRadius: "8px",
-                  backgroundColor: "var(--adm-surface-subtle)",
-                  border: "1px solid var(--adm-border)",
-                  fontSize: "13px",
-                  color: "#121110",
-                  marginBottom: "16px",
-                }}
-              >
-                {seedMessage}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleSeedProducts}
-              disabled={seeding}
-              className="admin-btn-secondary"
-              style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
-            >
-              <RefreshCw size={15} className={seeding ? "spin" : ""} />
-              <span>{seeding ? "Syncing to Firestore..." : "Seed Products to Firestore"}</span>
-            </button>
-          </div>
-        )}
-
-        {activeTab !== "database" && (
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "24px" }}>
             <button
               type="submit"
               disabled={saving}
@@ -527,8 +506,7 @@ export default function AdminSettingsPage() {
               <Save size={15} />
               <span>{saving ? "Saving..." : "Save Settings"}</span>
             </button>
-          </div>
-        )}
+        </div>
       </form>
     </div>
   );

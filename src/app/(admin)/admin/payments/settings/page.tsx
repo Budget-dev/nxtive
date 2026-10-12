@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   CreditCard,
@@ -12,27 +12,57 @@ import {
   Save,
   ExternalLink,
 } from "lucide-react";
+import {
+  getAdminPaymentSettings,
+  saveAdminPaymentSettings,
+  type AdminPaymentSettings,
+} from "@/features/admin-dashboard/server/actions";
+import { AdminDataState, adminErrorMessage } from "../../_components/admin-data-state";
 
 export default function PaymentSettingsPage() {
-  const [gateway, setGateway] = useState("razorpay");
-  const [environmentMode, setEnvironmentMode] = useState<"test" | "live">("test");
-  const [keyId, setKeyId] = useState("rzp_test_YourKeyHere");
-  const [enableCod, setEnableCod] = useState(true);
-  const [autoCapture, setAutoCapture] = useState(true);
-  const [supportedMethods, setSupportedMethods] = useState({
-    upi: true,
-    cards: true,
-    netbanking: true,
-    wallets: true,
-    cod: true,
-  });
+  const [settings, setSettings] = useState<AdminPaymentSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  useEffect(() => {
+    getAdminPaymentSettings()
+      .then(setSettings)
+      .catch((err) => setError(adminErrorMessage(err)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const startConfiguration = () => {
+    setError(null);
+    setSettings({
+      gateway: "razorpay",
+      environmentMode: "test",
+      keyId: "",
+      enableCod: true,
+      autoCapture: true,
+      supportedMethods: { upi: true, cards: true, netbanking: true, wallets: true, cod: true },
+    });
   };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settings) return;
+    setSaving(true);
+    try {
+      await saveAdminPaymentSettings(settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div style={{ padding: "40px", color: "var(--adm-text-muted)" }}>Loading payment settings...</div>;
+  if (error && !settings) return <AdminDataState title="Payment settings unavailable" message={error} actionLabel="Retry" onAction={() => window.location.reload()} />;
+  if (!settings) return <AdminDataState title="Payment settings are not configured" message="No payment_settings/global document exists in Firestore. Create the configuration before editing gateway behavior." actionLabel="Create Configuration" onAction={startConfiguration} />;
 
   return (
     <div style={{ maxWidth: "900px" }}>
@@ -80,6 +110,11 @@ export default function PaymentSettingsPage() {
         >
           <Check size={16} />
           <span>Payment configuration saved successfully!</span>
+        </div>
+      )}
+      {error && settings && (
+        <div style={{ marginBottom: "20px" }}>
+          <AdminDataState title="Payment settings could not be saved" message={error} />
         </div>
       )}
 
@@ -130,11 +165,11 @@ export default function PaymentSettingsPage() {
             <label
               style={{
                 border: "2px solid",
-                borderColor: gateway === "razorpay" ? "#121110" : "var(--adm-border)",
+                borderColor: settings.gateway === "razorpay" ? "#121110" : "var(--adm-border)",
                 borderRadius: "10px",
                 padding: "16px",
                 cursor: "pointer",
-                backgroundColor: gateway === "razorpay" ? "var(--adm-surface-subtle)" : "#FFFFFF",
+                 backgroundColor: settings.gateway === "razorpay" ? "var(--adm-surface-subtle)" : "#FFFFFF",
                 display: "flex",
                 flexDirection: "column",
                 gap: "6px",
@@ -145,8 +180,8 @@ export default function PaymentSettingsPage() {
                 <input
                   type="radio"
                   name="gateway"
-                  checked={gateway === "razorpay"}
-                  onChange={() => setGateway("razorpay")}
+                   checked={settings.gateway === "razorpay"}
+                   onChange={() => setSettings({ ...settings, gateway: "razorpay" })}
                 />
               </div>
               <p style={{ fontSize: "12px", color: "var(--adm-text-muted)" }}>
@@ -183,8 +218,8 @@ export default function PaymentSettingsPage() {
             <div className="admin-form-group">
               <label className="admin-label">Environment Mode</label>
               <select
-                value={environmentMode}
-                onChange={(e) => setEnvironmentMode(e.target.value as "test" | "live")}
+                 value={settings.environmentMode}
+                 onChange={(e) => setSettings({ ...settings, environmentMode: e.target.value as "test" | "live" })}
                 className="admin-select"
               >
                 <option value="test">Test Mode (Sandbox / Staging)</option>
@@ -196,8 +231,8 @@ export default function PaymentSettingsPage() {
               <label className="admin-label">Public Key ID (Client-Safe)</label>
               <input
                 type="text"
-                value={keyId}
-                onChange={(e) => setKeyId(e.target.value)}
+                 value={settings.keyId}
+                 onChange={(e) => setSettings({ ...settings, keyId: e.target.value })}
                 className="admin-input"
               />
             </div>
@@ -212,8 +247,8 @@ export default function PaymentSettingsPage() {
             <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "13.5px" }}>
               <input
                 type="checkbox"
-                checked={supportedMethods.upi}
-                onChange={(e) => setSupportedMethods({ ...supportedMethods, upi: e.target.checked })}
+                 checked={settings.supportedMethods.upi}
+                 onChange={(e) => setSettings({ ...settings, supportedMethods: { ...settings.supportedMethods, upi: e.target.checked } })}
               />
               <span><strong>UPI Intent &amp; QR:</strong> GPay, PhonePe, Paytm, BHIM</span>
             </label>
@@ -221,8 +256,8 @@ export default function PaymentSettingsPage() {
             <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "13.5px" }}>
               <input
                 type="checkbox"
-                checked={supportedMethods.cards}
-                onChange={(e) => setSupportedMethods({ ...supportedMethods, cards: e.target.checked })}
+                 checked={settings.supportedMethods.cards}
+                 onChange={(e) => setSettings({ ...settings, supportedMethods: { ...settings.supportedMethods, cards: e.target.checked } })}
               />
               <span><strong>Credit &amp; Debit Cards:</strong> Visa, MasterCard, RuPay, Amex</span>
             </label>
@@ -230,8 +265,8 @@ export default function PaymentSettingsPage() {
             <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "13.5px" }}>
               <input
                 type="checkbox"
-                checked={supportedMethods.netbanking}
-                onChange={(e) => setSupportedMethods({ ...supportedMethods, netbanking: e.target.checked })}
+                 checked={settings.supportedMethods.netbanking}
+                 onChange={(e) => setSettings({ ...settings, supportedMethods: { ...settings.supportedMethods, netbanking: e.target.checked } })}
               />
               <span><strong>NetBanking:</strong> 50+ Indian commercial &amp; private banks</span>
             </label>
@@ -239,8 +274,8 @@ export default function PaymentSettingsPage() {
             <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "13.5px" }}>
               <input
                 type="checkbox"
-                checked={supportedMethods.cod}
-                onChange={(e) => setSupportedMethods({ ...supportedMethods, cod: e.target.checked })}
+                 checked={settings.supportedMethods.cod}
+                 onChange={(e) => setSettings({ ...settings, supportedMethods: { ...settings.supportedMethods, cod: e.target.checked } })}
               />
               <span><strong>Cash on Delivery (COD):</strong> Enable cash collection at door</span>
             </label>
@@ -248,9 +283,9 @@ export default function PaymentSettingsPage() {
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button type="submit" className="admin-btn-primary">
-            <Save size={15} />
-            <span>Save Payment Settings</span>
+           <button type="submit" disabled={saving} className="admin-btn-primary">
+             <Save size={15} />
+             <span>{saving ? "Saving..." : "Save Payment Settings"}</span>
           </button>
         </div>
       </form>

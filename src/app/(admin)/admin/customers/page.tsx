@@ -19,20 +19,25 @@ import {
 import { formatCurrency } from "@/utils/format-currency";
 import { getAdminCustomers, updateCustomerStatus } from "@/features/admin-dashboard/server/actions";
 import type { Customer } from "@/types/user";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const loadCustomers = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminCustomers(search);
       setCustomers(data);
     } catch (err) {
       console.error(err);
+      setCustomers([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -50,10 +55,15 @@ export default function AdminCustomersPage() {
         : `Activate account for ${c.name}?`;
     if (!confirm(confirmMsg)) return;
 
-    await updateCustomerStatus(c.id, nextStatus);
-    setCustomers((prev) =>
-      prev.map((item) => (item.id === c.id ? { ...item, accountStatus: nextStatus } : item))
-    );
+    try {
+      const result = await updateCustomerStatus(c.id, nextStatus);
+      if (!result.success) throw new Error(result.error || "Unable to update customer status");
+      setCustomers((prev) =>
+        prev.map((item) => (item.id === c.id ? { ...item, accountStatus: nextStatus } : item))
+      );
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    }
   };
 
   const filtered = customers.filter((c) => {
@@ -61,8 +71,20 @@ export default function AdminCustomersPage() {
     return true;
   });
 
+  if (error && customers.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Customer data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadCustomers}
+      />
+    );
+  }
+
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Customer operation failed" message={error} /></div>}
       {/* Header */}
       <div
         style={{
@@ -147,7 +169,7 @@ export default function AdminCustomersPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", padding: "40px" }}>
-                    <div style={{ color: "var(--adm-text-muted)" }}>No customer accounts match your criteria.</div>
+                    <div style={{ color: "var(--adm-text-muted)" }}>No customer accounts have been recorded in Firestore for this filter.</div>
                   </td>
                 </tr>
               ) : (

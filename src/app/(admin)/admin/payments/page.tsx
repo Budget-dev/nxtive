@@ -16,25 +16,26 @@ import {
   Download,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminPayments, issueRefund } from "@/features/admin-dashboard/server/actions";
+import { getAdminPayments } from "@/features/admin-dashboard/server/actions";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [refundModal, setRefundModal] = useState<any | null>(null);
-  const [refundAmount, setRefundAmount] = useState<number>(0);
-  const [refundReason, setRefundReason] = useState("");
-  const [refunding, setRefunding] = useState(false);
 
   const loadPayments = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminPayments();
       setPayments(data);
     } catch (err) {
       console.error(err);
+      setPayments([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -48,30 +49,6 @@ export default function AdminPaymentsPage() {
     .filter((p) => p.status === "paid")
     .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  const handleOpenRefund = (p: any) => {
-    setRefundModal(p);
-    setRefundAmount(p.amount);
-    setRefundReason("Customer requested cancellation / return");
-  };
-
-  const handleConfirmRefund = async () => {
-    if (!refundModal) return;
-    setRefunding(true);
-    try {
-      await issueRefund(refundModal.orderId, refundAmount, refundReason);
-      setPayments((prev) =>
-        prev.map((item) =>
-          item.orderId === refundModal.orderId ? { ...item, status: "refunded" } : item
-        )
-      );
-      setRefundModal(null);
-    } catch {
-      alert("Failed to process refund");
-    } finally {
-      setRefunding(false);
-    }
-  };
-
   const filtered = payments.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     if (!search.trim()) return true;
@@ -84,8 +61,20 @@ export default function AdminPaymentsPage() {
     );
   });
 
+  if (error && payments.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Payment data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadPayments}
+      />
+    );
+  }
+
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Payment operation failed" message={error} /></div>}
       {/* Header */}
       <div
         style={{
@@ -102,7 +91,7 @@ export default function AdminPaymentsPage() {
             Payment Transactions
           </h1>
           <p style={{ fontSize: "14px", color: "var(--adm-text-muted)", marginTop: "4px" }}>
-            Real-time ledger of Razorpay gateway authorizations, settlements, and refund claims
+             Payment states stored with customer orders in Firestore
           </p>
         </div>
 
@@ -125,7 +114,7 @@ export default function AdminPaymentsPage() {
             {formatCurrency(totalCaptured)}
           </div>
           <div style={{ fontSize: "12px", color: "#137333", fontWeight: 600 }}>
-            100% verified via Razorpay API
+             Recorded paid order totals
           </div>
         </div>
 
@@ -138,7 +127,7 @@ export default function AdminPaymentsPage() {
             {payments.filter((p) => p.status === "paid").length} Captured
           </div>
           <div style={{ fontSize: "12px", color: "var(--adm-text-muted)" }}>
-            HMAC-SHA256 signature checked
+             Payment status from stored orders
           </div>
         </div>
 
@@ -151,7 +140,7 @@ export default function AdminPaymentsPage() {
             {payments.filter((p) => p.status === "refunded").length} Records
           </div>
           <div style={{ fontSize: "12px", color: "var(--adm-text-muted)" }}>
-            Instant UPI & NetBanking reversal
+             Recorded refund states; issuing refunds is unavailable
           </div>
         </div>
       </div>
@@ -215,7 +204,7 @@ export default function AdminPaymentsPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", padding: "40px" }}>
-                    <div style={{ color: "var(--adm-text-muted)" }}>No transaction records match your search.</div>
+                    <div style={{ color: "var(--adm-text-muted)" }}>No payment transactions have been recorded in Firestore for this filter.</div>
                   </td>
                 </tr>
               ) : (
@@ -253,14 +242,13 @@ export default function AdminPaymentsPage() {
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           {p.status === "paid" && (
-                            <button
-                              onClick={() => handleOpenRefund(p)}
-                              className="admin-btn-secondary admin-btn-sm"
-                              style={{ color: "var(--adm-badge-red-text)" }}
-                              title="Issue Refund"
-                            >
-                              Refund
-                            </button>
+                             <span
+                               className="admin-btn-secondary admin-btn-sm"
+                               style={{ color: "var(--adm-text-muted)", cursor: "not-allowed" }}
+                               title="Refunds are unavailable until the payment provider integration is implemented"
+                             >
+                               Refund unavailable
+                             </span>
                           )}
                           <Link
                             href={`/admin/orders/${p.orderId}`}
@@ -287,104 +275,6 @@ export default function AdminPaymentsPage() {
         </div>
       </div>
 
-      {/* Refund Modal */}
-      {refundModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(18, 17, 16, 0.45)",
-            backdropFilter: "blur(2px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "14px",
-              padding: "24px",
-              maxWidth: "460px",
-              width: "100%",
-              boxShadow: "var(--adm-shadow-dropdown)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-              <div
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "50%",
-                  backgroundColor: "var(--adm-badge-purple-bg)",
-                  color: "var(--adm-badge-purple-text)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <RotateCcw size={18} />
-              </div>
-              <h3 style={{ fontSize: "16px", fontWeight: 800 }}>Issue Payment Refund</h3>
-            </div>
-
-            <p style={{ fontSize: "13px", color: "var(--adm-text-secondary)", marginBottom: "16px" }}>
-              Initiating reversal for Order <strong>{refundModal.orderNumber}</strong> ({refundModal.customerName}).
-            </p>
-
-            <div className="admin-form-group">
-              <label className="admin-label">Refund Amount (₹)</label>
-              <input
-                type="number"
-                value={refundAmount}
-                onChange={(e) => setRefundAmount(Number(e.target.value))}
-                max={refundModal.amount}
-                className="admin-input"
-              />
-              <span style={{ fontSize: "11px", color: "var(--adm-text-muted)", marginTop: "4px", display: "block" }}>
-                Maximum refundable: {formatCurrency(refundModal.amount)}
-              </span>
-            </div>
-
-            <div className="admin-form-group">
-              <label className="admin-label">Reason for Refund</label>
-              <textarea
-                rows={2}
-                value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
-                className="admin-textarea"
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-              <button
-                onClick={() => setRefundModal(null)}
-                className="admin-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmRefund}
-                disabled={refunding}
-                style={{
-                  padding: "9px 16px",
-                  backgroundColor: "#7B1FA2",
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontWeight: 700,
-                  fontSize: "13.5px",
-                  cursor: "pointer",
-                }}
-              >
-                {refunding ? "Processing..." : `Process Refund (${formatCurrency(refundAmount)})`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

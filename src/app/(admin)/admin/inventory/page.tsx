@@ -15,11 +15,13 @@ import {
 } from "lucide-react";
 import { getAdminInventory, updateStockLevel } from "@/features/admin-dashboard/server/actions";
 import type { Product } from "@/types/product";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminInventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [lowStockList, setLowStockList] = useState<{ product: Product; variant: any }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterHealth, setFilterHealth] = useState("all");
   const [stockChanges, setStockChanges] = useState<Record<string, number>>({});
@@ -27,6 +29,7 @@ export default function AdminInventoryPage() {
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminInventory();
       setProducts(data.products);
@@ -35,11 +38,14 @@ export default function AdminInventoryPage() {
       // Pre-fill stock changes
       const initialStock: Record<string, number> = {};
       data.products.forEach((p) => {
-        initialStock[p.id] = p.totalStock ?? 75;
+        if (typeof p.totalStock === "number") initialStock[p.id] = p.totalStock;
       });
       setStockChanges(initialStock);
     } catch (err) {
       console.error(err);
+      setProducts([]);
+      setLowStockList([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -69,34 +75,54 @@ export default function AdminInventoryPage() {
     if (newStock === undefined) return;
     setSavingId(id);
     try {
-      await updateStockLevel(id, newStock);
-      setProducts((prev) =>
+       const result = await updateStockLevel(id, newStock);
+       if (!result.success) throw new Error(result.error || "Unable to update stock");
+       setProducts((prev) =>
         prev.map((p) => (p.id === id ? { ...p, totalStock: newStock, inStock: newStock > 0 } : p))
       );
     } catch (err) {
-      alert("Failed to update stock");
+      setError(adminErrorMessage(err));
     } finally {
       setSavingId(null);
     }
   };
 
   const filteredProducts = products.filter((p) => {
-    const currentStock = stockChanges[p.id] ?? (p.totalStock ?? 50);
-    const threshold = p.lowStockThreshold ?? 10;
+     const currentStock = stockChanges[p.id] ?? p.totalStock;
+     const threshold = p.lowStockThreshold;
 
-    if (filterHealth === "low" && (currentStock > threshold || currentStock === 0)) return false;
-    if (filterHealth === "out" && currentStock > 0) return false;
-    if (filterHealth === "healthy" && currentStock <= threshold) return false;
+     if (filterHealth === "low" && (currentStock === undefined || threshold === undefined || currentStock > threshold || currentStock === 0)) return false;
+     if (filterHealth === "out" && (currentStock === undefined || currentStock > 0)) return false;
+     if (filterHealth === "healthy" && (currentStock === undefined || threshold === undefined || currentStock <= threshold)) return false;
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      return p.title.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q);
+      const sku = p.sku || `NV-${p.category?.slice(0, 2).toUpperCase()}-${p.id.slice(-3)}`;
+      return (
+        p.title.toLowerCase().includes(q) ||
+        p.slug.toLowerCase().includes(q) ||
+        (p.category && p.category.toLowerCase().includes(q)) ||
+        sku.toLowerCase().includes(q) ||
+        (p.fit && p.fit.toLowerCase().includes(q))
+      );
     }
     return true;
   });
 
+  if (error && products.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Inventory data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadData}
+      />
+    );
+  }
+
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Inventory operation failed" message={error} /></div>}
       {/* Low stock alert cards */}
       {lowStockList.length > 0 && (
         <div
@@ -133,38 +159,70 @@ export default function AdminInventoryPage() {
 
       {/* Main Panel */}
       <div className="admin-panel">
-        <div className="admin-panel-header">
+        <div className="admin-panel-header" style={{ gap: "16px", flexWrap: "wrap" }}>
           <div className="admin-panel-title-wrap">
             <h3>Inventory &amp; Stock Control</h3>
             <p>Real-time units on hand, reorder thresholds, and warehouse replenishment</p>
           </div>
 
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+            {/* Attractive Search Bar */}
+            <div style={{ position: "relative", minWidth: "260px" }}>
               <Search
                 size={15}
                 style={{
                   position: "absolute",
-                  left: "12px",
+                  left: "14px",
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: "var(--adm-text-muted)",
+                  color: "#888",
+                  pointerEvents: "none",
                 }}
               />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search apparel title..."
-                className="admin-search-input"
-                style={{ width: "220px" }}
+                placeholder="Search title, SKU, category..."
+                style={{
+                  width: "100%",
+                  padding: "9px 34px 9px 38px",
+                  borderRadius: "9999px",
+                  border: "1px solid var(--adm-border)",
+                  backgroundColor: "#FFFFFF",
+                  fontSize: "13px",
+                  color: "#121110",
+                  outline: "none",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                }}
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    color: "#999",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              )}
             </div>
 
             <select
               value={filterHealth}
               onChange={(e) => setFilterHealth(e.target.value)}
               className="admin-select"
+              style={{ padding: "8px 12px", fontSize: "13px" }}
             >
               <option value="all">All Stock Statuses</option>
               <option value="healthy">Healthy Stock</option>
@@ -203,11 +261,11 @@ export default function AdminInventoryPage() {
                 </tr>
               ) : (
                 filteredProducts.map((p) => {
-                  const current = stockChanges[p.id] ?? (p.totalStock ?? 50);
-                  const threshold = p.lowStockThreshold ?? 10;
-                  const isOut = current === 0;
-                  const isLow = current <= threshold && current > 0;
-                  const isModified = current !== p.totalStock;
+                           const current = stockChanges[p.id] ?? p.totalStock;
+                   const threshold = p.lowStockThreshold;
+                   const isOut = current !== undefined && current === 0;
+                   const isLow = current !== undefined && threshold !== undefined && current <= threshold && current > 0;
+                   const isModified = current !== p.totalStock;
 
                   return (
                     <tr key={p.id}>
@@ -276,7 +334,7 @@ export default function AdminInventoryPage() {
                           </button>
                           <input
                             type="number"
-                            value={current}
+                             value={current ?? ""}
                             onChange={(e) => handleStockInputChange(p.id, e.target.value)}
                             min={0}
                             style={{

@@ -20,16 +20,19 @@ import {
   getAdminShippingLogs,
 } from "@/features/admin-dashboard/server/actions";
 import type { Shipment, ShippingLog } from "@/types/delivery";
+import { AdminDataState, adminErrorMessage } from "../../_components/admin-data-state";
 
 export default function ShipmentTrackingPage() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [logs, setLogs] = useState<ShippingLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
 
   useEffect(() => {
     async function load() {
+      setError(null);
       try {
         const [ships, lgs] = await Promise.all([
           getAdminShipments(),
@@ -39,6 +42,9 @@ export default function ShipmentTrackingPage() {
         setLogs(lgs);
       } catch (err) {
         console.error(err);
+        setShipments([]);
+        setLogs([]);
+        setError(adminErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -56,6 +62,17 @@ export default function ShipmentTrackingPage() {
       (s.destinationCity && s.destinationCity.toLowerCase().includes(q))
     );
   });
+
+  if (error && shipments.length === 0 && logs.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Shipment telemetry unavailable"
+        message={error}
+        actionLabel="Reload"
+        onAction={() => window.location.reload()}
+      />
+    );
+  }
 
   return (
     <div>
@@ -131,7 +148,7 @@ export default function ShipmentTrackingPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", padding: "40px" }}>
-                    <div style={{ color: "var(--adm-text-muted)" }}>No shipments found.</div>
+                    <div style={{ color: "var(--adm-text-muted)" }}>No shipments have been recorded in Firestore.</div>
                   </td>
                 </tr>
               ) : (
@@ -204,7 +221,13 @@ export default function ShipmentTrackingPage() {
               </tr>
             </thead>
             <tbody>
-              {logs.map((l) => (
+              {logs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "32px", color: "var(--adm-text-muted)" }}>
+                    No shipping integration logs have been recorded in Firestore.
+                  </td>
+                </tr>
+              ) : logs.map((l) => (
                 <tr key={l.id}>
                   <td style={{ fontSize: "12px", color: "var(--adm-text-muted)", whiteSpace: "nowrap" }}>
                     {new Date(l.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

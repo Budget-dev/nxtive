@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getAdminRoles, saveAdminRole } from "@/features/admin-dashboard/server/actions";
 import type { AdminRoleDefinition, AdminPermission } from "@/types/user";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 const ALL_PERMISSIONS: { group: string; perm: AdminPermission; label: string }[] = [
   // Products
@@ -50,6 +51,7 @@ const ALL_PERMISSIONS: { group: string; perm: AdminPermission; label: string }[]
 export default function AdminRolesPage() {
   const [roles, setRoles] = useState<AdminRoleDefinition[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   // New role state
@@ -60,11 +62,14 @@ export default function AdminRolesPage() {
 
   const loadRoles = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminRoles();
       setRoles(data);
     } catch (err) {
       console.error(err);
+      setRoles([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -96,15 +101,27 @@ export default function AdminRolesPage() {
       setRoleName("");
       setRoleDesc("");
       await loadRoles();
-    } catch {
-      alert("Failed to create role");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setSaving(false);
     }
   };
 
+  if (error && roles.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Role data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadRoles}
+      />
+    );
+  }
+
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Role operation failed" message={error} /></div>}
       {/* Header */}
       <div
         style={{
@@ -138,8 +155,17 @@ export default function AdminRolesPage() {
       </div>
 
       {/* Roles Cards Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px", marginBottom: "32px" }}>
-        {roles.map((r) => (
+       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+         {loading ? (
+           <div style={{ padding: "32px", color: "var(--adm-text-muted)" }}>Loading roles...</div>
+         ) : roles.length === 0 ? (
+           <AdminDataState
+             title="No roles in Firestore"
+             message="Create an admin role before assigning permissions to team members."
+             actionLabel="Create Custom Role"
+             onAction={() => setShowModal(true)}
+           />
+         ) : roles.map((r) => (
           <div key={r.id} className="admin-card" style={{ padding: "20px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

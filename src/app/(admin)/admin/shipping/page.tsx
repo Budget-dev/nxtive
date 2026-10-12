@@ -23,10 +23,12 @@ import {
   setDefaultShippingProvider,
 } from "@/features/admin-dashboard/server/actions";
 import type { ShippingProvider } from "@/types/delivery";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminShippingPage() {
   const [providers, setProviders] = useState<ShippingProvider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProvider, setEditingProvider] = useState<ShippingProvider | null>(null);
 
@@ -40,11 +42,14 @@ export default function AdminShippingPage() {
 
   const loadProviders = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminShippingProviders();
       setProviders(data);
     } catch (err) {
       console.error(err);
+      setProviders([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -59,14 +64,26 @@ export default function AdminShippingPage() {
     setProviders((prev) =>
       prev.map((item) => (item.id === p.id ? { ...item, isEnabled: nextState } : item))
     );
-    await toggleShippingProvider(p.id, nextState);
+    try {
+      const result = await toggleShippingProvider(p.id, nextState);
+      if (!result.success) throw new Error(result.error || "Unable to update shipping provider");
+    } catch (err) {
+      setProviders((prev) => prev.map((item) => (item.id === p.id ? p : item)));
+      setError(adminErrorMessage(err));
+    }
   };
 
   const handleSetDefault = async (id: string) => {
     setProviders((prev) =>
       prev.map((item) => ({ ...item, isDefault: item.id === id }))
     );
-    await setDefaultShippingProvider(id);
+    try {
+      const result = await setDefaultShippingProvider(id);
+      if (!result.success) throw new Error(result.error || "Unable to update default provider");
+    } catch (err) {
+      setError(adminErrorMessage(err));
+      await loadProviders();
+    }
   };
 
   const openNewModal = () => {
@@ -105,15 +122,27 @@ export default function AdminShippingPage() {
       });
       setShowAddModal(false);
       await loadProviders();
-    } catch {
-      alert("Failed to save provider");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setSaving(false);
     }
   };
 
+  if (error && providers.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Shipping provider data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadProviders}
+      />
+    );
+  }
+
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Shipping operation failed" message={error} /></div>}
       {/* Header */}
       <div
         style={{
@@ -190,6 +219,13 @@ export default function AdminShippingPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
         {loading ? (
           <div style={{ padding: "40px", color: "var(--adm-text-muted)" }}>Loading shipping providers...</div>
+        ) : providers.length === 0 ? (
+          <AdminDataState
+            title="No shipping providers in Firestore"
+            message="Add a shipping provider to configure delivery operations."
+            actionLabel="Add Shipping Partner"
+            onAction={openNewModal}
+          />
         ) : (
           providers.map((p) => {
             return (

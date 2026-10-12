@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Heart, ShoppingBag, Eye } from "lucide-react";
-import { useStore, ProductItem } from "@/components/store-context";
+import { motion, useReducedMotion } from "framer-motion";
+import { useStore } from "@/components/store-context";
 import { Product } from "@/constants/mock-products";
 
 interface ProductCardProps {
@@ -12,6 +13,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const { addToCart, toggleWishlist, isInWishlist, setQuickViewProduct } = useStore();
+  const shouldReduceMotion = useReducedMotion();
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
 
   const inWishlist = isInWishlist(product.id);
@@ -36,7 +38,11 @@ export function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <div
+    <motion.div
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+      whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+      viewport={shouldReduceMotion ? undefined : { once: true, amount: 0.12 }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.35, ease: [0.16, 1, 0.3, 1] }}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -60,6 +66,8 @@ export function ProductCard({ product }: ProductCardProps) {
           <img
             src={product.image}
             alt={product.title}
+            loading="lazy"
+            decoding="async"
             style={{
               width: "100%",
               height: "100%",
@@ -94,14 +102,15 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Wishlist Heart Icon (Top Right) */}
         <button
+          type="button"
           onClick={handleWishlist}
           aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
           style={{
             position: "absolute",
             top: "8px",
             right: "8px",
-            width: "30px",
-            height: "30px",
+            width: "44px",
+            height: "44px",
             borderRadius: "50%",
             backgroundColor: "rgba(255, 255, 255, 0.9)",
             color: inWishlist ? "#E63946" : "#121110",
@@ -119,6 +128,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Quick View Button (Slide up on hover) */}
         <button
+          type="button"
           onClick={handleQuickView}
           aria-label="Quick preview"
           style={{
@@ -137,7 +147,9 @@ export function ProductCard({ product }: ProductCardProps) {
             gap: "5px",
             boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
             opacity: 0,
+            pointerEvents: "none",
             transition: "all 0.25s ease",
+            minHeight: "44px",
             cursor: "pointer",
             whiteSpace: "nowrap",
           }}
@@ -196,7 +208,7 @@ export function ProductCard({ product }: ProductCardProps) {
         }}
       >
         {/* Color Dots */}
-        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+        <div className="product-color-swatches" style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           {product.colors.map((color, idx) => {
             const isSelected = selectedColorIdx === idx;
             return (
@@ -208,10 +220,12 @@ export function ProductCard({ product }: ProductCardProps) {
                   setSelectedColorIdx(idx);
                 }}
                 aria-label={`Select ${color.name}`}
+                aria-pressed={isSelected}
                 title={color.name}
+                className="product-color-swatch"
                 style={{
-                  width: "9px",
-                  height: "9px",
+                  width: "28px",
+                  height: "28px",
                   borderRadius: "50%",
                   backgroundColor: color.hex,
                   border: isSelected ? "1.5px solid #111110" : "1px solid rgba(0,0,0,0.15)",
@@ -228,11 +242,12 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Add to Cart Button */}
         <button
+          type="button"
           onClick={handleAddToCart}
           aria-label={`Add ${product.title} to bag`}
           style={{
-            width: "28px",
-            height: "28px",
+            width: "44px",
+            height: "44px",
             borderRadius: "5px",
             backgroundColor: "#111110",
             color: "#FFFFFF",
@@ -249,17 +264,34 @@ export function ProductCard({ product }: ProductCardProps) {
       </div>
 
       <style jsx global>{`
-        .product-card-wrap:hover .product-card-img {
-          transform: scale(1.05);
+        @media (hover: hover) and (pointer: fine) {
+          .product-card-wrap:hover .product-card-img {
+            transform: scale(1.05);
+          }
+          .product-card-wrap:hover .quick-view-hover-btn {
+            opacity: 1 !important;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0) !important;
+          }
+          .card-action-hover:hover {
+            transform: scale(1.1);
+          }
         }
-        .product-card-wrap:hover .quick-view-hover-btn {
+
+        .product-card-wrap:focus-within .quick-view-hover-btn {
           opacity: 1 !important;
+          pointer-events: auto;
           transform: translateX(-50%) translateY(0) !important;
         }
-        .card-action-hover:hover {
-          transform: scale(1.1);
+
+        @media (hover: none), (pointer: coarse) {
+          .product-card-wrap .quick-view-hover-btn {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+          }
         }
       `}</style>
-    </div>
+    </motion.div>
   );
 }

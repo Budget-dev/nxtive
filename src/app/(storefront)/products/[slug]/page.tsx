@@ -3,9 +3,8 @@ import { notFound } from "next/navigation";
 import { getProductBySlug, getRelatedProducts, MOCK_PRODUCTS } from "@/constants/mock-products";
 import { ProductDetailClient } from "./product-detail-client";
 
-export function generateStaticParams() {
-  return MOCK_PRODUCTS.map((p) => ({ slug: p.slug }));
-}
+export const dynamic = "force-dynamic";
+export const dynamicParams = true;
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;

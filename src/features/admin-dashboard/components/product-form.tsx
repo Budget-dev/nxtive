@@ -22,7 +22,7 @@ interface ProductFormProps {
   isEdit?: boolean;
 }
 
-const CATEGORIES: ProductCategory[] = [
+const DEFAULT_CATEGORIES: string[] = [
   "T-Shirts",
   "Shirts",
   "Hoodies",
@@ -45,6 +45,8 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [categoryOptions] = useState<string[]>(DEFAULT_CATEGORIES);
 
   // Form State
   const [title, setTitle] = useState(initialProduct?.title || "");
@@ -154,7 +156,6 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
       const details = detailsText.split("\n").filter((l) => l.trim().length > 0);
       const fabricCare = fabricCareText.split("\n").filter((l) => l.trim().length > 0);
 
-      // Generate variant matrix
       const variants = selectedSizes.flatMap((s) =>
         colors.map((c) => ({
           sku: `${slug.toUpperCase().slice(0, 4)}-${s}-${c.name.toUpperCase().slice(0, 3)}`,
@@ -227,9 +228,16 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            color: "var(--adm-text-muted)",
-            fontSize: "0.85rem",
+            padding: "10px 20px",
+            borderRadius: "9999px",
+            backgroundColor: "#FFFFFF",
+            color: "#121110",
+            fontSize: "13.5px",
+            fontWeight: 700,
             textDecoration: "none",
+            border: "1px solid rgba(0,0,0,0.14)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            transition: "all 0.2s ease",
           }}
         >
           <ArrowLeft size={16} />
@@ -240,10 +248,26 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="admin-action-btn-primary"
+            style={{
+              padding: "11px 26px",
+              borderRadius: "9999px",
+              backgroundColor: "#121110",
+              color: "#FFFFFF",
+              fontSize: "14px",
+              fontWeight: 800,
+              letterSpacing: "0.02em",
+              border: "1px solid rgba(255,255,255,0.12)",
+              cursor: submitting ? "not-allowed" : "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              boxShadow: "0 6px 20px rgba(18, 17, 16, 0.22)",
+              opacity: submitting ? 0.75 : 1,
+              transition: "all 0.2s ease",
+            }}
           >
-            <Save size={16} />
-            <span>{submitting ? "Saving..." : isEdit ? "Update Apparel" : "Publish Apparel"}</span>
+            <Sparkles size={16} color="#F2AC24" />
+            <span>{submitting ? "Saving..." : isEdit ? "Update Apparel Item" : "Publish Apparel Item"}</span>
           </button>
         </div>
       </div>
@@ -577,7 +601,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                 className="admin-select"
                 style={{ width: "100%", padding: "10px 14px" }}
               >
-                {CATEGORIES.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>

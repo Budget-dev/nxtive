@@ -2,6 +2,7 @@ import React from "react";
 import { notFound } from "next/navigation";
 import { getAdminProductById } from "@/features/admin-dashboard/server/actions";
 import { ProductForm } from "@/features/admin-dashboard/components/product-form";
+import { AdminDataState } from "../../_components/admin-data-state";
 
 export const metadata = {
   title: "Edit Apparel Item | NXTIVE Admin",
@@ -13,7 +14,17 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = await getAdminProductById(id);
+  let product;
+  try {
+    product = await getAdminProductById(id);
+  } catch (error) {
+    return (
+      <AdminDataState
+        title="Product data unavailable"
+        message={error instanceof Error ? error.message : "The product could not be loaded from Firestore."}
+      />
+    );
+  }
 
   if (!product) {
     notFound();

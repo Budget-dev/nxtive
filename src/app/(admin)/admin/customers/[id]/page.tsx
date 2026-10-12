@@ -28,6 +28,7 @@ import {
 } from "@/features/admin-dashboard/server/actions";
 import type { Customer } from "@/types/user";
 import type { Order } from "@/types/order";
+import { AdminDataState, adminErrorMessage } from "../../_components/admin-data-state";
 
 export default function CustomerDetailPage({
   params,
@@ -39,6 +40,7 @@ export default function CustomerDetailPage({
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
@@ -64,6 +66,7 @@ export default function CustomerDetailPage({
         }
       } catch (err) {
         console.error(err);
+        setError(adminErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -80,21 +83,28 @@ export default function CustomerDetailPage({
         : `Activate ${customer.name}'s account?`;
     if (!confirm(confirmMsg)) return;
 
-    await updateCustomerStatus(customer.id, nextStatus);
-    setCustomer((prev) => (prev ? { ...prev, accountStatus: nextStatus } : null));
+    try {
+      const result = await updateCustomerStatus(customer.id, nextStatus);
+      if (!result.success) throw new Error(result.error || "Unable to update customer status");
+      setCustomer((prev) => (prev ? { ...prev, accountStatus: nextStatus } : null));
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    }
   };
 
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer) return;
-    await updateCustomerDetails(customer.id, {
-      phone,
-      notes,
-    });
-    setCustomer((prev) => (prev ? { ...prev, phone, notes } : null));
-    setIsEditing(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
+    try {
+      const result = await updateCustomerDetails(customer.id, { phone, notes });
+      if (!result.success) throw new Error(result.error || "Unable to update customer details");
+      setCustomer((prev) => (prev ? { ...prev, phone, notes } : null));
+      setIsEditing(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    }
   };
 
   if (loading) {
@@ -104,6 +114,10 @@ export default function CustomerDetailPage({
         <div style={{ height: "300px", backgroundColor: "#FFFFFF", borderRadius: "12px", border: "1px solid #E8E5DF" }} />
       </div>
     );
+  }
+
+  if (error && !customer) {
+    return <AdminDataState title="Customer data unavailable" message={error} />;
   }
 
   if (!customer) {
@@ -342,14 +356,14 @@ export default function CustomerDetailPage({
                 {formatCurrency(customer.totalSpent)}
               </div>
               <div style={{ fontSize: "12px", color: "#137333", fontWeight: 600, marginTop: "4px" }}>
-                {customer.ordersCount} completed orders
+                {customer.ordersCount} recorded non-cancelled orders
               </div>
             </div>
 
             <div className="admin-card" style={{ padding: "20px" }}>
               <div style={{ fontSize: "12.5px", color: "var(--adm-text-muted)", fontWeight: 600 }}>Account Standing</div>
               <div style={{ fontSize: "20px", fontWeight: 800, color: isSuspended ? "#C5221F" : "#137333", marginTop: "4px" }}>
-                {isSuspended ? "Suspended" : "Verified Customer"}
+                {isSuspended ? "Suspended" : "Active Customer"}
               </div>
               <div style={{ fontSize: "12px", color: "var(--adm-text-muted)", marginTop: "4px" }}>
                 Last Active: {new Date(customer.lastActivity).toLocaleDateString("en-GB")}

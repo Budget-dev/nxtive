@@ -1,28 +1,27 @@
-// GET/PATCH /api/orders/[orderId] — Get or update a single order (admin)
+// GET/PATCH /api/orders/[orderId] — customer read or authorized admin update
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase/admin";
+import { adminDb } from "@/lib/firebase/admin";
+import { AuthError, requireAdmin, requireUser, tryRequireAdmin } from "@/server/auth";
 import { ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 import type { OrderStatus } from "@/types/order";
 import { z } from "zod";
 
-async function getAuthenticatedUser(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  try {
-    return await adminAuth.verifyIdToken(authHeader.slice(7));
-  } catch {
-    return null;
-  }
-}
-
-async function isAdmin(uid: string): Promise<boolean> {
-  const userDoc = await adminDb.collection("users").doc(uid).get();
-  if (!userDoc.exists) return false;
-  const role = userDoc.data()?.role;
-  return role === "admin" || role === "super_admin";
-}
+const orderStatusSchema = z.enum([
+  "pending",
+  "payment_confirmed",
+  "processing",
+  "packed",
+  "shipped",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+  "return_requested",
+  "returned",
+  "refund_initiated",
+  "refunded",
+]);
 
 export async function GET(
   req: NextRequest,
@@ -30,7 +29,12 @@ export async function GET(
 ) {
   try {
     const { orderId } = await params;
-    const user = await getAuthenticatedUser(req);
+    if (!orderId || orderId.length > 160) {
+      return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
+    }
+
+    const admin = await tryRequireAdmin("orders.view", req);
+    const user = admin || await requireUser(req);
     if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
@@ -41,9 +45,6 @@ export async function GET(
     }
 
     const order = orderDoc.data()!;
-
-    // Non-admin can only view own orders
-    const admin = await isAdmin(user.uid);
     if (!admin && order.userId !== user.uid) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
@@ -52,19 +53,23 @@ export async function GET(
       success: true,
       data: { id: orderDoc.id, ...order },
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+    }
+    console.error("[order-read] Error:", error);
+    return NextResponse.json({ success: false, error: "Unable to load order" }, { status: 500 });
   }
 }
 
 const updateOrderSchema = z.object({
-  status: z.string().optional(),
-  trackingNumber: z.string().optional(),
-  trackingUrl: z.string().optional(),
-  notes: z.string().optional(),
-  cancelReason: z.string().optional(),
-  returnReason: z.string().optional(),
-});
+  status: orderStatusSchema.optional(),
+  trackingNumber: z.string().trim().min(1).max(160).optional(),
+  trackingUrl: z.string().url().max(2048).optional(),
+  notes: z.string().trim().max(1000).optional(),
+  cancelReason: z.string().trim().max(500).optional(),
+  returnReason: z.string().trim().max(500).optional(),
+}).strict();
 
 export async function PATCH(
   req: NextRequest,
@@ -72,26 +77,28 @@ export async function PATCH(
 ) {
   try {
     const { orderId } = await params;
-    const user = await getAuthenticatedUser(req);
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    if (!orderId || orderId.length > 160) {
+      return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
 
-    const admin = await isAdmin(user.uid);
+    const admin = await requireAdmin("orders.edit", req);
     if (!admin) {
       return NextResponse.json({ success: false, error: "Admin access required" }, { status: 403 });
     }
 
     const body = await req.json();
     const parsed = updateOrderSchema.safeParse(body);
-    if (!parsed.success) {
+    if (!parsed.success || Object.keys(parsed.data).length === 0) {
       return NextResponse.json({ success: false, error: "Invalid update data" }, { status: 400 });
     }
 
     const updates = parsed.data;
+    if (updates.status === "cancelled" && !admin.permissions.includes("orders.cancel") && admin.role !== "super_admin") {
+      return NextResponse.json({ success: false, error: "Order cancellation is not authorized" }, { status: 403 });
+    }
+
     const orderRef = adminDb.collection("orders").doc(orderId);
     const orderDoc = await orderRef.get();
-
     if (!orderDoc.exists) {
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
@@ -100,7 +107,6 @@ export async function PATCH(
     const now = new Date().toISOString();
     const updateData: Record<string, unknown> = { updatedAt: now };
 
-    // -- Status transition validation --
     if (updates.status) {
       const currentStatus = order.status as OrderStatus;
       const newStatus = updates.status as OrderStatus;
@@ -115,18 +121,20 @@ export async function PATCH(
 
       updateData.status = newStatus;
       updateData.statusHistory = [
-        ...(order.statusHistory || []),
+        ...(Array.isArray(order.statusHistory) ? order.statusHistory : []),
         {
           status: newStatus,
           timestamp: now,
-          note: updates.notes || `Status updated by admin`,
-          updatedBy: user.uid,
+          note: updates.notes || "Status updated by admin",
+          updatedBy: admin.uid,
         },
       ];
 
-      // Auto-update payment status for certain transitions
       if (newStatus === "cancelled") {
         updateData.cancelReason = updates.cancelReason || "Cancelled by admin";
+      }
+      if (newStatus === "return_requested" && updates.returnReason) {
+        updateData.returnReason = updates.returnReason;
       }
       if (newStatus === "refund_initiated") {
         updateData.paymentStatus = "refund_initiated";
@@ -142,20 +150,22 @@ export async function PATCH(
 
     await orderRef.update(updateData);
 
-    // Log admin action
     await adminDb.collection("admin_logs").add({
       action: "order.update",
       resource: "orders",
       resourceId: orderId,
-      adminUid: user.uid,
-      adminEmail: user.email || "",
+      adminUid: admin.uid,
+      adminEmail: admin.email || "",
       details: JSON.stringify(updates),
       timestamp: now,
     });
 
     return NextResponse.json({ success: true, data: { id: orderId, ...updateData } });
-  } catch (error: any) {
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+    }
     console.error("[order-update] Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Unable to update order" }, { status: 500 });
   }
 }

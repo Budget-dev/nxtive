@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Package,
@@ -13,9 +12,7 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  RefreshCw,
   ExternalLink,
-  ShieldAlert,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
@@ -36,12 +33,9 @@ const ALL_STATUSES: OrderStatus[] = [
   "delivered",
   "cancelled",
   "returned",
-  "refund_initiated",
-  "refunded",
 ];
 
 export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerProps) {
-  const router = useRouter();
   const [order, setOrder] = useState<Order>(initialOrder);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(initialOrder.status);
   const [statusNote, setStatusNote] = useState("");
@@ -51,10 +45,6 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Refund state
-  const [showRefundModal, setShowRefundModal] = useState(false);
-  const [refundReason, setRefundReason] = useState("Customer requested cancellation");
-  const [refunding, setRefunding] = useState(false);
 
   const handleUpdateStatus = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,39 +90,6 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
       setMessage({ type: "error", text: err?.message || "Failed to update order." });
     } finally {
       setUpdating(false);
-    }
-  };
-
-  const handleInitiateRefund = async () => {
-    setRefunding(true);
-    try {
-      const res = await updateOrderStatus(
-        order.id,
-        "refunded",
-        `Refund of ${formatCurrency(order.total)} processed. Reason: ${refundReason}`
-      );
-      if (res.success) {
-        setOrder((prev) => ({
-          ...prev,
-          status: "refunded",
-          paymentStatus: "refunded",
-          statusHistory: [
-            ...(prev.statusHistory || []),
-            {
-              status: "refunded",
-              timestamp: new Date().toISOString(),
-              note: `Refund completed: ${refundReason}`,
-              updatedBy: "admin",
-            },
-          ],
-        }));
-        setShowRefundModal(false);
-        setMessage({ type: "success", text: "Refund recorded and marked as completed." });
-      }
-    } catch (err: any) {
-      alert("Failed to record refund: " + err?.message);
-    } finally {
-      setRefunding(false);
     }
   };
 
@@ -218,16 +175,10 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
           </p>
         </div>
 
-        {order.paymentMethod === "Razorpay" && order.paymentStatus === "paid" && (
-          <button
-            type="button"
-            onClick={() => setShowRefundModal(true)}
-            className="admin-action-btn-secondary"
-            style={{ color: "#F87171", borderColor: "rgba(239, 68, 68, 0.3)" }}
-          >
-            <ShieldAlert size={15} />
-            <span>Process Razorpay Refund</span>
-          </button>
+        {order.paymentStatus === "paid" && (
+          <span className="admin-action-btn-secondary" style={{ color: "var(--adm-text-muted)", cursor: "not-allowed" }}>
+            Refund unavailable until payment provider integration is implemented
+          </span>
         )}
       </div>
 
@@ -572,48 +523,6 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
         </div>
       </div>
 
-      {/* Refund Modal */}
-      {showRefundModal && (
-        <div className="admin-modal-backdrop">
-          <div className="admin-modal">
-            <div className="admin-modal-header">
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--adm-text)" }}>
-                Confirm Razorpay Refund
-              </h3>
-              <button onClick={() => setShowRefundModal(false)} className="admin-icon-btn">
-                ×
-              </button>
-            </div>
-            <div className="admin-modal-body">
-              <p style={{ fontSize: "0.85rem", color: "var(--adm-text-secondary)", marginBottom: "16px" }}>
-                You are initiating a full refund of <strong style={{ color: "#F2AC24" }}>{formatCurrency(order.total)}</strong> for Order #{order.orderNumber}.
-              </p>
-              <div className="admin-form-group">
-                <label className="admin-form-label">Reason for Refund</label>
-                <textarea
-                  value={refundReason}
-                  onChange={(e) => setRefundReason(e.target.value)}
-                  rows={3}
-                  className="admin-textarea"
-                />
-              </div>
-            </div>
-            <div className="admin-modal-footer">
-              <button onClick={() => setShowRefundModal(false)} className="admin-action-btn-secondary">
-                Cancel
-              </button>
-              <button
-                onClick={handleInitiateRefund}
-                disabled={refunding}
-                className="admin-action-btn-primary"
-                style={{ backgroundColor: "#EF4444", color: "#FFF" }}
-              >
-                {refunding ? "Processing..." : "Authorize Refund"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

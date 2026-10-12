@@ -3,11 +3,15 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/admin";
+import { adminDb, hasAdminCredentials } from "@/lib/firebase/admin";
 import { getRazorpayAdapter } from "@/server/payments";
 
 export async function POST(req: NextRequest) {
   try {
+    if (!hasAdminCredentials) {
+      return NextResponse.json({ success: false, error: "Webhook service unavailable" }, { status: 503 });
+    }
+
     const rawBody = await req.text();
     const signature = req.headers.get("x-razorpay-signature");
 
@@ -24,9 +28,14 @@ export async function POST(req: NextRequest) {
       return new Response("Invalid signature", { status: 400 });
     }
 
-    const event = JSON.parse(rawBody);
-    const eventType: string = event.event;
-    const payload = event.payload;
+    let event: any;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return new Response("Invalid payload", { status: 400 });
+    }
+    const eventType: string = typeof event.event === "string" ? event.event : "";
+    const payload = event.payload && typeof event.payload === "object" ? event.payload : {};
 
     const now = new Date().toISOString();
 
@@ -36,6 +45,7 @@ export async function POST(req: NextRequest) {
         if (!payment) break;
 
         const razorpayOrderId = payment.order_id;
+        if (typeof razorpayOrderId !== "string" || typeof payment.id !== "string") break;
 
         // Update payment record
         const paymentSnap = await adminDb
@@ -61,7 +71,7 @@ export async function POST(req: NextRequest) {
             const orderSnap = await orderRef.get();
             if (orderSnap.exists) {
               const order = orderSnap.data()!;
-              if (order.paymentStatus !== "paid") {
+               if (order.paymentStatus !== "paid" && order.paymentStatus !== "refunded" && order.paymentStatus !== "refund_initiated") {
                 await orderRef.update({
                   paymentStatus: "paid",
                   status: "payment_confirmed",
@@ -87,6 +97,7 @@ export async function POST(req: NextRequest) {
         if (!payment) break;
 
         const razorpayOrderId = payment.order_id;
+        if (typeof razorpayOrderId !== "string") break;
 
         const paymentSnap = await adminDb
           .collection("payments")
@@ -110,6 +121,8 @@ export async function POST(req: NextRequest) {
         if (!refund) break;
 
         const paymentId = refund.payment_id;
+        const refundPaise = Number(refund.amount);
+        if (typeof paymentId !== "string" || typeof refund.id !== "string" || !Number.isInteger(refundPaise) || refundPaise <= 0) break;
 
         const paymentSnap = await adminDb
           .collection("payments")
@@ -119,35 +132,46 @@ export async function POST(req: NextRequest) {
 
         if (!paymentSnap.empty) {
           const paymentDoc = paymentSnap.docs[0];
-          await paymentDoc.ref.update({
-            status: "refunded",
-            refundId: refund.id,
-            refundAmount: refund.amount,
-            updatedAt: now,
-          });
+           await paymentDoc.ref.update({
+             status: "refunded",
+             refundId: refund.id,
+             refundAmount: refundPaise,
+             updatedAt: now,
+           });
 
           const paymentData = paymentDoc.data();
           if (paymentData.orderId) {
             const orderRef = adminDb.collection("orders").doc(paymentData.orderId);
             const orderSnap = await orderRef.get();
-            if (orderSnap.exists) {
-              const order = orderSnap.data()!;
-              await orderRef.update({
-                paymentStatus: "refunded",
-                status: "refunded",
-                refundId: refund.id,
-                refundAmount: refund.amount / 100, // convert paise to INR
-                updatedAt: now,
-                statusHistory: [
-                  ...(order.statusHistory || []),
-                  {
-                    status: "refunded",
-                    timestamp: now,
-                    note: `Refund processed: ${refund.id}`,
-                  },
-                ],
-              });
-            }
+             if (orderSnap.exists) {
+               const order = orderSnap.data()!;
+               const orderTotal = Number(order.total);
+               const previousRefund = Number(order.refundAmount || 0);
+               const refundInr = refundPaise / 100;
+               const totalRefunded = Math.round((previousRefund + refundInr) * 100) / 100;
+               if (!Number.isFinite(orderTotal) || orderTotal <= 0 || !Number.isFinite(previousRefund) || previousRefund < 0 || totalRefunded > orderTotal) {
+                 console.error("[razorpay-webhook] Ignoring refund greater than order total", refund.id);
+                 break;
+               }
+               if (order.refundId === refund.id && order.paymentStatus === "refunded") break;
+               const fullyRefunded = totalRefunded >= orderTotal;
+               const refundStatus = fullyRefunded ? "refunded" : "refund_initiated";
+               await orderRef.update({
+                 paymentStatus: refundStatus,
+                 status: refundStatus,
+                 refundId: refund.id,
+                 refundAmount: totalRefunded,
+                 updatedAt: now,
+                 statusHistory: [
+                   ...(Array.isArray(order.statusHistory) ? order.statusHistory : []),
+                   {
+                     status: refundStatus,
+                     timestamp: now,
+                     note: fullyRefunded ? `Refund processed: ${refund.id}` : `Partial refund processed: ${refund.id}`,
+                   },
+                 ],
+               });
+             }
           }
         }
         break;
@@ -161,7 +185,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("[razorpay-webhook] Error:", error);
-    // Return 200 to prevent Razorpay retries for processing errors
-    return NextResponse.json({ success: false, error: error.message }, { status: 200 });
+    // Return a generic retryable response without exposing exception text.
+    return NextResponse.json({ success: false, error: "Webhook processing failed" }, { status: 500 });
   }
 }

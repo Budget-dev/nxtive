@@ -23,11 +23,13 @@ import {
   toggleAdminUserStatus,
 } from "@/features/admin-dashboard/server/actions";
 import type { AdminUser, AdminRoleDefinition } from "@/types/user";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<AdminRoleDefinition[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
 
@@ -39,12 +41,16 @@ export default function AdminUsersPage() {
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [u, r] = await Promise.all([getAdminUsers(), getAdminRoles()]);
       setUsers(u);
       setRoles(r);
     } catch (err) {
       console.error(err);
+      setUsers([]);
+      setRoles([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -63,7 +69,13 @@ export default function AdminUsersPage() {
     setUsers((prev) =>
       prev.map((item) => (item.uid === u.uid ? { ...item, isActive: nextState } : item))
     );
-    await toggleAdminUserStatus(u.uid, nextState);
+    try {
+      const result = await toggleAdminUserStatus(u.uid, nextState);
+      if (!result.success) throw new Error(result.error || "Unable to update admin user");
+    } catch (err) {
+      setUsers((prev) => prev.map((item) => (item.uid === u.uid ? u : item)));
+      setError(adminErrorMessage(err));
+    }
   };
 
   const openNewModal = () => {
@@ -87,15 +99,27 @@ export default function AdminUsersPage() {
       });
       setShowAddModal(false);
       await loadData();
-    } catch {
-      alert("Failed to save admin user");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setSaving(false);
     }
   };
 
+  if (error && users.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Admin user data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadData}
+      />
+    );
+  }
+
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Admin user operation failed" message={error} /></div>}
       {/* Header */}
       <div
         style={{
@@ -149,7 +173,13 @@ export default function AdminUsersPage() {
                     <div style={{ color: "var(--adm-text-muted)" }}>Loading admin accounts...</div>
                   </td>
                 </tr>
-              ) : (
+               ) : users.length === 0 ? (
+                 <tr>
+                   <td colSpan={6} style={{ textAlign: "center", padding: "40px", color: "var(--adm-text-muted)" }}>
+                     No admin users have been recorded in Firestore.
+                   </td>
+                 </tr>
+               ) : (
                 users.map((u) => {
                   const roleDef = roles.find((r) => r.slug === u.role);
 

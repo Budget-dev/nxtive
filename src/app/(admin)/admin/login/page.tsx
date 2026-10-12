@@ -3,10 +3,10 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useAdminAuth } from "@/features/admin-dashboard/components/admin-auth-context";
-import { Lock, Mail, ArrowRight, Zap, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 export default function AdminLoginPage() {
-  const { loginAsAdmin, loginDemoAdmin } = useAdminAuth();
+  const { loginAsAdmin } = useAdminAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -253,52 +253,6 @@ export default function AdminLoginPage() {
               {!loading && <ArrowRight size={15} />}
             </button>
           </form>
-        </div>
-
-        {/* Demo Access */}
-        <div
-          style={{
-            marginTop: "16px",
-            padding: "14px",
-            borderRadius: "10px",
-            backgroundColor: "#141414",
-            border: "1px dashed #2A2A2A",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "0.75rem",
-              color: "#666666",
-              marginBottom: "10px",
-              fontWeight: 500,
-            }}
-          >
-            Development quick access
-          </div>
-          <button
-            type="button"
-            onClick={() => loginDemoAdmin()}
-            style={{
-              width: "100%",
-              padding: "9px 14px",
-              borderRadius: "6px",
-              backgroundColor: "rgba(255, 255, 255, 0.06)",
-              border: "1px solid #2A2A2A",
-              color: "#BBBBBB",
-              fontSize: "0.82rem",
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              cursor: "pointer",
-              transition: "background-color 0.2s ease",
-            }}
-          >
-            <Zap size={13} />
-            <span>Demo Admin Login</span>
-          </button>
         </div>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>

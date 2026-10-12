@@ -44,8 +44,18 @@ export function Footer() {
           className="footer-grid"
         >
           {/* Column 1: Brand Info */}
-          <div style={{ maxWidth: "260px" }}>
-            <Link href="/" aria-label="NXTVIE Home" style={{ display: "inline-block", marginBottom: "18px" }}>
+          <div className="footer-brand" style={{ maxWidth: "260px" }}>
+            <Link
+              href="/"
+              aria-label="NXTVIE Home"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                minWidth: "44px",
+                minHeight: "44px",
+                marginBottom: "18px",
+              }}
+            >
               <NxtvieLogo size={22} color="#FFFFFF" />
             </Link>
             <p
@@ -66,7 +76,15 @@ export function Footer() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Instagram"
-                style={{ color: "#D1CCC2", transition: "color 0.2s ease", display: "flex" }}
+                style={{
+                  color: "#D1CCC2",
+                  transition: "color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "44px",
+                  height: "44px",
+                }}
                 className="footer-social-icon"
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -80,7 +98,15 @@ export function Footer() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="YouTube"
-                style={{ color: "#D1CCC2", transition: "color 0.2s ease", display: "flex" }}
+                style={{
+                  color: "#D1CCC2",
+                  transition: "color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "44px",
+                  height: "44px",
+                }}
                 className="footer-social-icon"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,7 +119,15 @@ export function Footer() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="X (Twitter)"
-                style={{ color: "#D1CCC2", transition: "color 0.2s ease", display: "flex" }}
+                style={{
+                  color: "#D1CCC2",
+                  transition: "color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "44px",
+                  height: "44px",
+                }}
                 className="footer-social-icon"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -104,7 +138,7 @@ export function Footer() {
           </div>
 
           {/* Column 2: Shop */}
-          <div>
+          <div className="footer-menu">
             <h4
               style={{
                 fontSize: "13px",
@@ -120,8 +154,15 @@ export function Footer() {
               {["Men", "New Arrivals", "Clothing", "Accessories", "Collections", "Sale"].map((item) => (
                 <li key={item}>
                   <Link
-                    href={`/categories/${item.toLowerCase().replace(/\s+/g, "-")}`}
-                    style={{ fontSize: "12.5px", color: "#9A948C", transition: "color 0.2s ease" }}
+                      href={`/categories/${item.toLowerCase().replace(/\s+/g, "-")}`}
+                      style={{
+                        fontSize: "12.5px",
+                        color: "#9A948C",
+                        transition: "color 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        minHeight: "44px",
+                      }}
                     className="footer-link"
                   >
                     {item}
@@ -132,7 +173,7 @@ export function Footer() {
           </div>
 
           {/* Column 3: Help */}
-          <div>
+          <div className="footer-menu">
             <h4
               style={{
                 fontSize: "13px",
@@ -156,7 +197,14 @@ export function Footer() {
                 <li key={item.label}>
                   <Link
                     href={item.href}
-                    style={{ fontSize: "12.5px", color: "#9A948C", transition: "color 0.2s ease" }}
+                    style={{
+                      fontSize: "12.5px",
+                      color: "#9A948C",
+                      transition: "color 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      minHeight: "44px",
+                    }}
                     className="footer-link"
                   >
                     {item.label}
@@ -167,7 +215,7 @@ export function Footer() {
           </div>
 
           {/* Column 4: About */}
-          <div>
+          <div className="footer-menu">
             <h4
               style={{
                 fontSize: "13px",
@@ -190,7 +238,14 @@ export function Footer() {
                 <li key={item.label}>
                   <Link
                     href={item.href}
-                    style={{ fontSize: "12.5px", color: "#9A948C", transition: "color 0.2s ease" }}
+                    style={{
+                      fontSize: "12.5px",
+                      color: "#9A948C",
+                      transition: "color 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      minHeight: "44px",
+                    }}
                     className="footer-link"
                   >
                     {item.label}
@@ -201,7 +256,7 @@ export function Footer() {
           </div>
 
           {/* Column 5: Newsletter */}
-          <div style={{ minWidth: "220px" }}>
+          <div className="footer-newsletter" style={{ minWidth: "220px" }}>
             <h4
               style={{
                 fontSize: "13px",
@@ -259,15 +314,17 @@ export function Footer() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     aria-label="Enter your email"
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      outline: "none",
-                      color: "#FFFFFF",
-                      fontSize: "12.5px",
-                      padding: "9px 12px",
-                    }}
+                   style={{
+                     flex: 1,
+                     background: "transparent",
+                     border: "none",
+                     outline: "none",
+                     color: "#FFFFFF",
+                     fontSize: "12.5px",
+                     minWidth: 0,
+                     minHeight: "44px",
+                     padding: "9px 12px",
+                   }}
                   />
                   <button
                     type="submit"
@@ -276,8 +333,8 @@ export function Footer() {
                       backgroundColor: "#FFFFFF",
                       color: "#111110",
                       border: "none",
-                      width: "36px",
-                      height: "36px",
+                      width: "44px",
+                      height: "44px",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -309,8 +366,8 @@ export function Footer() {
                     style={{
                       accentColor: "#FFFFFF",
                       cursor: "pointer",
-                      width: "12px",
-                      height: "12px",
+                       width: "18px",
+                       height: "18px",
                     }}
                   />
                   <span>I agree to receive marketing emails.</span>
@@ -336,7 +393,7 @@ export function Footer() {
         >
           <div>© 2024 NXTVIE. All rights reserved.</div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+           <div className="footer-bottom-links" style={{ display: "flex", alignItems: "center", gap: "24px" }}>
             <Link href="/privacy" className="footer-bottom-link">
               Privacy Policy
             </Link>
@@ -351,19 +408,26 @@ export function Footer() {
       </div>
 
       <style jsx global>{`
-        .footer-link:hover {
-          color: #FFFFFF !important;
-        }
-        .footer-social-icon:hover {
-          color: #FFFFFF !important;
-          transform: translateY(-1px);
+        @media (hover: hover) and (pointer: fine) {
+          .footer-link:hover {
+            color: #FFFFFF !important;
+          }
+          .footer-social-icon:hover {
+            color: #FFFFFF !important;
+            transform: translateY(-1px);
+          }
         }
         .footer-bottom-link {
           color: #7E7972;
           transition: color 0.2s ease;
+          min-height: 44px;
+          display: inline-flex;
+          align-items: center;
         }
-        .footer-bottom-link:hover {
-          color: #D1CCC2;
+        @media (hover: hover) and (pointer: fine) {
+          .footer-bottom-link:hover {
+            color: #D1CCC2;
+          }
         }
         @media (max-width: 768px) {
           .footer-grid {
@@ -372,7 +436,22 @@ export function Footer() {
         }
         @media (max-width: 480px) {
           .footer-grid {
-            grid-template-columns: 1fr !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 32px 20px !important;
+          }
+          .footer-brand,
+          .footer-newsletter {
+            grid-column: 1 / -1;
+            max-width: none !important;
+            min-width: 0 !important;
+          }
+          .footer-menu {
+            min-width: 0;
+          }
+          .footer-bottom-links {
+            width: 100%;
+            flex-wrap: wrap;
+            gap: 8px 16px !important;
           }
         }
       `}</style>

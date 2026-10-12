@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
-import { createOrder as createFirestoreOrder } from "@/lib/firebase/firestore";
+import { onIdTokenChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase/client";
 
 export interface ProductItem {
   id: string;
@@ -49,9 +50,9 @@ export interface Order {
   discount: number;
   shipping: number;
   total: number;
-  status: "Order Confirmed" | "Processing" | "Shipped" | "Delivered";
+  status: "Order Confirmed" | "Processing" | "Shipped" | "Delivered" | "Cancelled";
   paymentMethod: string;
-  paymentStatus: "Paid" | "Pending COD";
+  paymentStatus: "Paid" | "Pending COD" | "Refunded";
   shippingAddress: {
     fullName: string;
     email: string;
@@ -105,57 +106,55 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
-const SAMPLE_ORDERS: Order[] = [
-  {
-    id: "NX-2026-94812",
-    date: "2026-09-24",
-    items: [
-      {
-        id: "prod-1",
-        title: "Oversized Essential Tee",
-        price: 799,
-        quantity: 1,
-        selectedSize: "L",
-        selectedColor: "Pitch Black",
-        image: "/images/nxtvie/product-oversized-tee-hd.jpg",
-      },
-      {
-        id: "prod-6",
-        title: "NXTVIE Cap",
-        price: 599,
-        quantity: 1,
-        selectedSize: "One Size",
-        selectedColor: "Deep Black",
-        image: "/images/nxtvie/product-cap-hd.jpg",
-      },
-    ],
-    subtotal: 1398,
-    discount: 140,
-    shipping: 0,
-    total: 1258,
-    status: "Delivered",
-    paymentMethod: "Razorpay UPI (Google Pay)",
-    paymentStatus: "Paid",
-    shippingAddress: {
-      fullName: "Kabir Mehra",
-      email: "kabir.mehra@example.com",
-      phone: "+91 98201 44521",
-      street: "402, Horizon Tower, Bandra West",
-      apartment: "Flat 402",
-      city: "Mumbai",
-      state: "Maharashtra",
-      postalCode: "400050",
-      country: "India",
-    },
-    deliveryDateEstimate: "28 Sep 2026",
-    trackingNumber: "DEL-NXT-902341",
-  },
-];
+function toIsoDate(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate?: unknown }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function normalizeOrder(raw: any): Order {
+  const rawStatus = String(raw.status || "pending").toLowerCase();
+  const status: Order["status"] = rawStatus === "delivered"
+    ? "Delivered"
+    : rawStatus === "shipped" || rawStatus === "out_for_delivery"
+      ? "Shipped"
+      : rawStatus === "cancelled" || rawStatus === "refunded"
+        ? "Cancelled"
+        : rawStatus === "processing" || rawStatus === "packed" || rawStatus === "payment_confirmed"
+          ? "Processing"
+          : "Order Confirmed";
+  const createdAt = toIsoDate(raw.createdAt || raw.date);
+  return {
+    id: String(raw.id || raw.orderId || ""),
+    date: createdAt.split("T")[0],
+    items: Array.isArray(raw.items) ? raw.items.map((item: any) => ({
+      id: String(item.productId || item.id || ""),
+      title: String(item.title || "Product"),
+      price: Number(item.price || 0),
+      quantity: Number(item.quantity || 0),
+      selectedSize: String(item.selectedSize || ""),
+      selectedColor: item.selectedColor ? String(item.selectedColor) : undefined,
+      image: String(item.image || ""),
+    })) : [],
+    subtotal: Number(raw.subtotal || 0),
+    discount: Number(raw.discount || 0),
+    shipping: Number(raw.shipping || 0),
+    total: Number(raw.total || 0),
+    status,
+    paymentMethod: String(raw.paymentMethod || "Cash on Delivery"),
+    paymentStatus: raw.paymentStatus === "paid" ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending COD",
+    shippingAddress: raw.shippingAddress,
+    deliveryDateEstimate: String(raw.deliveryDateEstimate || ""),
+    trackingNumber: String(raw.trackingNumber || ""),
+  };
+}
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
-  const [orders, setOrders] = useState<Order[]>(SAMPLE_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [couponCode, setCouponCode] = useState<string | null>(null);
   const [discountRate, setDiscountRate] = useState<number>(0);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -172,8 +171,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const savedWishlist = localStorage.getItem("nxtvie_wishlist");
       if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
 
-      const savedOrders = localStorage.getItem("nxtvie_orders");
-      if (savedOrders) setOrders(JSON.parse(savedOrders));
     } catch {
       // Ignore storage errors in non-browser envs
     }
@@ -193,10 +190,30 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [wishlist]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("nxtvie_orders", JSON.stringify(orders));
-    } catch {}
-  }, [orders]);
+    let disposed = false;
+    const unsubscribe = onIdTokenChanged(auth, async (user: { getIdToken: () => Promise<string> } | null) => {
+      if (!user) {
+        if (!disposed) setOrders([]);
+        return;
+      }
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/orders?page=1&pageSize=100", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error("Unable to load orders");
+        if (!disposed) setOrders((result.data?.items || []).map(normalizeOrder));
+      } catch {
+        if (!disposed) setOrders([]);
+      }
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -331,87 +348,53 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     deliveryMethod: string;
     userId?: string;
   }): Promise<Order> => {
-    // Generate idempotency key once per submission attempt
+    const currentUser = auth.currentUser;
+    if (!currentUser || (userId && currentUser.uid !== userId)) {
+      throw new Error("Please sign in before placing an order.");
+    }
+
     const idempotencyKey =
       idempotencyRef.current || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     idempotencyRef.current = idempotencyKey;
 
-    const orderItems: OrderItem[] = cart.map((item) => ({
-      id: item.id,
-      title: item.title,
-      price: item.price,
-      quantity: item.quantity,
-      selectedSize: item.selectedSize,
-      selectedColor: item.selectedColor,
-      image: item.image,
-    }));
-
-    const finalShipping = deliveryMethod.includes("Priority") ? 150 : shippingFee;
-    const finalTotal = Math.max(0, cartSubtotal - discountAmount + finalShipping);
-    const trackingNumber = `EXP-NXT-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    // Attempt Firestore persistence
-    let firestoreOrderId: string | null = null;
-    const effectiveUserId = userId || `anon-${Date.now()}`;
     try {
-      firestoreOrderId = await createFirestoreOrder({
-        userId: effectiveUserId,
-        items: orderItems.map((i) => ({
-          productId: i.id,
-          title: i.title,
-          price: i.price,
-          quantity: i.quantity,
-          selectedSize: i.selectedSize,
-          selectedColor: i.selectedColor,
-          image: i.image,
-        })),
-        subtotal: cartSubtotal,
-        discount: discountAmount,
-        shipping: finalShipping,
-        total: finalTotal,
-        status: "Order Confirmed",
-        paymentMethod,
-        paymentStatus: paymentMethod.toLowerCase().includes("cash") ? "Pending COD" : "Paid",
-        shippingAddress,
-        deliveryDateEstimate: deliveryMethod.includes("Priority")
-          ? "1-2 Business Days"
-          : "4-5 Business Days",
-        trackingNumber,
-        idempotencyKey,
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          userId: currentUser.uid,
+          items: cart.map((item) => ({
+            productId: item.id,
+            title: item.title,
+            price: item.price,
+            quantity: item.quantity,
+            selectedSize: item.selectedSize,
+            selectedColor: item.selectedColor,
+            image: item.image,
+          })),
+          shippingAddress,
+          deliveryMethod,
+          couponCode: couponCode || undefined,
+          idempotencyKey,
+        }),
       });
-    } catch (err) {
-      console.error("Firestore order creation failed, falling back to local:", err);
-      // Continue with local order — do not block checkout
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(result.error || "Unable to create order.");
+      }
+      const newOrder = normalizeOrder(result.data);
+      idempotencyRef.current = null;
+      setOrders((prev) => [newOrder, ...prev.filter((order) => order.id !== newOrder.id)]);
+      clearCart();
+      return newOrder;
+    } catch (error) {
+      idempotencyRef.current = null;
+      throw error;
     }
-
-    const newOrderId = firestoreOrderId
-      ? `NX-${firestoreOrderId.slice(0, 8).toUpperCase()}`
-      : `NX-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-
-    const newOrder: Order = {
-      id: newOrderId,
-      date: new Date().toISOString().split("T")[0],
-      items: orderItems,
-      subtotal: cartSubtotal,
-      discount: discountAmount,
-      shipping: finalShipping,
-      total: finalTotal,
-      status: "Order Confirmed",
-      paymentMethod,
-      paymentStatus: paymentMethod.toLowerCase().includes("cash") ? "Pending COD" : "Paid",
-      shippingAddress,
-      deliveryDateEstimate: deliveryMethod.includes("Priority")
-        ? "1-2 Business Days"
-        : "4-5 Business Days",
-      trackingNumber,
-    };
-
-    // Reset idempotency key so next order gets a new one
-    idempotencyRef.current = null;
-
-    setOrders((prev) => [newOrder, ...prev]);
-    clearCart();
-    return newOrder;
   };
 
   const getOrderById = (orderId: string): Order | undefined => {

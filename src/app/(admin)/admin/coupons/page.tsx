@@ -4,10 +4,12 @@ import React, { useEffect, useState } from "react";
 import { Ticket, Plus, Trash2, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import { getAdminCoupons, saveCoupon, deleteCoupon } from "@/features/admin-dashboard/server/actions";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   // Form State
@@ -20,11 +22,14 @@ export default function AdminCouponsPage() {
 
   const loadCoupons = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminCoupons();
       setCoupons(data);
     } catch (err) {
       console.error(err);
+      setCoupons([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -56,7 +61,7 @@ export default function AdminCouponsPage() {
       setDescription("");
       await loadCoupons();
     } catch (err) {
-      alert("Failed to create coupon");
+      setError(adminErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -64,12 +69,29 @@ export default function AdminCouponsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to deactivate this coupon?")) return;
-    await deleteCoupon(id);
-    setCoupons((prev) => prev.filter((c) => c.id !== id));
+    try {
+      const result = await deleteCoupon(id);
+      if (!result.success) throw new Error(result.error || "Unable to delete coupon");
+      setCoupons((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    }
   };
+
+  if (error && coupons.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Coupon data unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadCoupons}
+      />
+    );
+  }
 
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Coupon operation failed" message={error} /></div>}
       {/* Header */}
       <div className="admin-panel" style={{ marginBottom: "24px" }}>
         <div className="admin-panel-header">
@@ -114,7 +136,7 @@ export default function AdminCouponsPage() {
               ) : coupons.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: "center", padding: "40px" }}>
-                    <div style={{ color: "var(--adm-text-muted)" }}>No active promo codes.</div>
+                    <div style={{ color: "var(--adm-text-muted)" }}>No promo codes have been recorded in Firestore.</div>
                   </td>
                 </tr>
               ) : (

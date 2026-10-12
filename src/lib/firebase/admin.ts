@@ -1,42 +1,51 @@
-// SERVER-ONLY. Firebase Admin SDK (privileged access: full Firestore/Auth/Storage control).
-// Must never be imported from any file under app/(storefront) client components.
-// Uses FIREBASE_ADMIN_* secrets from process.env — never NEXT_PUBLIC_.
+// Privileged Firebase access. Never initialize an ambient/project-only account.
+// Lazy access lets Next.js build without secrets; every runtime operation fails
+// closed unless an explicit service account has been configured.
 import "server-only";
 
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
-import { getFirestore, Firestore } from "firebase-admin/firestore";
-import { getAuth, Auth } from "firebase-admin/auth";
+import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getAuth, type Auth } from "firebase-admin/auth";
+
+export const hasAdminCredentials = Boolean(
+  process.env.FIREBASE_ADMIN_PROJECT_ID?.trim() &&
+  process.env.FIREBASE_ADMIN_CLIENT_EMAIL?.trim() &&
+  process.env.FIREBASE_ADMIN_PRIVATE_KEY?.trim()
+);
+
+export class FirebaseAdminUnavailableError extends Error {
+  constructor() {
+    super("Server authentication is not configured");
+    this.name = "FirebaseAdminUnavailableError";
+  }
+}
 
 function getAdminApp(): App {
-  const existing = getApps();
-  if (existing.length > 0) return existing[0];
-
-  const projectId =
-    process.env.FIREBASE_ADMIN_PROJECT_ID ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(
-    /\\n/g,
-    "\n"
-  );
-
-  // In development/emulator without service account, initialize with project ID only
-  if (!clientEmail || !privateKey) {
-    console.warn(
-      "[firebase-admin] No service account credentials found. " +
-        "Initializing with project ID only — some operations may fail."
-    );
-    return initializeApp({ projectId });
-  }
+  if (!hasAdminCredentials) throw new FirebaseAdminUnavailableError();
+  const existing = getApps().find((app) => app.name === "nxtive-server");
+  if (existing) return existing;
 
   return initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey }),
-    projectId,
+    credential: cert({
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY!.replace(/\\n/g, "\n"),
+    }),
+    projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+  }, "nxtive-server");
+}
+
+function lazyService<T extends object>(initialize: () => T): T {
+  let service: T | undefined;
+  return new Proxy({} as T, {
+    get(_target, property) {
+      service ??= initialize();
+      const value = Reflect.get(service, property, service);
+      return typeof value === "function" ? value.bind(service) : value;
+    },
   });
 }
 
-const adminApp = getAdminApp();
-
-export const adminDb: Firestore = getFirestore(adminApp);
-export const adminAuth: Auth = getAuth(adminApp);
-export { adminApp };
+export const adminApp: App = lazyService(getAdminApp);
+export const adminDb: Firestore = lazyService(() => getFirestore(getAdminApp()));
+export const adminAuth: Auth = lazyService(() => getAuth(getAdminApp()));

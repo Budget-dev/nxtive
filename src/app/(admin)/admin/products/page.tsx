@@ -19,10 +19,12 @@ import {
 import { formatCurrency } from "@/utils/format-currency";
 import { getAdminProducts, deleteProduct, saveProduct } from "@/features/admin-dashboard/server/actions";
 import type { Product } from "@/types/product";
+import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
@@ -32,6 +34,7 @@ export default function AdminProductsPage() {
 
   const loadProducts = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getAdminProducts({
         category: categoryFilter !== "all" ? categoryFilter : undefined,
@@ -41,6 +44,8 @@ export default function AdminProductsPage() {
       setProducts(data);
     } catch (err) {
       console.error("Failed to fetch products", err);
+      setProducts([]);
+      setError(adminErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -61,11 +66,12 @@ export default function AdminProductsPage() {
     setDeletingId(id);
     setShowConfirmModal(null);
     try {
-      await deleteProduct(id);
+      const result = await deleteProduct(id);
+      if (!result.success) throw new Error(result.error || "Unable to delete product");
       setProducts((prev) => prev.filter((p) => p.id !== id));
       setSelectedIds((prev) => prev.filter((item) => item !== id));
-    } catch {
-      alert("Failed to delete product");
+    } catch (err) {
+      setError(adminErrorMessage(err));
     } finally {
       setDeletingId(null);
     }
@@ -87,12 +93,29 @@ export default function AdminProductsPage() {
 
   const handleToggleActive = async (p: Product) => {
     const updated = { ...p, isActive: !p.isActive };
-    setProducts((prev) => prev.map((item) => (item.id === p.id ? updated : item)));
-    await saveProduct(updated);
+    try {
+      const result = await saveProduct(updated);
+      if (!result.success) throw new Error(result.error || "Unable to update product status");
+      setProducts((prev) => prev.map((item) => (item.id === p.id ? updated : item)));
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    }
   };
+
+  if (error && products.length === 0 && !loading) {
+    return (
+      <AdminDataState
+        title="Product catalog unavailable"
+        message={error}
+        actionLabel="Retry"
+        onAction={loadProducts}
+      />
+    );
+  }
 
   return (
     <div>
+      {error && <div style={{ marginBottom: "20px" }}><AdminDataState title="Product update failed" message={error} /></div>}
       {/* Page Header */}
       <div
         style={{
@@ -209,9 +232,11 @@ export default function AdminProductsPage() {
               ) : products.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", padding: "48px 20px" }}>
-                    <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "6px" }}>No products found</div>
+                    <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "6px" }}>No products in Firestore</div>
                     <div style={{ color: "var(--adm-text-muted)", fontSize: "13px", marginBottom: "16px" }}>
-                      Try adjusting your search criteria or add a new clothing product.
+                      {search || categoryFilter !== "all" || stockFilter !== "all"
+                        ? "Try adjusting your search criteria."
+                        : "Create a product to start building the catalog."}
                     </div>
                     <Link href="/admin/products/new" className="admin-btn-primary admin-btn-sm">
                       <Plus size={14} /> Add Product
@@ -220,8 +245,8 @@ export default function AdminProductsPage() {
                 </tr>
               ) : (
                 products.map((p) => {
-                  const isLow = (p.totalStock ?? 10) <= (p.lowStockThreshold ?? 10) && (p.totalStock ?? 10) > 0;
-                  const isOut = (p.totalStock ?? 10) <= 0;
+                  const isLow = typeof p.totalStock === "number" && p.totalStock > 0 && typeof p.lowStockThreshold === "number" && p.totalStock <= p.lowStockThreshold;
+                  const isOut = typeof p.totalStock === "number" && p.totalStock <= 0;
                   const isSelected = selectedIds.includes(p.id);
 
                   return (
@@ -257,7 +282,7 @@ export default function AdminProductsPage() {
                               </Link>
                             </div>
                             <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>
-                              SKU: {p.sku || `NV-${p.category.slice(0, 2).toUpperCase()}-${p.id.slice(-3)}`}
+                              SKU: {p.sku || "Not set"}
                               {p.badge && (
                                 <span style={{ marginLeft: "6px", color: "#936037", fontWeight: 700 }}>
                                   • {p.badge}
@@ -278,10 +303,10 @@ export default function AdminProductsPage() {
                       </td>
                       <td>
                         <div style={{ fontWeight: 700, color: isOut ? "#C5221F" : isLow ? "#B06000" : "#121110" }}>
-                          {p.totalStock ?? 15}
+                          {p.totalStock ?? "Not set"}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--adm-text-muted)" }}>
-                          {isOut ? "Out of Stock" : isLow ? "Low Stock" : "In Stock"}
+                          {p.totalStock === undefined ? "Stock not configured" : isOut ? "Out of Stock" : isLow ? "Low Stock" : "In Stock"}
                         </div>
                       </td>
                       <td>
@@ -295,11 +320,11 @@ export default function AdminProductsPage() {
                         </button>
                       </td>
                       <td style={{ fontSize: "12px", color: "var(--adm-text-muted)", whiteSpace: "nowrap" }}>
-                        {new Date(p.createdAt || Date.now()).toLocaleDateString("en-GB", {
+                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString("en-GB", {
                           day: "2-digit",
                           month: "short",
                           year: "numeric",
-                        })}
+                        }) : "Not recorded"}
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>

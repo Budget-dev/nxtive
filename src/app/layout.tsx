@@ -32,6 +32,20 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Caveat:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap"
           rel="stylesheet"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  var theme = window.localStorage.getItem("nxtvie-theme");
+                  document.documentElement.dataset.theme = theme === "dark" ? "dark" : "light";
+                } catch (error) {
+                  document.documentElement.dataset.theme = "light";
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body>
         <AuthProvider>{children}</AuthProvider>
@@ -43,4 +57,3 @@ export default function RootLayout({
     </html>
   );
 }
-
