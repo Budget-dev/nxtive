@@ -66,7 +66,7 @@ export default function OrdersPage() {
               Your Order History
             </h1>
             <p style={{ fontSize: "13.5px", color: "#6F6961", marginTop: "4px" }}>
-              Track active shipments, download invoices, and reorder your favorite NXTVIE essentials.
+              Track active shipments, download invoices, and reorder your favorite NXTIVE essentials.
             </p>
           </div>
 

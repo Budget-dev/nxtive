@@ -51,7 +51,7 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
         />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <div style={{ fontSize: "0.88rem", color: "#736C65", fontWeight: 600, letterSpacing: "0.05em" }}>
-          Authenticating NXTVIE Operations...
+          Authenticating NXTIVE Operations...
         </div>
       </div>
     );

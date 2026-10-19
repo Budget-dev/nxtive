@@ -4,8 +4,8 @@ import { Metadata } from "next";
 import { RefreshCw, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Truck } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Returns & Exchanges Policy — NXTVIE Menswear",
-  description: "Learn about NXTVIE 7-day domestic returns, free size exchanges, reverse pickups, and refund methods.",
+  title: "Returns & Exchanges Policy — NXTIVE Menswear",
+  description: "Learn about NXTIVE 7-day domestic returns, free size exchanges, reverse pickups, and refund methods.",
 };
 
 export default function ReturnsPolicyPage() {
@@ -40,7 +40,7 @@ export default function ReturnsPolicyPage() {
             Returns & Exchanges
           </h1>
           <p style={{ fontSize: "14.5px", color: "#6A645C", maxWidth: "600px" }}>
-            We want you to wear your NXTVIE garments with total confidence. If your sizing isn't exact or you're unsatisfied with your piece, our 7-day domestic exchange program makes the process effortless.
+            We want you to wear your NXTIVE garments with total confidence. If your sizing isn't exact or you're unsatisfied with your piece, our 7-day domestic exchange program makes the process effortless.
           </p>
         </div>
 

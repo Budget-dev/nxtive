@@ -3,8 +3,8 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — NXTVIE Menswear",
-  description: "Read about how NXTVIE collects, stores, protects, and handles your personal data.",
+  title: "Privacy Policy — NXTIVE Menswear",
+  description: "Read about how NXTIVE collects, stores, protects, and handles your personal data.",
 };
 
 export default function PrivacyPolicyPage() {
@@ -61,7 +61,7 @@ export default function PrivacyPolicyPage() {
               1. Overview
             </h2>
             <p>
-              At NXTVIE ("we", "our", or "us"), we value your trust and are committed to safeguarding your personal data. This Privacy Policy details the types of information we collect through our website (nxtvie.com), our client concierge, and checkout gateways, and explains how that data is stored, processed, and respected.
+              At NXTIVE ("we", "our", or "us"), we value your trust and are committed to safeguarding your personal data. This Privacy Policy details the types of information we collect through our website (nxtvie.com), our client concierge, and checkout gateways, and explains how that data is stored, processed, and respected.
             </p>
           </section>
 
@@ -69,7 +69,7 @@ export default function PrivacyPolicyPage() {
             <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#111110", marginBottom: "10px" }}>
               2. Information We Collect
             </h2>
-            <p>When you browse, register, or complete a transaction on NXTVIE, we collect:</p>
+            <p>When you browse, register, or complete a transaction on NXTIVE, we collect:</p>
             <ul style={{ paddingLeft: "20px", marginTop: "8px" }}>
               <li>
                 <strong>Identity & Contact Information:</strong> Your name, email address, delivery phone number, and residential shipping address.
@@ -129,7 +129,7 @@ export default function PrivacyPolicyPage() {
               <a href="mailto:support@nxtvie.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
                 support@nxtvie.com
               </a>{" "}
-              or by postal mail to: NXTVIE Atelier, Unit 14/B Sun Mill Compound, Lower Parel, Mumbai 400013.
+              or by postal mail to: NXTIVE Atelier, Unit 14/B Sun Mill Compound, Lower Parel, Mumbai 400013.
             </p>
           </section>
         </div>

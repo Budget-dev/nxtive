@@ -51,7 +51,7 @@ export const MOCK_PRODUCTS: Product[] = [
       "Signature drop shoulder relaxed cut",
       "Reinforced rib-knit neckband that retains shape",
       "Pre-shrunk to prevent post-wash distortion",
-      "Discreet NXTVIE embroidered tonal emblem",
+      "Discreet NXTIVE embroidered tonal emblem",
     ],
     fabricCare: [
       "100% Combed Organic Cotton",
@@ -87,7 +87,7 @@ export const MOCK_PRODUCTS: Product[] = [
     ],
     sizes: ["S", "M", "L", "XL"],
     description:
-      "A serene minimalist staple made from ultra-soft brushed Japanese cotton. Embellished with high-density micro-embroidery of the NXTVIE lightning crest across the chest.",
+      "A serene minimalist staple made from ultra-soft brushed Japanese cotton. Embellished with high-density micro-embroidery of the NXTIVE lightning crest across the chest.",
     details: [
       "260 GSM single jersey ultra-fine cotton",
       "High-density tonal micro-embroidery",
@@ -229,7 +229,7 @@ export const MOCK_PRODUCTS: Product[] = [
   {
     id: "prod-6",
     slug: "nxtvie-cap",
-    title: "NXTVIE Cap",
+    title: "NXTIVE Cap",
     price: 599,
     originalPrice: 899,
     image: "/images/nxtvie/product-cap-hd.jpg",
@@ -248,7 +248,7 @@ export const MOCK_PRODUCTS: Product[] = [
     ],
     sizes: ["One Size"],
     description:
-      "Structured 6-panel low-profile dad cap crafted from heavy cotton twill. Embellished with 3D raised white embroidery of the NXTVIE lightning bolt crest and finished with an antique brass adjuster.",
+      "Structured 6-panel low-profile dad cap crafted from heavy cotton twill. Embellished with 3D raised white embroidery of the NXTIVE lightning bolt crest and finished with an antique brass adjuster.",
     details: [
       "100% Premium cotton chino twill",
       "3D raised high-density lightning bolt embroidery",
@@ -326,7 +326,7 @@ export const MOCK_PRODUCTS: Product[] = [
       "420 GSM custom loopback knit",
       "Subtle garment distress and mineral enzyme wash",
       "Elongated heavyweight flat drawstrings with metal aglets",
-      "NXTVIE tonal silicone badge at lower hem",
+      "NXTIVE tonal silicone badge at lower hem",
     ],
     fabricCare: [
       "100% Enzyme Washed Cotton",
@@ -360,7 +360,7 @@ export const MOCK_PRODUCTS: Product[] = [
     ],
     sizes: ["S", "M", "L", "XL", "XXL"],
     description:
-      "A tribute to the NXTVIE mindset. Features a massive silkscreen printed lightning graphic and bold brand insignia on the back, crafted on heavy 280 GSM off-white cotton.",
+      "A tribute to the NXTIVE mindset. Features a massive silkscreen printed lightning graphic and bold brand insignia on the back, crafted on heavy 280 GSM off-white cotton.",
     details: [
       "280 GSM heavyweight organic cotton jersey",
       "High-density discharge silkscreen back print",
@@ -401,7 +401,7 @@ export const MOCK_PRODUCTS: Product[] = [
     details: [
       "Bundle of 3 signature 260 GSM t-shirts",
       "Save 25% compared to individual purchase",
-      "Includes reusable NXTVIE canvas presentation dust bag",
+      "Includes reusable NXTIVE canvas presentation dust bag",
       "Garment washed for supreme softness from day one",
     ],
     fabricCare: ["100% Organic Cotton", "Machine wash cold with like colors"],
@@ -674,7 +674,7 @@ export const CATEGORIES_LIST = [
     slug: "best-sellers",
     name: "Best Sellers",
     title: "Best Selling",
-    tagline: "Most loved pieces by the NXTVIE community across India.",
+    tagline: "Most loved pieces by the NXTIVE community across India.",
     image: "/images/nxtvie/hero-model.jpg",
   },
 ];

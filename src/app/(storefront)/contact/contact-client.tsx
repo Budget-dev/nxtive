@@ -21,7 +21,7 @@ export function ContactClient() {
     setTimeout(() => {
       setIsSubmitting(false);
       setSubmitted(true);
-      showToast("Your message has been sent to NXTVIE Concierge.");
+      showToast("Your message has been sent to NXTIVE Concierge.");
     }, 700);
   };
 
@@ -101,7 +101,7 @@ export function ContactClient() {
                   Message Received
                 </h3>
                 <p style={{ fontSize: "13.5px", color: "#6A645C", lineHeight: 1.6, marginBottom: "24px" }}>
-                  Thank you, <strong>{name}</strong>. A dedicated NXTVIE specialist will respond to{" "}
+                  Thank you, <strong>{name}</strong>. A dedicated NXTIVE specialist will respond to{" "}
                   <strong>{email}</strong> within 12–24 hours.
                 </p>
                 <button

@@ -16,7 +16,7 @@ export function Footer() {
     e.preventDefault();
     if (email && email.includes("@")) {
       setIsSubscribed(true);
-      showToast("Thank you for subscribing to NXTVIE!");
+      showToast("Thank you for subscribing to NXTIVE!");
       setEmail("");
     }
   };
@@ -47,7 +47,7 @@ export function Footer() {
           <div className="footer-brand" style={{ maxWidth: "260px" }}>
             <Link
               href="/"
-              aria-label="NXTVIE Home"
+              aria-label="NXTIVE Home"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -391,7 +391,7 @@ export function Footer() {
             color: "#7E7972",
           }}
         >
-          <div>© 2024 NXTVIE. All rights reserved.</div>
+          <div>© 2024 NXTIVE. All rights reserved.</div>
 
            <div className="footer-bottom-links" style={{ display: "flex", alignItems: "center", gap: "24px" }}>
             <Link href="/privacy" className="footer-bottom-link">

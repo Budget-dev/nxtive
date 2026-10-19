@@ -101,7 +101,7 @@ export default function RegisterPage() {
       >
         <img
           src="/images/nxtvie/banner-urban-essentials-hd.jpg"
-          alt="NXTVIE Community"
+          alt="NXTIVE Community"
           style={{
             position: "absolute",
             inset: 0,
@@ -142,7 +142,7 @@ export default function RegisterPage() {
               marginBottom: "12px",
             }}
           >
-            Join The NXTVIE Collective
+            Join The NXTIVE Collective
           </div>
           <h2
             style={{
@@ -222,7 +222,7 @@ export default function RegisterPage() {
             Create Account
           </h1>
           <p style={{ fontSize: "13.5px", color: "#6A645C" }}>
-            Join NXTVIE for personalized curation, fast checkout, and drop alerts.
+            Join NXTIVE for personalized curation, fast checkout, and drop alerts.
           </p>
         </div>
 
@@ -451,7 +451,7 @@ export default function RegisterPage() {
               }}
             />
             <span>
-              I agree to the NXTVIE <Link href="#" style={{ color: "#111110", textDecoration: "underline" }}>Terms of Service</Link> and <Link href="#" style={{ color: "#111110", textDecoration: "underline" }}>Privacy Policy</Link>.
+              I agree to the NXTIVE <Link href="#" style={{ color: "#111110", textDecoration: "underline" }}>Terms of Service</Link> and <Link href="#" style={{ color: "#111110", textDecoration: "underline" }}>Privacy Policy</Link>.
             </span>
           </label>
 

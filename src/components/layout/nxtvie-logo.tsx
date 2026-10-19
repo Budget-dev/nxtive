@@ -58,7 +58,7 @@ export function NxtvieLogo({
             color: color,
           }}
         >
-          NXTVIE
+          NXTIVE
         </span>
       )}
     </div>

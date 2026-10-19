@@ -64,7 +64,7 @@ export default function AccountPage() {
         }}
       >
         <div style={{ fontSize: "14px", color: "var(--text-muted)", fontWeight: 600 }}>
-          Loading your NXTVIE account...
+          Loading your NXTIVE account...
         </div>
       </div>
     );
@@ -120,7 +120,7 @@ export default function AccountPage() {
               marginBottom: "10px",
             }}
           >
-            NXTVIE Member Account
+            NXTIVE Member Account
           </h1>
 
           <p style={{ fontSize: "13.5px", color: "#6A645C", lineHeight: 1.5, marginBottom: "28px" }}>
@@ -220,7 +220,7 @@ export default function AccountPage() {
                   marginBottom: "4px",
                 }}
               >
-                NXTVIE Club Member
+                NXTIVE Club Member
               </div>
               <h1
                 style={{

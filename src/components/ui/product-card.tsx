@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Heart, ShoppingBag, Eye } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useStore } from "@/components/store-context";
-import { Product } from "@/constants/mock-products";
+import type { Product } from "@/types/product";
+import { sharpImageSrc } from "@/lib/sharp-image";
 
 interface ProductCardProps {
   product: Product;
@@ -60,7 +61,7 @@ export function ProductCard({ product }: ProductCardProps) {
       >
         <Link href={`/products/${product.slug || product.id}`} style={{ display: "block", width: "100%", height: "100%" }}>
           <img
-            src={product.image}
+            src={sharpImageSrc(product.image)}
             alt={product.title}
             loading="lazy"
             decoding="async"

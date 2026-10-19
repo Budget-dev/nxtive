@@ -199,7 +199,7 @@ export default function CheckoutPage() {
         <div style={{ maxWidth: "480px", margin: "0 auto", backgroundColor: "#FFFFFF", padding: "40px", borderRadius: "14px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "10px" }}>No items in checkout</h2>
           <p style={{ fontSize: "13.5px", color: "#666", marginBottom: "20px" }}>
-            Add your favorite NXTVIE items to the bag first.
+            Add your favorite NXTIVE items to the bag first.
           </p>
           <Link
             href="/products"
@@ -813,7 +813,7 @@ export default function CheckoutPage() {
                 )}
 
                 <p style={{ fontSize: "11px", color: "#8E8880", textAlign: "center", marginTop: "10px", lineHeight: 1.4 }}>
-                  By completing order, you agree to NXTVIE Terms of Service & 7-Day Return Policy.
+                  By completing order, you agree to NXTIVE Terms of Service & 7-Day Return Policy.
                 </p>
 
                 {orderError && (

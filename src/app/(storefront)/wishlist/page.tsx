@@ -4,13 +4,14 @@ import React from "react";
 import Link from "next/link";
 import { Trash2, ShoppingBag, ArrowRight, Heart } from "lucide-react";
 import { useStore } from "@/components/store-context";
-import { MOCK_PRODUCTS } from "@/constants/mock-products";
 import { ProductCard } from "@/components/ui/product-card";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
 
 export default function WishlistPage() {
   const { wishlist, toggleWishlist, addToCart } = useStore();
+  const { products } = useStorefrontCatalog();
 
-  const savedProducts = MOCK_PRODUCTS.filter((p) => wishlist.includes(p.id));
+  const savedProducts = products.filter((p) => wishlist.includes(p.id));
 
   const handleMoveAllToBag = () => {
     savedProducts.forEach((p) => {

@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
       >
         {/* Top Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <Link href="/" aria-label="NXTVIE Home">
+          <Link href="/" aria-label="NXTIVE Home">
             <NxtvieLogo size={24} color="#111110" />
           </Link>
 
@@ -120,7 +120,7 @@ export default function ForgotPasswordPage() {
               </h1>
 
               <p style={{ fontSize: "14px", color: "#6A645C", lineHeight: "1.6", marginBottom: "32px" }}>
-                We've sent a password reset link to <strong>{email}</strong>. Follow the instructions in the email to regain access to your NXTVIE account.
+                We've sent a password reset link to <strong>{email}</strong>. Follow the instructions in the email to regain access to your NXTIVE account.
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -191,7 +191,7 @@ export default function ForgotPasswordPage() {
               </h1>
 
               <p style={{ fontSize: "13.5px", color: "#6A645C", marginBottom: "28px", lineHeight: "1.5" }}>
-                Enter the email address associated with your NXTVIE account and we'll send you a link to reset your credentials.
+                Enter the email address associated with your NXTIVE account and we'll send you a link to reset your credentials.
               </p>
 
               {errorMessage && (
@@ -323,7 +323,7 @@ export default function ForgotPasswordPage() {
       >
         <Image
           src="/images/nxtvie/hero-model.jpg"
-          alt="NXTVIE Fashion Campaign"
+          alt="NXTIVE Fashion Campaign"
           fill
           priority
           style={{ objectFit: "cover", objectPosition: "center 20%", opacity: 0.65 }}

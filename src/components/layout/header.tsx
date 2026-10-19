@@ -126,7 +126,7 @@ export function Header() {
 
             <Link
               href="/"
-              aria-label="NXTVIE Home"
+              aria-label="NXTIVE Home"
               style={{
                 minWidth: "44px",
                 minHeight: "44px",

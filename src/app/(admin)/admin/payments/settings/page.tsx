@@ -151,7 +151,7 @@ export default function PaymentSettingsPage() {
             Server-Only Security Perimeter Active
           </div>
           <p style={{ fontSize: "12.5px", color: "var(--adm-text-muted)", marginTop: "4px", lineHeight: 1.5 }}>
-            In accordance with NXTVIE architecture rules, <code>RAZORPAY_KEY_SECRET</code> and <code>RAZORPAY_WEBHOOK_SECRET</code> are stored exclusively in server environment variables (<code>.env.local</code>) and are never exposed to browser client components.
+            In accordance with NXTIVE architecture rules, <code>RAZORPAY_KEY_SECRET</code> and <code>RAZORPAY_WEBHOOK_SECRET</code> are stored exclusively in server environment variables (<code>.env.local</code>) and are never exposed to browser client components.
           </p>
         </div>
       </div>

@@ -18,7 +18,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
-import { Product } from "@/constants/mock-products";
+import type { Product } from "@/types/product";
+import { sharpImageSrc } from "@/lib/sharp-image";
 import { ProductCard } from "@/components/ui/product-card";
 import { getPublicApprovedReviews, submitCustomerReview } from "@/features/admin-dashboard/server/actions";
 import type { Review } from "@/types/review";
@@ -32,7 +33,8 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   const router = useRouter();
   const { addToCart, toggleWishlist, isInWishlist, showToast } = useStore();
 
-  const [selectedImage, setSelectedImage] = useState<string>(product.images[0] || product.image);
+  const gallery = (product.images.length ? product.images : [product.image]).map((image) => sharpImageSrc(image));
+  const [selectedImage, setSelectedImage] = useState<string>(gallery[0] || "");
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[1] || product.sizes[0] || "M");
   const [selectedColorIdx, setSelectedColorIdx] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
@@ -157,7 +159,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
           {/* Left Column: Image Gallery */}
           <div style={{ display: "flex", gap: "16px", position: "sticky", top: "90px" }} className="pdp-gallery-wrap">
             {/* Thumbnail Strip */}
-            {product.images.length > 1 && (
+            {gallery.length > 1 && (
               <div
                 style={{
                   display: "flex",
@@ -168,7 +170,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                 }}
                 className="pdp-thumbnails"
               >
-                {product.images.map((img, idx) => (
+                {gallery.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(img)}
@@ -248,7 +250,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                   color: "var(--accent-next)",
                 }}
               >
-                NXTVIE {product.category}
+                NXTIVE {product.category}
               </span>
 
               <button
@@ -1079,7 +1081,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 900, textTransform: "uppercase", color: "#111110" }}>
-                NXTVIE Menswear Size Guide (Inches)
+                NXTIVE Menswear Size Guide (Inches)
               </h3>
               <button
                 onClick={() => setShowSizeGuide(false)}

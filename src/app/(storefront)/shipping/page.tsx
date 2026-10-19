@@ -4,8 +4,8 @@ import { Metadata } from "next";
 import { Truck, Clock, ShieldCheck, Box, AlertCircle, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Shipping & Delivery Policy — NXTVIE Menswear",
-  description: "Learn about NXTVIE domestic transit times, dispatch schedules, free shipping thresholds, and courier handling.",
+  title: "Shipping & Delivery Policy — NXTIVE Menswear",
+  description: "Learn about NXTIVE domestic transit times, dispatch schedules, free shipping thresholds, and courier handling.",
 };
 
 export default function ShippingPolicyPage() {
@@ -40,7 +40,7 @@ export default function ShippingPolicyPage() {
             Shipping Policy
           </h1>
           <p style={{ fontSize: "14.5px", color: "#6A645C", maxWidth: "600px" }}>
-            Every NXTVIE garment is inspected, packaged in custom dust sleeves, and dispatched from our primary fulfillment facility in Mumbai.
+            Every NXTIVE garment is inspected, packaged in custom dust sleeves, and dispatched from our primary fulfillment facility in Mumbai.
           </p>
         </div>
 

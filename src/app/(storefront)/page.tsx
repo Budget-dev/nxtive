@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -17,106 +17,21 @@ import {
   Heart,
   Eye,
 } from "lucide-react";
-import { useStore, ProductItem } from "@/components/store-context";
-import { MOCK_PRODUCTS, Product } from "@/constants/mock-products";
-
-// 5 Categories from reference
-const CATEGORIES = [
-  { name: "T-Shirts", image: "/images/nxtvie/cat-tshirts.jpg", href: "/categories/t-shirts" },
-  { name: "Shirts", image: "/images/nxtvie/cat-shirts.jpg", href: "/categories/shirts" },
-  { name: "Hoodies", image: "/images/nxtvie/cat-hoodies.jpg", href: "/categories/hoodies" },
-  { name: "Bottoms", image: "/images/nxtvie/cat-bottoms.jpg", href: "/categories/bottoms" },
-  { name: "Accessories", image: "/images/nxtvie/cat-accessories.jpg", href: "/categories/accessories" },
-];
-
-// Category sections with 2 featured cards per category
-interface CategorySectionConfig {
-  slug: string;
-  name: string;
-  eyebrow: string;
-  tagline: string;
-  href: string;
-  products: Product[];
-}
-
-const CATEGORY_SECTIONS: CategorySectionConfig[] = [
-  {
-    slug: "t-shirts",
-    name: "T-Shirts",
-    eyebrow: "Core Drop 01",
-    tagline: "Heavyweight 260-300 GSM combed organic cotton tees with architectural drop shoulders.",
-    href: "/categories/t-shirts",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "oversized-essential-tee") || MOCK_PRODUCTS[0],
-      MOCK_PRODUCTS.find((p) => p.slug === "minimal-logo-tee") || MOCK_PRODUCTS[1],
-    ],
-  },
-  {
-    slug: "hoodies",
-    name: "Hoodies",
-    eyebrow: "Heavyweight Volume",
-    tagline: "Substantial 450 GSM French terry loopback pullovers with double-layered hoods.",
-    href: "/categories/hoodies",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "core-hoodie") || MOCK_PRODUCTS[3],
-      MOCK_PRODUCTS.find((p) => p.slug === "asian-minimal-modern-hoodie") || MOCK_PRODUCTS[7],
-    ],
-  },
-  {
-    slug: "shirts",
-    name: "Shirts",
-    eyebrow: "Summer Layering",
-    tagline: "Breathable linen-cotton camp shirts and workwear overshirts for effortless everyday styling.",
-    href: "/categories/shirts",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "relaxed-fit-shirt") || MOCK_PRODUCTS[2],
-      MOCK_PRODUCTS.find((p) => p.slug === "camp-collar-linen-shirt") || MOCK_PRODUCTS[2],
-    ],
-  },
-  {
-    slug: "bottoms",
-    name: "Bottoms",
-    eyebrow: "Urban Movement",
-    tagline: "Articulated ripstop tactical cargo pants and relaxed wide-leg brushed fleece track pants.",
-    href: "/categories/bottoms",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "cargo-pants") || MOCK_PRODUCTS[4],
-      MOCK_PRODUCTS.find((p) => p.slug === "urban-runner-relaxed-sweats") || MOCK_PRODUCTS[4],
-    ],
-  },
-  {
-    slug: "jackets",
-    name: "Jackets",
-    eyebrow: "Specialized Fabrics",
-    tagline: "Technical weather-resistant memory nylon windbreakers engineered with Aquaguard zips.",
-    href: "/categories/jackets",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "jackets-for-every-journey") || MOCK_PRODUCTS[6],
-      MOCK_PRODUCTS.find((p) => p.slug === "specialized-technical-jacket") || MOCK_PRODUCTS[6],
-    ],
-  },
-  {
-    slug: "accessories",
-    name: "Accessories",
-    eyebrow: "Signature Details",
-    tagline: "Structured 6-panel low-profile dad caps and heavyweight 16oz organic canvas daily carry totes.",
-    href: "/categories/accessories",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "nxtvie-cap") || MOCK_PRODUCTS[5],
-      MOCK_PRODUCTS.find((p) => p.slug === "heavyweight-canvas-tote") || MOCK_PRODUCTS[5],
-    ],
-  },
-];
+import { useStore } from "@/components/store-context";
+import type { Product } from "@/types/product";
+import { categoriesFromProducts, productsForCategory } from "@/lib/catalog";
+import { sharpImageSrc } from "@/lib/sharp-image";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
 
 // Social gallery photos
 const GALLERY_PHOTOS = [
-  { id: 1, image: "/images/nxtvie/hero-model.jpg", alt: "NXTVIE relaxed streetwear look on concrete steps" },
-  { id: 2, image: "/images/nxtvie/promo-jackets-hd.jpg", alt: "NXTVIE technical jacket editorial look" },
-  { id: 3, image: "/images/nxtvie/promo-asian-minimal-hd.jpg", alt: "NXTVIE minimal hoodie editorial look" },
-  { id: 4, image: "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg", alt: "NXTVIE relaxed olive shirt and cargo styling" },
-  { id: 5, image: "/images/nxtvie/product-core-hoodie-hd.jpg", alt: "NXTVIE heavyweight hoodie streetwear look" },
-  { id: 6, image: "/images/nxtvie/product-cargo-pants-hd.jpg", alt: "NXTVIE cargo pants urban styling" },
-  { id: 7, image: "/images/nxtvie/product-cap-hd.jpg", alt: "NXTVIE black lightning cap detail" },
+  { id: 1, image: "/images/nxtvie/hero-model.jpg", alt: "NXTIVE relaxed streetwear look on concrete steps" },
+  { id: 2, image: "/images/nxtvie/promo-jackets-hd.jpg", alt: "NXTIVE technical jacket editorial look" },
+  { id: 3, image: "/images/nxtvie/promo-asian-minimal-hd.jpg", alt: "NXTIVE minimal hoodie editorial look" },
+  { id: 4, image: "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg", alt: "NXTIVE relaxed olive shirt and cargo styling" },
+  { id: 5, image: "/images/nxtvie/product-core-hoodie-hd.jpg", alt: "NXTIVE heavyweight hoodie streetwear look" },
+  { id: 6, image: "/images/nxtvie/product-cargo-pants-hd.jpg", alt: "NXTIVE cargo pants urban styling" },
+  { id: 7, image: "/images/nxtvie/product-cap-hd.jpg", alt: "NXTIVE black lightning cap detail" },
 ];
 
 // Cinematic Full-Width 16:9 Hero Banner Slides
@@ -127,13 +42,13 @@ const CINEMATIC_HERO_SLIDES = [
     headlineLine1: "WEAR YOUR",
     headlineAccent: "NEXT",
     headlineLine2: "SIDE.",
-    subtitle: "NXTVIE brings modern menswear inspired by Asian streetwear, minimal aesthetics, and everyday comfort.",
+    subtitle: "NXTIVE brings modern menswear inspired by Asian streetwear, minimal aesthetics, and everyday comfort.",
     primaryCta: "Shop New Arrivals",
     primaryHref: "/categories/new-arrivals",
     secondaryCta: "Explore Urban",
     secondaryHref: "/categories/urban-essentials",
     image: "/images/cinematic/banner-urban-movement.jpg",
-    alt: "NXTVIE Urban Movement Indian Roots Modern Style Collection",
+    alt: "NXTIVE Urban Movement Indian Roots Modern Style Collection",
     scriptTag: "For\nNew\nGenerations",
     accentColor: "var(--accent-next, #C78D4E)",
     badge: "New Season AW26",
@@ -151,7 +66,7 @@ const CINEMATIC_HERO_SLIDES = [
     secondaryCta: "Explore Fabrics",
     secondaryHref: "/about",
     image: "/images/cinematic/banner-outerwear-fabrics.jpg",
-    alt: "NXTVIE Specialized Fabrics Technical Outerwear Campaign",
+    alt: "NXTIVE Specialized Fabrics Technical Outerwear Campaign",
     scriptTag: "Form &\nFunction",
     accentColor: "#E29D52",
     badge: "Weatherproof 450 GSM",
@@ -169,7 +84,7 @@ const CINEMATIC_HERO_SLIDES = [
     secondaryCta: "View Lookbook",
     secondaryHref: "/products",
     image: "/images/cinematic/banner-asian-minimal-night.jpg",
-    alt: "NXTVIE Asian Minimal Modern Twilight Skyline Campaign",
+    alt: "NXTIVE Asian Minimal Modern Twilight Skyline Campaign",
     scriptTag: "Nightfall\nSeries",
     accentColor: "#F4A261",
     badge: "Trending Worldwide",
@@ -187,7 +102,7 @@ const CINEMATIC_HERO_SLIDES = [
     secondaryCta: "All Menswear",
     secondaryHref: "/products",
     image: "/images/cinematic/banner-luxury-basics.jpg",
-    alt: "NXTVIE Refined Everyday Luxury Architecture Campaign",
+    alt: "NXTIVE Refined Everyday Luxury Architecture Campaign",
     scriptTag: "Refined\nSimplicity",
     accentColor: "#E0A899",
     badge: "Zero Compromise",
@@ -227,7 +142,7 @@ function TwoCardProduct({ product }: { product: Product }) {
       <div className="two-card-media-box">
         <Link href={`/products/${product.slug || product.id}`} className="two-card-img-link">
           <img
-            src={product.image}
+            src={sharpImageSrc(product.image)}
             alt={product.title}
             loading="lazy"
             decoding="async"
@@ -328,6 +243,27 @@ function TwoCardProduct({ product }: { product: Product }) {
 export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const touchStartXRef = useRef<number | null>(null);
+  const { products, categories, ready } = useStorefrontCatalog();
+
+  const browseCategories = useMemo(
+    () => (categories.length > 0 ? categories : categoriesFromProducts(products)),
+    [categories, products]
+  );
+
+  const categorySections = useMemo(
+    () =>
+      browseCategories
+        .map((category) => ({
+          slug: category.slug,
+          name: category.name,
+          eyebrow: category.title || category.name,
+          tagline: category.tagline,
+          href: `/categories/${category.slug}`,
+          products: productsForCategory(products, category.slug).slice(0, 2),
+        }))
+        .filter((section) => section.products.length > 0),
+    [browseCategories, products]
+  );
 
   const nextSlide = useCallback(() => {
     setActiveSlide((prev) => (prev + 1) % CINEMATIC_HERO_SLIDES.length);
@@ -381,7 +317,7 @@ export default function HomePage() {
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
         aria-roledescription="carousel"
-        aria-label="NXTVIE seasonal collections"
+        aria-label="NXTIVE seasonal collections"
         className="cinematic-hero-section"
       >
         <span className="sr-only" aria-live="polite">
@@ -774,7 +710,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. CATEGORY TILES BAR (Quick Navigation Row of 5) */}
+      {/* 2. CATEGORY TILES — live catalogue only */}
+      {ready && browseCategories.length > 0 && (
       <section style={{ padding: "28px 0 20px 0" }} className="categories-preview-section">
         <div className="container">
           <div className="section-title-wrap">
@@ -791,25 +728,27 @@ export default function HomePage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: "14px",
             }}
             className="categories-grid"
           >
-            {CATEGORIES.map((cat) => (
+            {browseCategories.map((cat) => (
               <Link
-                key={cat.name}
-                href={cat.href}
+                key={cat.id}
+                href={`/categories/${cat.slug}`}
                 className="category-card"
               >
                 <div className="category-card-media">
-                  <img
-                    src={cat.image}
-                    alt={cat.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="cat-img"
-                  />
+                  {cat.image ? (
+                    <img
+                      src={sharpImageSrc(cat.image)}
+                      alt={cat.name}
+                      loading="eager"
+                      decoding="async"
+                      className="cat-img"
+                    />
+                  ) : null}
                 </div>
                 <div className="category-card-footer">
                   <span className="cat-name">{cat.name}</span>
@@ -820,72 +759,42 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
-      {/* 3. CATEGORY SECTIONS WITH 2-CARD LAYOUT & "SEE ALL" NAVIGATION */}
-
-      {/* Section A: T-SHIRTS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[0].eyebrow}</span>
+      {/* 3. LIVE CATEGORY SECTIONS */}
+      {categorySections.map((section) => (
+        <section key={section.slug} className="category-showcase-section">
+          <div className="container">
+            <div className="category-showcase-header">
+              <div>
+                <div className="category-badge-pill">
+                  <span className="badge-dot" />
+                  <span>{section.eyebrow}</span>
+                </div>
+                <h2 className="category-showcase-title">{section.name}</h2>
+                {section.tagline ? (
+                  <p className="category-showcase-tagline">{section.tagline}</p>
+                ) : null}
               </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[0].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[0].tagline}</p>
+
+              <Link
+                href={section.href}
+                className="see-all-cta-btn"
+                aria-label={`See all ${section.name}`}
+              >
+                <span>See All {section.name}</span>
+                <ArrowRight size={15} />
+              </Link>
             </div>
 
-            <Link
-              href={CATEGORY_SECTIONS[0].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[0].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[0].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          {/* 2-Card Layout Grid */}
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[0].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section B: HOODIES (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[1].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[1].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[1].tagline}</p>
+            <div className="two-card-grid">
+              {section.products.map((prod) => (
+                <TwoCardProduct key={prod.id} product={prod} />
+              ))}
             </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[1].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[1].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[1].name}</span>
-              <ArrowRight size={15} />
-            </Link>
           </div>
-
-          {/* 2-Card Layout Grid */}
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[1].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      ))}
 
       {/* 4. EDITORIAL COLLECTION BANNERS (Urban Essentials & Premium Basics) */}
       <section style={{ padding: "16px 0 44px 0" }} className="collections-section">
@@ -902,7 +811,7 @@ export default function HomePage() {
             <div className="urban-banner">
               <img
                 src="/images/nxtvie/banner-urban-essentials-hd.jpg"
-                alt="NXTVIE Urban Essentials Collection"
+                alt="NXTIVE Urban Essentials Collection"
                 loading="lazy"
                 decoding="async"
                 style={{
@@ -997,7 +906,7 @@ export default function HomePage() {
               >
                 <img
                   src="/images/nxtvie/banner-premium-basics-stack-hd.jpg"
-                  alt="NXTVIE Premium Folded Basics"
+                  alt="NXTIVE Premium Folded Basics"
                   loading="lazy"
                   decoding="async"
                   style={{
@@ -1070,129 +979,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Section C: SHIRTS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[2].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[2].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[2].tagline}</p>
-            </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[2].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[2].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[2].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[2].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section D: BOTTOMS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[3].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[3].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[3].tagline}</p>
-            </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[3].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[3].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[3].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[3].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section E: JACKETS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[4].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[4].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[4].tagline}</p>
-            </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[4].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[4].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[4].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[4].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section F: ACCESSORIES (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[5].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[5].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[5].tagline}</p>
-            </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[5].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[5].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[5].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[5].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* 5. TRUST / FEATURES STRIP (4 Pillars) */}
       <section style={{ padding: "16px 0 54px 0" }} className="features-section">
@@ -1306,7 +1092,7 @@ export default function HomePage() {
                   marginBottom: "28px",
                 }}
               >
-                NXTVIE is a mindset — inspired by Asian culture, built for the new generation. Minimal. Modern. Always Evolving.
+                NXTIVE is a mindset — inspired by Asian culture, built for the new generation. Minimal. Modern. Always Evolving.
               </p>
               <div>
                 <Link
@@ -1342,7 +1128,7 @@ export default function HomePage() {
             >
               <img
                 src="/images/nxtvie/story-back-print-hd.jpg"
-                alt="NXTVIE Mindset Philosophy Editorial"
+                alt="NXTIVE Mindset Philosophy Editorial"
                 loading="lazy"
                 decoding="async"
                 style={{
@@ -1358,7 +1144,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 7. FOLLOW @NXTVIE / INSTAGRAM SOCIAL GALLERY */}
+      {/* 7. FOLLOW @NXTIVE / INSTAGRAM SOCIAL GALLERY */}
       <section style={{ padding: "0 0 76px 0" }} className="gallery-section">
         <div className="container">
           <div
@@ -1382,7 +1168,7 @@ export default function HomePage() {
                   lineHeight: 1.1,
                 }}
               >
-                FOLLOW @NXTVIE
+                FOLLOW @NXTIVE
               </h2>
               <p
                 style={{
@@ -1562,6 +1348,8 @@ export default function HomePage() {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          object-position: center 18%;
+          display: block;
           transition: transform 0.35s ease;
         }
         .category-card-footer {

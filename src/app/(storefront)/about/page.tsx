@@ -5,7 +5,7 @@ import { Metadata } from "next";
 import { ArrowRight, Compass, Shield, Feather, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Our Story — NXTVIE Menswear",
+  title: "Our Story — NXTIVE Menswear",
   description: "Modern menswear inspired by Asian style. Minimal design. Everyday comfort. For new generations.",
 };
 
@@ -28,7 +28,7 @@ export default function AboutPage() {
       >
         <Image
           src="/images/nxtvie/banner-urban-essentials-hd.jpg"
-          alt="NXTVIE Design Studio"
+          alt="NXTIVE Design Studio"
           fill
           priority
           style={{ objectFit: "cover", opacity: 0.45 }}
@@ -54,7 +54,7 @@ export default function AboutPage() {
               marginBottom: "16px",
             }}
           >
-            The NXTVIE Philosophy
+            The NXTIVE Philosophy
           </div>
 
           <h1
@@ -81,7 +81,7 @@ export default function AboutPage() {
               margin: "0 auto",
             }}
           >
-            Born at the intersection of Tokyo streetwear precision and Mumbai creative pulse, NXTVIE crafts silhouettes that redefine casual modern luxury for the next generation.
+            Born at the intersection of Tokyo streetwear precision and Mumbai creative pulse, NXTIVE crafts silhouettes that redefine casual modern luxury for the next generation.
           </p>
         </div>
       </section>
@@ -133,7 +133,7 @@ export default function AboutPage() {
                   marginBottom: "18px",
                 }}
               >
-                NXTVIE was founded in 2024 to dismantle the cycle of disposable fast fashion. We observed that contemporary men were constantly forced to choose between stiff formal tailoring and generic, ill-fitting loungewear.
+                NXTIVE was founded in 2024 to dismantle the cycle of disposable fast fashion. We observed that contemporary men were constantly forced to choose between stiff formal tailoring and generic, ill-fitting loungewear.
               </p>
               <p
                 style={{
@@ -173,7 +173,7 @@ export default function AboutPage() {
             >
               <Image
                 src="/images/nxtvie/story-back-print-hd.jpg"
-                alt="NXTVIE Garment Back Detail"
+                alt="NXTIVE Garment Back Detail"
                 fill
                 style={{ objectFit: "cover" }}
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -208,7 +208,7 @@ export default function AboutPage() {
                 marginTop: "6px",
               }}
             >
-              What Makes NXTVIE Different
+              What Makes NXTIVE Different
             </h2>
           </div>
 
@@ -291,7 +291,7 @@ export default function AboutPage() {
             <div style={{ position: "relative", height: "380px", borderRadius: "12px", overflow: "hidden" }}>
               <Image
                 src="/images/nxtvie/promo-jackets-hd.jpg"
-                alt="NXTVIE Outerwear Lookbook"
+                alt="NXTIVE Outerwear Lookbook"
                 fill
                 style={{ objectFit: "cover" }}
                 sizes="(max-width: 768px) 100vw, 33vw"
@@ -300,7 +300,7 @@ export default function AboutPage() {
             <div style={{ position: "relative", height: "380px", borderRadius: "12px", overflow: "hidden" }}>
               <Image
                 src="/images/nxtvie/hero-model.jpg"
-                alt="NXTVIE Everyday Essentials"
+                alt="NXTIVE Everyday Essentials"
                 fill
                 style={{ objectFit: "cover" }}
                 sizes="(max-width: 768px) 100vw, 33vw"
@@ -309,7 +309,7 @@ export default function AboutPage() {
             <div style={{ position: "relative", height: "380px", borderRadius: "12px", overflow: "hidden" }}>
               <Image
                 src="/images/nxtvie/promo-asian-minimal-hd.jpg"
-                alt="NXTVIE Asian Minimal Collection"
+                alt="NXTIVE Asian Minimal Collection"
                 fill
                 style={{ objectFit: "cover" }}
                 sizes="(max-width: 768px) 100vw, 33vw"

@@ -3,8 +3,8 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — NXTVIE Menswear",
-  description: "Terms and conditions governing the purchase, browsing, and use of NXTVIE services and products.",
+  title: "Terms of Service — NXTIVE Menswear",
+  description: "Terms and conditions governing the purchase, browsing, and use of NXTIVE services and products.",
 };
 
 export default function TermsOfServicePage() {
@@ -61,7 +61,7 @@ export default function TermsOfServicePage() {
               1. Acceptance of Terms
             </h2>
             <p>
-              By accessing, browsing, or purchasing products on NXTVIE ("nxtvie.com"), you agree to be legally bound by these Terms of Service, our Privacy Policy, and our Shipping and Returns guidelines. If you do not agree to all provisions, you should refrain from using our platforms.
+              By accessing, browsing, or purchasing products on NXTIVE ("nxtvie.com"), you agree to be legally bound by these Terms of Service, our Privacy Policy, and our Shipping and Returns guidelines. If you do not agree to all provisions, you should refrain from using our platforms.
             </p>
           </section>
 
@@ -70,7 +70,7 @@ export default function TermsOfServicePage() {
               2. Intellectual Property
             </h2>
             <p>
-              All trademarks, product designs, garment typography, campaign photographs, lookbook layouts, and digital code are the exclusive property of NXTVIE Apparel. Reproduction, reverse engineering, redistribution, or commercial use of our media without explicit written authorization is strictly prohibited.
+              All trademarks, product designs, garment typography, campaign photographs, lookbook layouts, and digital code are the exclusive property of NXTIVE Apparel. Reproduction, reverse engineering, redistribution, or commercial use of our media without explicit written authorization is strictly prohibited.
             </p>
           </section>
 
@@ -79,7 +79,7 @@ export default function TermsOfServicePage() {
               3. Pricing, Taxes & Availability
             </h2>
             <p>
-              All prices displayed on NXTVIE are in Indian Rupees (₹ INR) and include applicable Goods and Services Tax (GST) unless explicitly noted otherwise. We reserve the right to revise pricing, discontinue colorways, or limit purchase quantities on limited-edition capsule drops without prior notice.
+              All prices displayed on NXTIVE are in Indian Rupees (₹ INR) and include applicable Goods and Services Tax (GST) unless explicitly noted otherwise. We reserve the right to revise pricing, discontinue colorways, or limit purchase quantities on limited-edition capsule drops without prior notice.
             </p>
           </section>
 
@@ -88,7 +88,7 @@ export default function TermsOfServicePage() {
               4. Order Confirmation & Fraud Verification
             </h2>
             <p>
-              Receipt of an electronic order confirmation does not signify our final acceptance of your order. NXTVIE reserves the right to decline or cancel any order suspected of fraudulent activity, unauthorized coupon manipulation, reselling, or inventory discrepancies. In the event of cancellation, all charged amounts will be refunded immediately.
+              Receipt of an electronic order confirmation does not signify our final acceptance of your order. NXTIVE reserves the right to decline or cancel any order suspected of fraudulent activity, unauthorized coupon manipulation, reselling, or inventory discrepancies. In the event of cancellation, all charged amounts will be refunded immediately.
             </p>
           </section>
 

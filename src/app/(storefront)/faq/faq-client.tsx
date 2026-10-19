@@ -39,7 +39,7 @@ const FAQ_DATA: FAQItem[] = [
   {
     id: "size-1",
     category: "sizing",
-    question: "How does the NXTVIE oversized fit compare to standard sizing?",
+    question: "How does the NXTIVE oversized fit compare to standard sizing?",
     answer:
       "Our garments are intentionally tailored with an Asian-minimalist relaxed drop shoulder and generous chest volume. If you prefer the intended slouchy streetwear aesthetic, order your true size. If you prefer a cleaner, regular slim profile, we recommend sizing down one size.",
   },
@@ -87,7 +87,7 @@ const FAQ_DATA: FAQItem[] = [
   {
     id: "care-1",
     category: "care",
-    question: "How should I wash my heavyweight NXTVIE tee or hoodie?",
+    question: "How should I wash my heavyweight NXTIVE tee or hoodie?",
     answer:
       "To preserve the architectural drape, screen print integrity, and 280+ GSM combed cotton fibers: Machine wash cold (inside-out) on a gentle cycle with like colors. Avoid harsh bleaching agents. Lay flat or hang dry in the shade; tumble drying on high heat may cause subtle shrinkage.",
   },
@@ -96,7 +96,7 @@ const FAQ_DATA: FAQItem[] = [
     category: "care",
     question: "Will the fabric shrink after the first wash?",
     answer:
-      "All NXTVIE textiles undergo an industrial pre-shrinkage wash and silicone enzyme softening cycle prior to cutting. Residual shrinkage is limited to under 2% when washed according to care labels.",
+      "All NXTIVE textiles undergo an industrial pre-shrinkage wash and silicone enzyme softening cycle prior to cutting. Residual shrinkage is limited to under 2% when washed according to care labels.",
   },
 ];
 

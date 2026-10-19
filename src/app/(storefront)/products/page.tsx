@@ -4,15 +4,19 @@ import React, { useState, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SlidersHorizontal, X, ChevronDown, Check, ArrowRight } from "lucide-react";
-import { MOCK_PRODUCTS, Product } from "@/constants/mock-products";
 import { ProductCard } from "@/components/ui/product-card";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
 
 function ProductsContent() {
   const searchParams = useSearchParams();
   const searchQ = searchParams.get("q") || "";
   const categoryParam = searchParams.get("category");
+  const { products, ready } = useStorefrontCatalog();
 
-  const categories = ["All", "T-Shirts", "Shirts", "Hoodies", "Bottoms", "Accessories", "Jackets"];
+  const categories = useMemo(() => {
+    const names = Array.from(new Set(products.map((product) => product.category)));
+    return ["All", ...names];
+  }, [products]);
 
   const resolvedInitialCat = categoryParam
     ? categories.find(c => c.toLowerCase() === categoryParam.toLowerCase().replace(/-/g, " ")) ||
@@ -27,7 +31,7 @@ function ProductsContent() {
                     categories.find(c => c.toLowerCase() === categoryParam.toLowerCase());
       if (match) setSelectedCategory(match);
     }
-  }, [categoryParam]);
+  }, [categoryParam, categories]);
 
   const [selectedSize, setSelectedSize] = useState<string>("All");
   const [selectedColor, setSelectedColor] = useState<string>("All");
@@ -45,7 +49,7 @@ function ProductsContent() {
   ];
 
   const filteredProducts = useMemo(() => {
-    return MOCK_PRODUCTS.filter((prod) => {
+    return products.filter((prod) => {
       // Search term
       if (
         searchQ &&
@@ -87,7 +91,7 @@ function ProductsContent() {
       if (sortBy === "newest") return (b.badge === "New" ? 1 : 0) - (a.badge === "New" ? 1 : 0);
       return 0; // default featured
     });
-  }, [searchQ, selectedCategory, selectedSize, selectedColor, priceRange, sortBy]);
+  }, [products, searchQ, selectedCategory, selectedSize, selectedColor, priceRange, sortBy]);
 
   const resetFilters = () => {
     setSelectedCategory("All");
@@ -407,11 +411,20 @@ function ProductsContent() {
             }}
           >
             <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#111110", marginBottom: "8px" }}>
-              No items match your criteria
+              {!ready
+                ? "Loading the catalogue"
+                : products.length === 0
+                  ? "No products yet"
+                  : "No items match your criteria"}
             </h3>
             <p style={{ fontSize: "13px", color: "#746E66", marginBottom: "20px" }}>
-              Try loosening your filters or browsing another category.
+              {!ready
+                ? "Fetching products from the store."
+                : products.length === 0
+                  ? "Products added in the admin catalogue will show up here."
+                  : "Try loosening your filters or browsing another category."}
             </p>
+            {ready && products.length > 0 && (
             <button
               onClick={resetFilters}
               style={{
@@ -427,6 +440,7 @@ function ProductsContent() {
             >
               Reset All Filters
             </button>
+            )}
           </div>
         ) : (
           <div>

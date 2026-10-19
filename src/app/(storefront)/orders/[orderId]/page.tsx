@@ -3,7 +3,7 @@ import { Metadata } from "next";
 import { OrderDetailClient } from "./order-detail-client";
 
 export const metadata: Metadata = {
-  title: "Order Details | NXTVIE",
+  title: "Order Details | NXTIVE",
   description: "Track shipment and view order summary.",
 };
 

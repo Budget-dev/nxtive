@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { X, Heart, ShoppingBag, Check, ShieldCheck, Truck } from "lucide-react";
 import { useStore } from "@/components/store-context";
+import { sharpImageSrc } from "@/lib/sharp-image";
 
 export function QuickViewModal() {
   const {
@@ -100,7 +101,7 @@ export function QuickViewModal() {
           }}
         >
           <img
-            src={quickViewProduct.image}
+            src={sharpImageSrc(quickViewProduct.image)}
             alt={quickViewProduct.title}
             style={{
               width: "100%",

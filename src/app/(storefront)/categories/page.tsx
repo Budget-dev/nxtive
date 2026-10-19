@@ -1,16 +1,23 @@
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
-import { CATEGORIES_LIST, MOCK_PRODUCTS } from "@/constants/mock-products";
+import { categoriesFromProducts, fetchStorefrontCategories, fetchStorefrontProducts, productsForCategory } from "@/lib/catalog";
+import { sharpImageSrc } from "@/lib/sharp-image";
 
 export const metadata: Metadata = {
-  title: "Categories & Collections — NXTVIE Menswear",
-  description: "Explore all NXTVIE collections: Men, New Arrivals, Heavyweight Tees, Hoodies, Technical Jackets, and Accessories.",
+  title: "Categories & Collections — NXTIVE Menswear",
+  description: "Explore all NXTIVE collections: Men, New Arrivals, Heavyweight Tees, Hoodies, Technical Jackets, and Accessories.",
 };
 
-export default function CategoriesIndexPage() {
+export const dynamic = "force-dynamic";
+
+export default async function CategoriesIndexPage() {
+  const [storedCategories, products] = await Promise.all([
+    fetchStorefrontCategories(),
+    fetchStorefrontProducts(),
+  ]);
+  const categories = storedCategories.length > 0 ? storedCategories : categoriesFromProducts(products);
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
       <div className="container">
@@ -42,9 +49,15 @@ export default function CategoriesIndexPage() {
             All Collections & Categories
           </h1>
           <p style={{ fontSize: "14.5px", color: "#6A645C", maxWidth: "560px", margin: "0 auto" }}>
-            Explore each curated chapter of the NXTVIE wardrobe. Architectural fits, heavyweight organic cottons, and minimal silhouettes.
+            Explore each curated chapter of the NXTIVE wardrobe. Architectural fits, heavyweight organic cottons, and minimal silhouettes.
           </p>
         </div>
+
+        {categories.length === 0 ? (
+          <p style={{ textAlign: "center", color: "#6A645C", fontSize: "14px" }}>
+            Categories will appear here once they are added in the catalogue.
+          </p>
+        ) : null}
 
         {/* Categories Grid */}
         <div
@@ -54,13 +67,8 @@ export default function CategoriesIndexPage() {
             gap: "24px",
           }}
         >
-          {CATEGORIES_LIST.map((category) => {
-            const count = MOCK_PRODUCTS.filter(
-              (p) =>
-                p.category.toLowerCase() === category.slug ||
-                p.category.toLowerCase().replace(/\s+/g, "-") === category.slug ||
-                p.collections.includes(category.slug)
-            ).length;
+          {categories.map((category) => {
+            const count = productsForCategory(products, category.slug).length;
 
             return (
               <Link
@@ -81,13 +89,20 @@ export default function CategoriesIndexPage() {
                 }}
                 className="category-card-hover"
               >
-                <Image
-                  src={category.image}
-                  alt={category.title}
-                  fill
-                  style={{ objectFit: "cover" }}
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                />
+                {category.image ? (
+                  <img
+                    src={sharpImageSrc(category.image)}
+                    alt={category.title}
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      objectPosition: "center 18%",
+                    }}
+                  />
+                ) : null}
 
                 <div
                   style={{

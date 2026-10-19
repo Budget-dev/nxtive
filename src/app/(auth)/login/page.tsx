@@ -83,7 +83,7 @@ export default function LoginPage() {
       >
         <img
           src="/images/nxtvie/hero-model.jpg"
-          alt="NXTVIE Editorial"
+          alt="NXTIVE Editorial"
           style={{
             position: "absolute",
             inset: 0,

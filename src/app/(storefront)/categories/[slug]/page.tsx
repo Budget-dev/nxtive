@@ -1,7 +1,8 @@
 import React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CATEGORIES_LIST, getProductsByCategory } from "@/constants/mock-products";
+import { fetchStorefrontCategories, fetchStorefrontProducts, productsForCategory } from "@/lib/catalog";
+import { sharpImageSrc } from "@/lib/sharp-image";
 import { ProductCard } from "@/components/ui/product-card";
 
 export const dynamic = "force-dynamic";
@@ -14,16 +15,20 @@ interface CategoryPageProps {
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
   const normalizedSlug = slug.toLowerCase();
+  const [categories, catalog] = await Promise.all([
+    fetchStorefrontCategories(),
+    fetchStorefrontProducts(),
+  ]);
 
-  const categoryMeta = CATEGORIES_LIST.find((c) => c.slug === normalizedSlug) || {
+  const categoryMeta = categories.find((c) => c.slug === normalizedSlug) || {
     slug: normalizedSlug,
     name: normalizedSlug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
     title: normalizedSlug.replace(/-/g, " ").toUpperCase(),
-    tagline: "Curated modern menswear inspired by Asian aesthetics and minimalism.",
-    image: "/images/nxtvie/hero-model.jpg",
+    tagline: "",
+    image: catalog.find((product) => product.category.toLowerCase().replace(/\s+/g, "-") === normalizedSlug)?.image || "",
   };
 
-  const products = getProductsByCategory(normalizedSlug);
+  const products = productsForCategory(catalog, normalizedSlug);
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "100vh", paddingBottom: "80px" }}>
@@ -38,18 +43,21 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         }}
       >
         {/* Background Image with Overlay */}
-        <img
-          src={categoryMeta.image}
-          alt={categoryMeta.name}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: 0.35,
-          }}
-        />
+        {categoryMeta.image ? (
+          <img
+            src={sharpImageSrc(categoryMeta.image)}
+            alt={categoryMeta.name}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center 18%",
+              opacity: 0.35,
+            }}
+          />
+        ) : null}
         <div
           style={{
             position: "absolute",

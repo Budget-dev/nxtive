@@ -5,23 +5,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, X, ArrowRight } from "lucide-react";
 import { useStore } from "@/components/store-context";
-import { MOCK_PRODUCTS } from "@/constants/mock-products";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
+import { sharpImageSrc } from "@/lib/sharp-image";
 
 export function SearchModal() {
   const router = useRouter();
   const { isSearchOpen, setIsSearchOpen, setQuickViewProduct } = useStore();
+  const { products } = useStorefrontCatalog();
   const [query, setQuery] = useState("");
 
   if (!isSearchOpen) return null;
 
   const results = query.trim()
-    ? MOCK_PRODUCTS.filter(
+    ? products.filter(
         (item) =>
           item.title.toLowerCase().includes(query.toLowerCase()) ||
           item.category.toLowerCase().includes(query.toLowerCase()) ||
           item.description.toLowerCase().includes(query.toLowerCase())
       )
-    : MOCK_PRODUCTS.slice(0, 4);
+    : products.slice(0, 4);
+  const popularSearches = Array.from(new Set(products.map((item) => item.category))).slice(0, 5);
 
   const handleSelectProduct = (slug: string) => {
     setIsSearchOpen(false);
@@ -35,8 +38,6 @@ export function SearchModal() {
       router.push(`/products?q=${encodeURIComponent(query.trim())}`);
     }
   };
-
-  const popularSearches = ["Oversized Essential", "Core Hoodie", "Cargo Pants", "Cap", "Relaxed Fit"];
 
   return (
     <div
@@ -129,7 +130,7 @@ export function SearchModal() {
           </button>
         </form>
 
-        {/* Popular Tags */}
+        {popularSearches.length > 0 && (
         <div
           style={{
             padding: "12px 22px",
@@ -163,6 +164,7 @@ export function SearchModal() {
             </button>
           ))}
         </div>
+        )}
 
         {/* Results List */}
         <div style={{ maxHeight: "380px", overflowY: "auto", padding: "14px 22px" }}>
@@ -173,7 +175,7 @@ export function SearchModal() {
           {results.length === 0 ? (
             <div style={{ padding: "36px 0", textAlign: "center", color: "#736D65" }}>
               <p style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>No pieces found for "{query}"</p>
-              <p style={{ fontSize: "12px" }}>Try searching for "tee", "hoodie", "cargo", or "cap".</p>
+              <p style={{ fontSize: "12px" }}>Try a product name or category from the catalogue.</p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -206,7 +208,7 @@ export function SearchModal() {
                       }}
                     >
                       <img
-                        src={product.image}
+                        src={sharpImageSrc(product.image)}
                         alt={product.title}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />

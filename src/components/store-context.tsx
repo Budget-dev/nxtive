@@ -9,12 +9,12 @@ export interface ProductItem {
   slug?: string;
   title: string;
   price: number;
-  originalPrice?: number;
+  originalPrice?: number | null;
   image: string;
   images?: string[];
   category?: string;
   tag?: string;
-  badge?: string;
+  badge?: string | null;
   sizes?: string[];
   colors?: { name: string; hex: string }[];
   description?: string;
@@ -312,10 +312,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       showToast("Coupon NEXT10 applied: 10% discount!");
       return true;
     }
-    if (clean === "NXTVIE20") {
-      setCouponCode("NXTVIE20");
+    if (clean === "NXTIVE20") {
+      setCouponCode("NXTIVE20");
       setDiscountRate(0.2);
-      showToast("VIP Coupon NXTVIE20 applied: 20% discount!");
+      showToast("VIP Coupon NXTIVE20 applied: 20% discount!");
       return true;
     }
     showToast("Invalid promo code. Try NEXT10.");

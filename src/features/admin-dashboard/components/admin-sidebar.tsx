@@ -192,7 +192,7 @@ export function AdminSidebar({
                 <line x1="2" y1="12" x2="22" y2="12" />
               </svg>
             </div>
-            {!collapsed && <span className="admin-brand-title">NXTVIE</span>}
+            {!collapsed && <span className="admin-brand-title">NXTIVE</span>}
           </Link>
 
           {/* Collapse / Expand Toggle Button (matching `|<<` in reference) */}
@@ -297,7 +297,7 @@ export function AdminSidebar({
           <div className="admin-sidebar-promo">
             <img
               src="/images/nxtvie/hero-model.jpg"
-              alt="NXTVIE Menswear"
+              alt="NXTIVE Menswear"
               className="admin-sidebar-promo-bg"
             />
             <div className="admin-sidebar-promo-content">
@@ -306,7 +306,7 @@ export function AdminSidebar({
                   <polygon points="12 2 2 12 12 22 22 12 12 2" />
                   <line x1="2" y1="12" x2="22" y2="12" />
                 </svg>
-                <span>NXTVIE</span>
+                <span>NXTIVE</span>
               </div>
               <div className="admin-sidebar-promo-title">
                 Modern Menswear for New Generations.
