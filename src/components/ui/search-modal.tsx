@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, X, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "@/components/store-context";
 import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
 import { sharpImageSrc } from "@/lib/sharp-image";
@@ -13,8 +14,6 @@ export function SearchModal() {
   const { isSearchOpen, setIsSearchOpen, setQuickViewProduct } = useStore();
   const { products } = useStorefrontCatalog();
   const [query, setQuery] = useState("");
-
-  if (!isSearchOpen) return null;
 
   const results = query.trim()
     ? products.filter(
@@ -40,42 +39,52 @@ export function SearchModal() {
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1200,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "70px 20px 20px",
-      }}
-    >
-      {/* Backdrop */}
-      <div
-        onClick={() => setIsSearchOpen(false)}
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.65)",
-          backdropFilter: "blur(6px)",
-        }}
-      />
+    <AnimatePresence>
+      {isSearchOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1200,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "70px 20px 20px",
+          }}
+        >
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            onClick={() => setIsSearchOpen(false)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.65)",
+              backdropFilter: "blur(6px)",
+            }}
+          />
 
-      {/* Modal Box */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          maxWidth: "680px",
-          backgroundColor: "#FAF9F6",
-          borderRadius: "14px",
-          overflow: "hidden",
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.25)",
-          border: "1px solid rgba(0, 0, 0, 0.08)",
-          zIndex: 10,
-        }}
-      >
+          {/* Modal Box */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: "680px",
+              backgroundColor: "#FAF9F6",
+              borderRadius: "14px",
+              overflow: "hidden",
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.25)",
+              border: "1px solid rgba(0, 0, 0, 0.08)",
+              zIndex: 10,
+            }}
+          >
         {/* Search Input Bar */}
         <form
           onSubmit={handleSearchSubmit}
@@ -261,14 +270,16 @@ export function SearchModal() {
             Explore All 12+ Available Products →
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      <style jsx global>{`
-        .search-item-row:hover {
-          background-color: #F5F3ED !important;
-          transform: translateX(3px);
-        }
-      `}</style>
-    </div>
+          <style jsx global>{`
+            .search-item-row:hover {
+              background-color: #F5F3ED !important;
+              transform: translateX(3px);
+            }
+          `}</style>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

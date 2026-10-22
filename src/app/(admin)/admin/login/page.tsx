@@ -20,6 +20,11 @@ export default function AdminLoginPage() {
       return;
     }
 
+    if (email.trim().toLowerCase() !== "venkateshchop14@gmail.com") {
+      setError("Access denied: Only venkateshchop14@gmail.com is authorized to access the admin operations console.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -81,7 +86,7 @@ export default function AdminLoginPage() {
             NXTIVE ADMIN
           </h1>
           <p style={{ fontSize: "0.82rem", color: "#6B6B6B" }}>
-            Sign in to the operations console
+            Authorized portal strictly for venkateshchop14@gmail.com
           </p>
         </div>
 
@@ -144,7 +149,7 @@ export default function AdminLoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@nxtive.com"
+                  placeholder="venkateshchop14@gmail.com"
                   style={{
                     width: "100%",
                     backgroundColor: "#0A0A0A",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -12,14 +12,79 @@ import {
   ShoppingBag,
   ExternalLink,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { useStore, Order } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
+import { auth } from "@/lib/firebase/client";
 
 export default function OrdersPage() {
-  const { orders, addToCart } = useStore();
+  const { orders: storeOrders, addToCart } = useStore();
   const { user } = useAuth();
+  const [fetchedOrders, setFetchedOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [filter, setFilter] = useState<"all" | "active" | "delivered">("all");
+
+  useEffect(() => {
+    if (storeOrders.length > 0) return;
+    let mounted = true;
+    async function load() {
+      setLoadingOrders(true);
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch("/api/orders?page=1&pageSize=50", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (mounted && json.success && Array.isArray(json.data?.items)) {
+          const normalized: Order[] = json.data.items.map((raw: any) => ({
+            id: String(raw.id || ""),
+            date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+            items: (raw.items || []).map((i: any) => ({
+              id: String(i.productId || i.id || ""),
+              title: String(i.title || "Item"),
+              price: Number(i.price || 0),
+              quantity: Number(i.quantity || 1),
+              selectedSize: String(i.selectedSize || "M"),
+              selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
+              image: String(i.image || "/images/nxtvie/product-oversized-tee-hd.jpg"),
+            })),
+            subtotal: Number(raw.subtotal || 0),
+            discount: Number(raw.discount || 0),
+            shipping: Number(raw.shipping || 0),
+            total: Number(raw.total || 0),
+            status:
+              raw.status === "Delivered" || raw.status === "delivered"
+                ? "Delivered"
+                : raw.status === "shipped" || raw.status === "out_for_delivery"
+                ? "Shipped"
+                : raw.status === "cancelled"
+                ? "Cancelled"
+                : raw.status === "processing"
+                ? "Processing"
+                : "Order Confirmed",
+            paymentMethod: raw.paymentMethod || "Online Payment",
+            paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
+            shippingAddress: raw.shippingAddress || {},
+            deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
+            trackingNumber: raw.trackingNumber || `NXT-AWB-${raw.id?.slice(-6) || "1001"}`,
+          }));
+          setFetchedOrders(normalized);
+        }
+      } catch (e) {
+        console.warn("Failed to load orders on orders page:", e);
+      } finally {
+        if (mounted) setLoadingOrders(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [storeOrders.length]);
+
+  const orders = storeOrders.length > 0 ? storeOrders : fetchedOrders;
 
   const filteredOrders = orders.filter((order) => {
     if (filter === "delivered") return order.status === "Delivered";

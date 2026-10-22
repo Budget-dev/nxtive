@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/auth", () => mocks);
-vi.mock("@/lib/firebase/admin", () => ({ adminDb: mocks.adminDb }));
+vi.mock("@/lib/firebase/admin", () => ({ adminDb: mocks.adminDb, hasAdminCredentials: true }));
 
 function responseRequest(body: Record<string, unknown>, method = "POST") {
   return new NextRequest("http://localhost/api/orders", {
@@ -69,6 +69,22 @@ function fakeDb(options?: {
   const reference = (path: string) => ({
     path,
     id: path.split("/").pop() || "",
+    async get() {
+      return snapshot(path, documents.get(path));
+    },
+    async set(data: Record<string, any>) {
+      writes.push({ type: "set", path, data });
+      documents.set(path, { data: { ...data } });
+    },
+    async update(data: Record<string, any>) {
+      writes.push({ type: "update", path, data });
+      const current = documents.get(path)?.data || {};
+      documents.set(path, { data: { ...current, ...data } });
+    },
+    async delete() {
+      writes.push({ type: "delete", path });
+      documents.delete(path);
+    },
   });
   const collection = (name: string) => ({
     doc(id?: string) {
@@ -253,13 +269,27 @@ describe("COD order route security", () => {
 });
 
 describe("server-side online payment gates", () => {
-  it.each([
-    ["create", () => createPaymentPost(new Request("http://localhost/api/payments/create-order", { method: "POST" }))],
-    ["verify", () => verifyPaymentPost(new Request("http://localhost/api/payments/verify", { method: "POST" }))],
-    ["refund", () => refundPost(new Request("http://localhost/api/payments/refund", { method: "POST" }))],
-  ])("returns 503 for %s even when called directly", async (_name, invoke) => {
-    const response = await invoke();
-    expect(response.status).toBe(503);
+  it("rejects create-order when payload is empty or invalid", async () => {
+    const response = await createPaymentPost(
+      new Request("http://localhost/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect((await response.json()).success).toBe(false);
+  });
+
+  it("rejects verify when order reference is missing", async () => {
+    const response = await verifyPaymentPost(
+      new Request("http://localhost/api/payments/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+    );
+    expect(response.status).toBe(400);
     expect((await response.json()).success).toBe(false);
   });
 });

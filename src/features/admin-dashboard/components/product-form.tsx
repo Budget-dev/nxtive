@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { slugify } from "@/utils/slugify";
 import type { Product, ProductCategory, ProductBadge } from "@/types/product";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 import { saveProduct } from "../server/actions";
 
 interface ProductFormProps {
@@ -191,6 +193,13 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
 
       const res = await saveProduct(productPayload);
       if (res.success) {
+        try {
+          const docId = res.id;
+          const prodRef = doc(db, "products", docId);
+          await setDoc(prodRef, { ...productPayload, id: docId }, { merge: true });
+        } catch {
+          // Handled if restricted
+        }
         setMessage({
           type: "success",
           text: isEdit ? "Apparel updated successfully!" : "New apparel created successfully!",
@@ -624,9 +633,57 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
 
           {/* Card 6: Product Imagery */}
           <div className="admin-panel" style={{ margin: 0, padding: "24px" }}>
-            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--adm-text)", marginBottom: "16px" }}>
-              Imagery
-            </h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--adm-text)" }}>
+                Product Imagery (URL Saving)
+              </h3>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--adm-gold)", backgroundColor: "var(--adm-sand-pill)", padding: "2px 8px", borderRadius: "4px" }}>
+                URL Mode
+              </span>
+            </div>
+            <p style={{ fontSize: "12px", color: "var(--adm-text-muted)", marginBottom: "16px" }}>
+              Images are saved directly by URL to Firestore. Paste any external or local path, or click a quick sample preset below.
+            </p>
+
+            {/* Quick Sample Presets */}
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--adm-text-muted)", display: "block", marginBottom: "6px" }}>
+                Quick Presets:
+              </label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {[
+                  { label: "Boxy Tee (Dark)", url: "/images/nxtvie/product-oversized-tee-hd.jpg" },
+                  { label: "Lookbook Shoot", url: "/images/nxtvie/gallery-1.jpg" },
+                  { label: "Street Drop", url: "/images/nxtvie/gallery-2.jpg" },
+                  { label: "Acid Wash", url: "/images/nxtvie/gallery-4.jpg" },
+                  { label: "Studio Black Tee", url: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80" },
+                  { label: "Street Hoodie", url: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80" },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setMainImage(preset.url);
+                      if (!galleryImages.includes(preset.url)) {
+                        setGalleryImages((prev) => [...prev, preset.url]);
+                      }
+                    }}
+                    style={{
+                      fontSize: "11px",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      backgroundColor: mainImage === preset.url ? "#121110" : "var(--adm-sand-pill)",
+                      color: mainImage === preset.url ? "#FFFFFF" : "#121110",
+                      border: "1px solid var(--adm-border)",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="admin-form-group">
               <label className="admin-form-label">
@@ -636,18 +693,31 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                 type="text"
                 value={mainImage}
                 onChange={(e) => setMainImage(e.target.value)}
-                placeholder="/images/nxtvie/product-oversized-tee-hd.jpg"
+                placeholder="https://... or /images/nxtvie/product-oversized-tee-hd.jpg"
                 required
                 className="admin-input"
               />
               {mainImage && (
-                <div style={{ marginTop: "10px", width: "80px", height: "100px", borderRadius: "6px", overflow: "hidden", border: "1px solid var(--adm-border)" }}>
-                  <img src={mainImage} alt="Cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ width: "90px", height: "115px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--adm-border)", boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}>
+                    <img
+                      src={mainImage}
+                      alt="Cover preview"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/images/nxtvie/product-oversized-tee-hd.jpg";
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)", maxWidth: "200px" }}>
+                    <div style={{ fontWeight: 700, color: "#121110", marginBottom: "2px" }}>Cover Preview</div>
+                    Live preview of the image URL as it will render in the store and product cards.
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="admin-form-group" style={{ marginTop: "16px" }}>
+            <div className="admin-form-group" style={{ marginTop: "18px" }}>
               <label className="admin-form-label">Gallery Images ({galleryImages.length})</label>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {galleryImages.map((img, idx) => (
@@ -662,7 +732,14 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                       border: "1px solid var(--adm-border)",
                     }}
                   >
-                    <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img
+                      src={img}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/images/nxtvie/gallery-1.jpg";
+                      }}
+                    />
                     <button
                       type="button"
                       onClick={() => removeGalleryImage(idx)}
@@ -670,8 +747,8 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                         position: "absolute",
                         top: 2,
                         right: 2,
-                        backgroundColor: "rgba(0,0,0,0.7)",
-                        color: "#EF4444",
+                        backgroundColor: "rgba(0,0,0,0.75)",
+                        color: "#FFFFFF",
                         width: "18px",
                         height: "18px",
                         borderRadius: "50%",
@@ -679,7 +756,10 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                         alignItems: "center",
                         justifyContent: "center",
                         fontSize: "12px",
+                        border: "none",
+                        cursor: "pointer",
                       }}
+                      title="Remove image"
                     >
                       ×
                     </button>
@@ -692,17 +772,24 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                   type="text"
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
-                  placeholder="Paste additional image URL"
+                  placeholder="Paste additional gallery image URL"
                   className="admin-input"
                   style={{ flex: 1, fontSize: "0.8rem" }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addGalleryImage();
+                    }
+                  }}
                 />
                 <button
                   type="button"
                   onClick={addGalleryImage}
                   className="admin-action-btn-secondary"
-                  style={{ padding: "6px 12px" }}
+                  style={{ padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: "4px" }}
                 >
                   <Plus size={14} />
+                  <span>Add URL</span>
                 </button>
               </div>
             </div>

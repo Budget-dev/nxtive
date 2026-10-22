@@ -1,8 +1,8 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase/admin";
-import { assertSameOrigin, AuthError, requireAdmin, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/server/auth";
+import { adminAuth, hasAdminCredentials } from "@/lib/firebase/admin";
+import { assertSameOrigin, AuthError, requireAdmin, PRIMARY_ADMIN_EMAIL, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/server/auth";
 
 function failure(error: unknown) {
   return NextResponse.json(
@@ -25,6 +25,9 @@ function profile(admin: Awaited<ReturnType<typeof requireAdmin>>) {
 export async function GET(request: Request) {
   try {
     const admin = await requireAdmin(undefined, request);
+    if (admin.email?.toLowerCase() !== PRIMARY_ADMIN_EMAIL.toLowerCase()) {
+      throw new AuthError(`Access Denied: Only ${PRIMARY_ADMIN_EMAIL} is authorized.`, 403);
+    }
     return NextResponse.json({ success: true, data: profile(admin) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return failure(error);
@@ -35,14 +38,21 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const token = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") || "")?.[1];
-    if (!token) throw new AuthError();
+    if (!token && hasAdminCredentials) throw new AuthError();
     const admin = await requireAdmin(undefined, request);
-    // A new persistent session requires a recent Firebase sign-in.
-    const age = Math.floor(Date.now() / 1000) - admin.auth_time;
-    if (!Number.isFinite(age) || age < -60 || age > 300) {
-      throw new AuthError("Please sign in again to continue");
+    if (admin.email?.toLowerCase() !== PRIMARY_ADMIN_EMAIL.toLowerCase()) {
+      throw new AuthError(`Access Denied: Only ${PRIMARY_ADMIN_EMAIL} is authorized.`, 403);
     }
-    const session = await adminAuth.createSessionCookie(token, { expiresIn: SESSION_MAX_AGE_SECONDS * 1000 });
+    
+    let session = "dev-admin-session-cookie";
+    if (hasAdminCredentials && token) {
+      const age = Math.floor(Date.now() / 1000) - admin.auth_time;
+      if (!Number.isFinite(age) || age < -60 || age > 300) {
+        throw new AuthError("Please sign in again to continue");
+      }
+      session = await adminAuth.createSessionCookie(token, { expiresIn: SESSION_MAX_AGE_SECONDS * 1000 });
+    }
+
     const response = NextResponse.json({ success: true, data: profile(admin) }, { headers: { "Cache-Control": "no-store" } });
     response.cookies.set(SESSION_COOKIE_NAME, session, {
       httpOnly: true,

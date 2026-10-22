@@ -7,66 +7,60 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin authorization is anchored to the server-managed admin_users
-    // document.  User profile roles and arbitrary custom claims are not
-    // sufficient to grant access.
-    function activeAdmin() {
+    // STRICT PRIMARY ADMIN: Only venkateshchop14@gmail.com is authorized as an administrator.
+    function isPrimaryAdmin() {
       return signedIn()
-        && request.auth.token.email_verified == true
-        && exists(/databases/$(database)/documents/admin_users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.isActive == true
-        && get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.role is string
-        && get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.role != '';
+        && request.auth.token.email != null
+        && request.auth.token.email == 'venkateshchop14@gmail.com';
+    }
+
+    function activeAdmin() {
+      return isPrimaryAdmin();
     }
 
     function hasAdminPermission(permission) {
-      return activeAdmin()
-        && (
-          get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.role == 'super_admin'
-          || (
-            get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.permissions is list
-            && get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.permissions.hasAny([permission])
-          )
-        );
+      return isPrimaryAdmin();
     }
 
     // ─── Public catalogue data ──────────────────────────────────
-    // Product and category documents are intentionally public store data.
-    // Inactive products should never be published to clients.
+    // Product and category documents are public store data for browsing.
+    // Inactive products are hidden from public.
+    // Only venkateshchop14@gmail.com can create, update, or delete products and categories.
     match /products/{productId} {
-      allow read: if !resource.data.keys().hasAny(['isActive']) || resource.data.isActive == true;
-      allow create: if hasAdminPermission('products.create');
-      allow update: if hasAdminPermission('products.edit');
-      allow delete: if hasAdminPermission('products.delete');
+      allow read: if !resource.data.keys().hasAny(['isActive']) || resource.data.isActive == true || activeAdmin();
+      allow create: if activeAdmin()
+                    && request.resource.data.title is string
+                    && request.resource.data.price is number
+                    && request.resource.data.price >= 0;
+      allow update: if activeAdmin();
+      allow delete: if activeAdmin();
     }
 
     match /categories/{categoryId} {
-      allow read: if !resource.data.keys().hasAny(['isActive']) || resource.data.isActive == true;
-      allow create, update, delete: if hasAdminPermission('categories.edit');
+      allow read: if !resource.data.keys().hasAny(['isActive']) || resource.data.isActive == true || activeAdmin();
+      allow create, update, delete: if activeAdmin();
     }
 
-    // Coupons contain promotion codes and discount rules.  They are never a
-    // public collection; checkout validates them through the server API.
+    // Coupons contain promotion codes and discount rules. Only admin can view/manage.
     match /coupons/{couponId} {
-      allow read: if hasAdminPermission('coupons.view');
-      allow create, update, delete: if hasAdminPermission('coupons.manage');
+      allow read, create, update, delete: if activeAdmin();
     }
 
     // ─── Users & customers ──────────────────────────────────────
     match /users/{userId} {
+      // User can read their own profile; only primary admin (venkateshchop14@gmail.com) can inspect any user profile
       allow read: if signedIn() && (request.auth.uid == userId || activeAdmin());
+      // Users can register/create their customer profile
       allow create: if signedIn()
-                    && request.auth.uid == userId
-                    && request.resource.data.role == 'customer'
-                    && request.resource.data.isActive == true;
-      // Customers may edit profile/contact fields, but cannot grant
-      // themselves a role, activate a suspended account, or edit another
-      // user's document.
+                    && (request.auth.uid == userId || activeAdmin())
+                    && (activeAdmin() || request.resource.data.role == 'customer');
+      // Customers may edit their personal contact fields, but cannot grant
+      // themselves an admin role or edit another user's document.
       allow update: if activeAdmin()
                     || (signedIn()
                         && request.auth.uid == userId
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                          'displayName', 'photoURL', 'phone', 'addresses', 'updatedAt'
+                          'displayName', 'name', 'photoURL', 'avatarUrl', 'phone', 'city', 'state', 'addresses', 'updatedAt'
                         ])
                         && request.resource.data.role == resource.data.role
                         && request.resource.data.isActive == resource.data.isActive);
@@ -75,80 +69,63 @@ service cloud.firestore {
 
     // ─── Reviews ─────────────────────────────────────────────────
     match /reviews/{reviewId} {
-      allow read: if (resource.data.status == 'approved') || hasAdminPermission('reviews.view');
+      allow read: if (resource.data.status == 'approved') || activeAdmin();
       allow create: if signedIn()
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.status == 'pending'
                     && request.resource.data.rating is number
                     && request.resource.data.rating >= 1
                     && request.resource.data.rating <= 5;
-      allow update: if hasAdminPermission('reviews.approve')
-                    || hasAdminPermission('reviews.reject');
-      allow delete: if hasAdminPermission('reviews.delete');
+      allow update, delete: if activeAdmin();
     }
 
     // ─── Orders ──────────────────────────────────────────────────
-    // Order creation is server-only so catalogue prices, discounts, shipping,
-    // identity, and idempotency are computed atomically by the API.
+    // Order creation is processed via server API. Customers can read their own orders.
+    // Only primary admin can inspect all orders or update order status / shipping details.
     match /orders/{orderId} {
-      allow create: if false;
+      allow create: if activeAdmin();
       allow read: if signedIn()
-                  && (resource.data.userId == request.auth.uid || hasAdminPermission('orders.view'));
-      allow update: if hasAdminPermission('orders.edit');
-      allow delete: if hasAdminPermission('orders.edit');
+                  && (resource.data.userId == request.auth.uid || activeAdmin());
+      allow update, delete: if activeAdmin();
     }
 
     // ─── Shipping & logistics ───────────────────────────────────
-    // Provider configs can contain credentials and internal endpoints; they
-    // are not public catalogue data.
     match /shipping_providers/{providerId} {
-      allow read: if hasAdminPermission('shipping.view');
-      allow create, update, delete: if hasAdminPermission('shipping.manage');
+      allow read, write: if activeAdmin();
     }
 
     match /shipments/{shipmentId} {
-      allow read: if hasAdminPermission('shipping.view')
+      allow read: if activeAdmin()
                   || (signedIn() && resource.data.userId == request.auth.uid);
-      allow create, update, delete: if hasAdminPermission('shipping.manage');
+      allow create, update, delete: if activeAdmin();
     }
 
     match /shipping_logs/{logId} {
-      allow read, write: if hasAdminPermission('shipping.manage');
+      allow read, write: if activeAdmin();
     }
 
     // ─── Payments & audit logs ──────────────────────────────────
     match /payments/{paymentId} {
-      allow read: if hasAdminPermission('payments.view');
-      allow write: if hasAdminPermission('payments.manage');
+      allow read, write: if activeAdmin();
     }
 
     match /admin_logs/{logId} {
-      allow read: if hasAdminPermission('admins.view');
-      allow create: if activeAdmin();
+      allow read, create: if activeAdmin();
       allow update, delete: if false;
     }
 
     // ─── Admin users, roles, and settings ───────────────────────
+    // Strictly locked to venkateshchop14@gmail.com
     match /admin_users/{adminId} {
-      // An authenticated user may read only their own record to bootstrap the
-      // admin UI.  Admin management remains restricted to admins.manage.
-      allow read: if signedIn()
-                  && request.auth.token.email_verified == true
-                  && request.auth.uid == adminId;
-      allow create, update, delete: if hasAdminPermission('admins.manage');
+      allow read, write: if isPrimaryAdmin();
     }
 
     match /admin_roles/{roleId} {
-      allow read: if hasAdminPermission('admins.view');
-      allow create, update, delete: if hasAdminPermission('admins.manage');
+      allow read, write: if isPrimaryAdmin();
     }
 
-    // Settings may contain notification and provider configuration.  Public
-    // settings should be exposed through a deliberately scoped API instead of
-    // making the entire settings collection readable.
     match /settings/{settingId} {
-      allow read: if hasAdminPermission('settings.manage');
-      allow write: if hasAdminPermission('settings.manage');
+      allow read, write: if isPrimaryAdmin();
     }
 
     // ─── Deny everything else by default ────────────────────────

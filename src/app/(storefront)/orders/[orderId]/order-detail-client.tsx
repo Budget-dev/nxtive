@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -15,8 +15,10 @@ import {
   Share2,
   AlertCircle,
   ShoppingBag,
+  Loader2,
 } from "lucide-react";
 import { useStore, Order } from "@/components/store-context";
+import { auth } from "@/lib/firebase/client";
 
 interface Props {
   orderId: string;
@@ -25,9 +27,79 @@ interface Props {
 export function OrderDetailClient({ orderId }: Props) {
   const { orders, addToCart, showToast } = useStore();
   const [copied, setCopied] = useState(false);
+  const [fetchedOrder, setFetchedOrder] = useState<Order | null>(null);
+  const [isLoading, setIsLoading] = useState(!orders.some((o) => o.id.toLowerCase() === orderId.toLowerCase()));
 
-  // Never fall back to another order: an unknown id must not reveal a different customer's data.
-  const order = orders.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
+  // Look in existing orders first
+  const existingOrder = orders.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
+
+  useEffect(() => {
+    if (existingOrder) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    async function load() {
+      setIsLoading(true);
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/orders/${orderId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (isMounted && json.success && json.data) {
+          const raw = json.data;
+          const rawStatus = String(raw.status || "pending").toLowerCase();
+          const status: Order["status"] =
+            rawStatus === "delivered"
+              ? "Delivered"
+              : rawStatus === "shipped" || rawStatus === "out_for_delivery"
+              ? "Shipped"
+              : rawStatus === "cancelled" || rawStatus === "refunded"
+              ? "Cancelled"
+              : rawStatus === "processing" || rawStatus === "packed"
+              ? "Processing"
+              : "Order Confirmed";
+
+          setFetchedOrder({
+            id: String(raw.id || orderId),
+            date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+            items: (raw.items || []).map((item: any) => ({
+              id: String(item.productId || item.id || ""),
+              title: String(item.title || "Item"),
+              price: Number(item.price || 0),
+              quantity: Number(item.quantity || 1),
+              selectedSize: String(item.selectedSize || "M"),
+              selectedColor: item.selectedColor ? String(item.selectedColor) : undefined,
+              image: String(item.image || "/images/nxtvie/product-oversized-tee-hd.jpg"),
+            })),
+            subtotal: Number(raw.subtotal || 0),
+            discount: Number(raw.discount || 0),
+            shipping: Number(raw.shipping || 0),
+            total: Number(raw.total || 0),
+            status,
+            paymentMethod: String(raw.paymentMethod || "Online Payment"),
+            paymentStatus: raw.paymentStatus === "paid" ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending COD",
+            shippingAddress: raw.shippingAddress || {},
+            deliveryDateEstimate: String(raw.deliveryDateEstimate || "3-5 Business Days"),
+            trackingNumber: String(raw.trackingNumber || `NXT-AWB-${raw.id?.slice(-6) || "998811"}`),
+          });
+        }
+      } catch (err) {
+        console.warn("[order-detail] Error fetching order:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [orderId, existingOrder]);
+
+  const order = existingOrder || fetchedOrder;
 
   const handleShareTracking = () => {
     if (typeof window !== "undefined") {
@@ -51,6 +123,17 @@ export function OrderDetailClient({ orderId }: Props) {
       1
     );
   };
+
+  if (isLoading) {
+    return (
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "80vh", padding: "80px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <Loader2 size={36} className="animate-spin" style={{ margin: "0 auto 16px auto", color: "#111110" }} />
+          <p style={{ fontSize: "14px", color: "#6A645C", fontWeight: 600 }}>Loading order details...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (

@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { X, Plus, Minus, Trash2, ArrowRight, ShoppingBag } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "@/components/store-context";
 
 export function CartDrawer() {
@@ -16,49 +17,56 @@ export function CartDrawer() {
     cartSubtotal,
   } = useStore();
 
-  if (!isCartOpen) return null;
-
   const freeShippingThreshold = 150;
   const progressToFreeShipping = Math.min(100, (cartSubtotal / freeShippingThreshold) * 100);
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        display: "flex",
-        justifyContent: "flex-end",
-      }}
-    >
-      {/* Backdrop */}
-      <div
-        onClick={() => setIsCartOpen(false)}
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.55)",
-          backdropFilter: "blur(4px)",
-          transition: "opacity 0.3s ease",
-        }}
-      />
+    <AnimatePresence>
+      {isCartOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            onClick={() => setIsCartOpen(false)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.55)",
+              backdropFilter: "blur(4px)",
+            }}
+          />
 
-      {/* Drawer */}
-      <div
-        style={{
-          position: "relative",
-          width: "440px",
-          maxWidth: "100vw",
-          height: "100%",
-          backgroundColor: "#FAF9F6",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "-8px 0 32px rgba(0, 0, 0, 0.15)",
-          zIndex: 10,
-        }}
-        className="cart-drawer-panel"
-      >
+          {/* Drawer */}
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 350 }}
+            style={{
+              position: "relative",
+              width: "440px",
+              maxWidth: "100vw",
+              height: "100%",
+              backgroundColor: "#FAF9F6",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "-8px 0 32px rgba(0, 0, 0, 0.15)",
+              zIndex: 10,
+            }}
+            className="cart-drawer-panel"
+          >
         {/* Header */}
         <div
           style={{
@@ -359,7 +367,7 @@ export function CartDrawer() {
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
       <style jsx global>{`
         @media (max-width: 480px) {
@@ -369,6 +377,8 @@ export function CartDrawer() {
           }
         }
       `}</style>
-    </div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

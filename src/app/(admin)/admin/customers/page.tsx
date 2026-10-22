@@ -195,16 +195,30 @@ export default function AdminCustomersPage() {
                               flexShrink: 0,
                             }}
                           >
-                            {c.name.charAt(0)}
+                            {(c.name || c.email || "C").charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <Link
                               href={`/admin/customers/${c.id}`}
                               style={{ fontWeight: 700, fontSize: "13.5px", color: "#121110", textDecoration: "none" }}
                             >
-                              {c.name}
+                              {c.name || c.email?.split("@")[0] || "Customer"}
                             </Link>
-                            {c.segmentTier === "VIP" && (
+                            {c.notes?.includes("Role: admin") || c.notes?.includes("Role: super_admin") ? (
+                              <span
+                                style={{
+                                  marginLeft: "6px",
+                                  fontSize: "10px",
+                                  fontWeight: 800,
+                                  backgroundColor: "#E8F0FE",
+                                  color: "#1967D2",
+                                  padding: "1px 6px",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                Admin
+                              </span>
+                            ) : c.segmentTier === "VIP" ? (
                               <span
                                 style={{
                                   marginLeft: "6px",
@@ -218,13 +232,13 @@ export default function AdminCustomersPage() {
                               >
                                 VIP
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontSize: "13px", color: "#121110" }}>{c.email}</div>
-                        <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>{c.phone}</div>
+                        <div style={{ fontSize: "13px", color: "#121110" }}>{c.email || "No email"}</div>
+                        <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>{c.phone || "—"}</div>
                       </td>
                       <td>{c.city ? `${c.city}, ${c.state || "IN"}` : "India"}</td>
                       <td>
@@ -235,11 +249,13 @@ export default function AdminCustomersPage() {
                       <td style={{ fontWeight: 700 }}>{c.ordersCount} orders</td>
                       <td style={{ fontWeight: 800, color: "#121110" }}>{formatCurrency(c.totalSpent)}</td>
                       <td style={{ fontSize: "12px", color: "var(--adm-text-muted)", whiteSpace: "nowrap" }}>
-                        {new Date(c.registrationDate).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {c.registrationDate && !isNaN(new Date(c.registrationDate).getTime())
+                          ? new Date(c.registrationDate).toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "Recent"}
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>

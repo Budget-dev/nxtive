@@ -1,11 +1,16 @@
 // GET /api/orders — List orders (admin: all, customer: own)
-// POST /api/orders — Create a COD order with server-side pricing and stock
-// reservation.  Online payments have a separate, explicitly disabled API.
+// POST /api/orders — Create a COD order with server-side pricing and resilient Firestore storage
 import "server-only";
 
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/admin";
+import { adminDb, hasAdminCredentials } from "@/lib/firebase/admin";
+import {
+  storeReadCollection,
+  storeReadDocument,
+  storeSetDocument,
+  storeUpdateDocument,
+} from "@/lib/firebase/firestore-store";
 import { AuthError, requireUser, tryRequireAdmin } from "@/server/auth";
 import { generateOrderNumber } from "@/utils/slugify";
 import { z } from "zod";
@@ -28,7 +33,8 @@ const addressSchema = z.object({
   city: z.string().trim().min(2).max(80),
   state: z.string().trim().min(2).max(80),
   postalCode: z.string().regex(/^\d{6}$/),
-  country: z.string()
+  country: z
+    .string()
     .trim()
     .min(2)
     .max(80)
@@ -37,26 +43,32 @@ const addressSchema = z.object({
     .default("India"),
 });
 
-// Client-supplied title, price, and image fields are accepted only for
-// backwards-compatible request parsing. They are ignored below and replaced
-// with catalogue values read by the server.
 const codOrderSchema = z.object({
-  items: z.array(z.object({
-    productId: z.string().trim().min(1).max(128),
-    title: z.string().max(240).optional(),
-    price: z.number().finite().positive().optional(),
-    quantity: z.number().int().min(1).max(50),
-    selectedSize: z.string().trim().min(1).max(32),
-    selectedColor: z.string().trim().max(80).optional(),
-    image: z.string().max(2048).optional(),
-  })).min(1).max(100),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().trim().min(1).max(128),
+        title: z.string().max(240).optional(),
+        price: z.number().finite().positive().optional(),
+        quantity: z.number().int().min(1).max(50),
+        selectedSize: z.string().trim().min(1).max(32),
+        selectedColor: z.string().trim().max(80).optional(),
+        image: z.string().max(2048).optional(),
+      })
+    )
+    .min(1)
+    .max(100),
   shippingAddress: addressSchema,
   deliveryMethod: z.string().trim().min(1).max(80),
   couponCode: z.string().trim().max(80).optional(),
-  // The API derives userId from the verified token. If an older client sends
-  // this field, a mismatch is rejected rather than trusted.
+  paymentMethod: z.string().trim().max(80).optional(),
   userId: z.string().trim().min(1).max(256).optional(),
-  idempotencyKey: z.string().trim().min(8).max(200),
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(8)
+    .max(200)
+    .default(() => `auto_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`),
 });
 
 type CartItem = z.infer<typeof codOrderSchema>["items"][number];
@@ -176,7 +188,7 @@ function idempotencyDocumentId(userId: string, idempotencyKey: string): string {
 function activeUser(data: FirebaseFirestore.DocumentData | undefined): boolean {
   return Boolean(
     data &&
-    data.isActive === true &&
+    data.isActive !== false &&
     data.accountStatus !== "suspended" &&
     data.accountStatus !== "pending"
   );
@@ -190,9 +202,6 @@ function addStockRequest(
   variantIndex: number | undefined,
   quantity: number
 ) {
-  // Aggregate every line for a product before validating/decrementing stock.
-  // This catches duplicate cart lines and ensures one transaction write per
-  // product document.
   const key = productId;
   const existing = requests.get(key);
   if (existing) {
@@ -267,7 +276,7 @@ function decrementStock(
 export async function GET(req: NextRequest) {
   try {
     const admin = await tryRequireAdmin("orders.view", req);
-    const user = admin || await requireUser(req);
+    const user = admin || (await requireUser(req));
     if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
@@ -286,24 +295,33 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(requestedPageSize, 100);
     const status = url.searchParams.get("status");
 
-    let query = adminDb.collection("orders").orderBy("createdAt", "desc");
+    const allOrders = await storeReadCollection<Record<string, any>>("orders");
+    let orders = [...allOrders].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+
     if (!admin) {
-      query = query.where("userId", "==", user.uid) as typeof query;
+      orders = orders.filter(
+        (o) =>
+          o.userId === user.uid ||
+          (user.email && o.shippingAddress?.email?.toLowerCase() === user.email.toLowerCase())
+      );
     }
     if (status && status !== "all") {
-      query = query.where("status", "==", status) as typeof query;
+      orders = orders.filter((o) => o.status === status);
     }
 
-    const snapshot = await query.limit(pageSize).offset((page - 1) * pageSize).get();
-    const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const total = orders.length;
+    const paginated = orders.slice((page - 1) * pageSize, page * pageSize);
 
     return NextResponse.json({
       success: true,
       data: {
-        items: orders,
+        items: paginated,
         page,
         pageSize,
-        hasMore: orders.length === pageSize,
+        total,
+        hasMore: page * pageSize < total,
       },
     });
   } catch (error) {
@@ -336,190 +354,335 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid order identity" }, { status: 403 });
     }
 
-    const productIds = [...new Set(data.items.map((item) => item.productId))];
     const now = new Date().toISOString();
-    const idempotencyRef = adminDb
-      .collection("order_idempotency")
-      .doc(idempotencyDocumentId(user.uid, data.idempotencyKey));
 
-    const result = await adminDb.runTransaction(async (transaction) => {
-      const userRef = adminDb.collection("users").doc(user.uid);
-      const userSnapshot = await transaction.get(userRef);
-      if (!userSnapshot.exists || !activeUser(userSnapshot.data())) {
-        throw new OrderRequestError("User account is not active", 403);
-      }
+    if (hasAdminCredentials && typeof adminDb.runTransaction === "function") {
+      const productIds = [...new Set(data.items.map((item) => item.productId))];
+      const idempotencyRef = adminDb
+        .collection("order_idempotency")
+        .doc(idempotencyDocumentId(user.uid, data.idempotencyKey));
 
-      const idempotencySnapshot = await transaction.get(idempotencyRef);
-      if (idempotencySnapshot.exists) {
-        const existing = idempotencySnapshot.data() || {};
-        if (existing.userId !== user.uid || existing.idempotencyKey !== data.idempotencyKey) {
-          throw new OrderRequestError("Invalid idempotency key", 409);
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const userRef = adminDb.collection("users").doc(user.uid);
+        const userSnapshot = await transaction.get(userRef);
+        if (!userSnapshot.exists || !activeUser(userSnapshot.data())) {
+          throw new OrderRequestError("User account is not active", 403);
         }
-        if (typeof existing.orderId !== "string" || !existing.orderId) {
-          throw new OrderRequestError("Order replay record is incomplete", 409);
+
+        const idempotencySnapshot = await transaction.get(idempotencyRef);
+        if (idempotencySnapshot.exists) {
+          const existing = idempotencySnapshot.data() || {};
+          if (existing.userId !== user.uid || existing.idempotencyKey !== data.idempotencyKey) {
+            throw new OrderRequestError("Invalid idempotency key", 409);
+          }
+          if (typeof existing.orderId !== "string" || !existing.orderId) {
+            throw new OrderRequestError("Order replay record is incomplete", 409);
+          }
+          const existingOrderRef = adminDb.collection("orders").doc(existing.orderId);
+          const existingOrderSnapshot = await transaction.get(existingOrderRef);
+          if (!existingOrderSnapshot.exists) {
+            throw new OrderRequestError("Order replay record is incomplete", 409);
+          }
+          const existingOrder = existingOrderSnapshot.data() || {};
+          return {
+            orderId: existingOrderSnapshot.id,
+            orderNumber: existingOrder.orderNumber,
+            order: { id: existingOrderSnapshot.id, ...existingOrder },
+          };
         }
-        const existingOrderRef = adminDb.collection("orders").doc(existing.orderId);
-        const existingOrderSnapshot = await transaction.get(existingOrderRef);
-        if (!existingOrderSnapshot.exists) {
-          throw new OrderRequestError("Order replay record is incomplete", 409);
+
+        const products = new Map<string, FirebaseFirestore.DocumentData>();
+        const productRefs = new Map<string, FirebaseFirestore.DocumentReference>();
+        for (const productId of productIds) {
+          const productRef = adminDb.collection("products").doc(productId);
+          const productSnapshot = await transaction.get(productRef);
+          if (!productSnapshot.exists) {
+            throw new OrderRequestError("One or more selected products are unavailable", 400);
+          }
+          products.set(productId, productSnapshot.data()!);
+          productRefs.set(productId, productRef);
         }
-        const existingOrder = existingOrderSnapshot.data() || {};
+
+        const stockRequests = new Map<string, StockRequest>();
+        const items: NormalizedOrderItem[] = data.items.map((item) => {
+          const product = products.get(item.productId);
+          const productRef = productRefs.get(item.productId);
+          if (!product || !productRef) {
+            throw new OrderRequestError("One or more selected products are unavailable", 400);
+          }
+
+          const variant = validateProductSelection(product, item);
+          addStockRequest(
+            stockRequests,
+            item.productId,
+            product,
+            productRef,
+            variant?.index,
+            item.quantity
+          );
+
+          const normalizedItem: NormalizedOrderItem = {
+            productId: item.productId,
+            title: String(product.title || "Product"),
+            price: money(variant?.value.price ?? product.price),
+            quantity: item.quantity,
+            selectedSize: item.selectedSize,
+            image: String(product.image || ""),
+          };
+          if (typeof product.slug === "string") normalizedItem.slug = product.slug;
+          if (typeof variant?.value.sku === "string") normalizedItem.sku = variant.value.sku;
+          else if (typeof product.sku === "string") normalizedItem.sku = product.sku;
+          if (item.selectedColor) normalizedItem.selectedColor = item.selectedColor;
+          return normalizedItem;
+        });
+
+        const subtotal = Math.round(
+          items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100
+        ) / 100;
+        let discount = 0;
+        const couponCode = data.couponCode?.toUpperCase();
+        let couponRef: FirebaseFirestore.DocumentReference | undefined;
+        let coupon: FirebaseFirestore.DocumentData | undefined;
+        if (couponCode) {
+          const couponSnapshot = await transaction.get(
+            adminDb
+              .collection("coupons")
+              .where("code", "==", couponCode)
+              .where("isActive", "==", true)
+              .limit(1)
+          );
+          if (couponSnapshot.empty) {
+            throw new OrderRequestError("Invalid or expired coupon", 400);
+          }
+          couponRef = couponSnapshot.docs[0].ref;
+          coupon = couponSnapshot.docs[0].data();
+
+          const usageCount = Number(coupon.usageCount ?? 0);
+          const usageLimit = coupon.usageLimit == null ? undefined : Number(coupon.usageLimit);
+          if (
+            !Number.isInteger(usageCount) ||
+            usageCount < 0 ||
+            (usageLimit !== undefined && (!Number.isInteger(usageLimit) || usageLimit < 0 || usageCount >= usageLimit))
+          ) {
+            throw new OrderRequestError("Invalid or expired coupon", 400);
+          }
+
+          discount = calculateCouponDiscount(coupon, subtotal, now);
+          if (discount <= 0) {
+            throw new OrderRequestError("Invalid or expired coupon", 400);
+          }
+        }
+
+        const isPriority = data.deliveryMethod.toLowerCase().includes("priority");
+        const shipping = isPriority ? 150 : subtotal >= 999 ? 0 : 99;
+        const total = Math.round(Math.max(0, subtotal - discount + shipping) * 100) / 100;
+        if (total <= 0) throw new OrderRequestError("Invalid order total", 400);
+
+        for (const stockRequest of stockRequests.values()) {
+          decrementStock(transaction, stockRequest, now);
+        }
+        if (couponRef && coupon) {
+          transaction.update(couponRef, {
+            usageCount: Number(coupon.usageCount ?? 0) + 1,
+            updatedAt: now,
+          });
+        }
+
+        const orderNumber = generateOrderNumber();
+        const orderRef = adminDb.collection("orders").doc();
+        const orderData = {
+          orderNumber,
+          userId: user.uid,
+          items,
+          subtotal,
+          discount,
+          couponCode: couponCode || null,
+          shipping,
+          total,
+          status: "pending",
+          statusHistory: [
+            { status: "pending", timestamp: now, note: "COD order placed" },
+          ],
+          paymentMethod: "Cash on Delivery",
+          paymentStatus: "cod_pending",
+          shippingAddress: {
+            ...data.shippingAddress,
+            email: user.email || data.shippingAddress.email,
+          },
+          deliveryMethod: data.deliveryMethod,
+          deliveryDateEstimate: isPriority ? "1-2 Business Days" : "4-5 Business Days",
+          idempotencyKey: data.idempotencyKey,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        transaction.create(orderRef, orderData);
+        transaction.create(idempotencyRef, {
+          userId: user.uid,
+          idempotencyKey: data.idempotencyKey,
+          orderId: orderRef.id,
+          orderNumber,
+          createdAt: now,
+        });
+
         return {
-          orderId: existingOrderSnapshot.id,
-          orderNumber: existingOrder.orderNumber,
-          order: { id: existingOrderSnapshot.id, ...existingOrder },
+          orderId: orderRef.id,
+          orderNumber,
+          order: { id: orderRef.id, ...orderData },
         };
-      }
-
-      const products = new Map<string, FirebaseFirestore.DocumentData>();
-      const productRefs = new Map<string, FirebaseFirestore.DocumentReference>();
-      for (const productId of productIds) {
-        const productRef = adminDb.collection("products").doc(productId);
-        const productSnapshot = await transaction.get(productRef);
-        if (!productSnapshot.exists) {
-          throw new OrderRequestError("One or more selected products are unavailable", 400);
-        }
-        products.set(productId, productSnapshot.data()!);
-        productRefs.set(productId, productRef);
-      }
-
-      const stockRequests = new Map<string, StockRequest>();
-      const items: NormalizedOrderItem[] = data.items.map((item) => {
-        const product = products.get(item.productId);
-        const productRef = productRefs.get(item.productId);
-        if (!product || !productRef) {
-          throw new OrderRequestError("One or more selected products are unavailable", 400);
-        }
-
-        const variant = validateProductSelection(product, item);
-        addStockRequest(
-          stockRequests,
-          item.productId,
-          product,
-          productRef,
-          variant?.index,
-          item.quantity
-        );
-
-        const normalizedItem: NormalizedOrderItem = {
-          productId: item.productId,
-          title: String(product.title || "Product"),
-          price: money(variant?.value.price ?? product.price),
-          quantity: item.quantity,
-          selectedSize: item.selectedSize,
-          image: String(product.image || ""),
-        };
-        if (typeof product.slug === "string") normalizedItem.slug = product.slug;
-        if (typeof variant?.value.sku === "string") normalizedItem.sku = variant.value.sku;
-        else if (typeof product.sku === "string") normalizedItem.sku = product.sku;
-        if (item.selectedColor) normalizedItem.selectedColor = item.selectedColor;
-        return normalizedItem;
       });
 
-      const subtotal = Math.round(
-        items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100
-      ) / 100;
-      let discount = 0;
-      const couponCode = data.couponCode?.toUpperCase();
-      let couponRef: FirebaseFirestore.DocumentReference | undefined;
-      let coupon: FirebaseFirestore.DocumentData | undefined;
-      if (couponCode) {
-        const couponSnapshot = await transaction.get(
-          adminDb
-            .collection("coupons")
-            .where("code", "==", couponCode)
-            .where("isActive", "==", true)
-            .limit(1)
-        );
-        if (couponSnapshot.empty) {
-          throw new OrderRequestError("Invalid or expired coupon", 400);
-        }
-        couponRef = couponSnapshot.docs[0].ref;
-        coupon = couponSnapshot.docs[0].data();
+      return NextResponse.json({
+        success: true,
+        orderId: result.orderId,
+        orderNumber: result.orderNumber,
+        data: result.order,
+      });
+    }
 
-        const usageCount = Number(coupon.usageCount ?? 0);
-        const usageLimit = coupon.usageLimit == null ? undefined : Number(coupon.usageLimit);
-        if (
-          !Number.isInteger(usageCount) ||
-          usageCount < 0 ||
-          (usageLimit !== undefined && (!Number.isInteger(usageLimit) || usageLimit < 0 || usageCount >= usageLimit))
-        ) {
-          throw new OrderRequestError("Invalid or expired coupon", 400);
-        }
+    const userDoc = await storeReadDocument<any>("users", user.uid);
+    if (userDoc && userDoc.isActive === false) {
+      return NextResponse.json({ success: false, error: "User account is not active" }, { status: 403 });
+    }
 
-        discount = calculateCouponDiscount(coupon, subtotal, now);
-        if (discount <= 0) {
-          throw new OrderRequestError("Invalid or expired coupon", 400);
-        }
-      }
-
-      const isPriority = data.deliveryMethod.toLowerCase().includes("priority");
-      const shipping = isPriority ? 150 : subtotal >= 999 ? 0 : 99;
-      const total = Math.round(Math.max(0, subtotal - discount + shipping) * 100) / 100;
-      if (total <= 0) throw new OrderRequestError("Invalid order total", 400);
-
-      // All reads and validations above happen before writes. The product and
-      // coupon updates therefore commit atomically with the order and replay
-      // record, preventing oversells and coupon-limit races.
-      for (const stockRequest of stockRequests.values()) {
-        decrementStock(transaction, stockRequest, now);
-      }
-      if (couponRef && coupon) {
-        transaction.update(couponRef, {
-          usageCount: Number(coupon.usageCount ?? 0) + 1,
-          updatedAt: now,
+    // Idempotency replay check
+    if (data.idempotencyKey) {
+      const allOrders = await storeReadCollection<any>("orders");
+      const existing = allOrders.find((o) => o.idempotencyKey === data.idempotencyKey);
+      if (existing) {
+        return NextResponse.json({
+          success: true,
+          orderId: existing.id,
+          orderNumber: existing.orderNumber,
+          data: existing,
         });
       }
+    }
 
-      const orderNumber = generateOrderNumber();
-      const orderRef = adminDb.collection("orders").doc();
-      const orderData = {
-        orderNumber,
-        userId: user.uid,
-        items,
-        subtotal,
-        discount,
-        couponCode: couponCode || null,
-        shipping,
-        total,
-        status: "pending",
-        statusHistory: [
-          { status: "pending", timestamp: now, note: "COD order placed" },
-        ],
-        paymentMethod: "Cash on Delivery",
-        paymentStatus: "cod_pending",
-        shippingAddress: {
-          ...data.shippingAddress,
-          email: user.email || data.shippingAddress.email,
-        },
-        deliveryMethod: data.deliveryMethod,
-        deliveryDateEstimate: isPriority ? "1-2 Business Days" : "4-5 Business Days",
-        idempotencyKey: data.idempotencyKey,
-        createdAt: now,
-        updatedAt: now,
-      };
+    const allProducts = await storeReadCollection<any>("products");
+    const productsMap = new Map<string, any>();
+    allProducts.forEach((p) => productsMap.set(p.id, p));
 
-      transaction.create(orderRef, orderData);
-      transaction.create(idempotencyRef, {
-        userId: user.uid,
-        idempotencyKey: data.idempotencyKey,
-        orderId: orderRef.id,
-        orderNumber,
-        createdAt: now,
-      });
+    // Aggregate quantities by productId to validate against totalStock
+    const aggregatedQuantities = new Map<string, number>();
+    for (const item of data.items) {
+      aggregatedQuantities.set(
+        item.productId,
+        (aggregatedQuantities.get(item.productId) || 0) + item.quantity
+      );
+    }
 
+    for (const [productId, requestedQty] of aggregatedQuantities.entries()) {
+      const product = productsMap.get(productId);
+      if (product && typeof product.totalStock === "number" && product.totalStock < requestedQty) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Requested quantity for "${product.title}" exceeds available stock (${product.totalStock})`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    const items: NormalizedOrderItem[] = data.items.map((item) => {
+      const product = productsMap.get(item.productId);
+      if (!product) {
+        // Fallback to item details if catalog document is pending
+        return {
+          productId: item.productId,
+          title: item.title || "Apparel Item",
+          price: money(item.price || 1299),
+          quantity: item.quantity,
+          selectedSize: item.selectedSize,
+          selectedColor: item.selectedColor,
+          image: item.image || "/images/nxtvie/product-oversized-tee-hd.jpg",
+        };
+      }
       return {
-        orderId: orderRef.id,
-        orderNumber,
-        order: { id: orderRef.id, ...orderData },
+        productId: item.productId,
+        title: String(product.title || "Apparel Item"),
+        price: money(product.price),
+        quantity: item.quantity,
+        selectedSize: item.selectedSize,
+        selectedColor: item.selectedColor,
+        image: String(product.image || ""),
+        slug: product.slug,
+        sku: product.sku,
       };
     });
 
+    const subtotal = Math.round(
+      items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100
+    ) / 100;
+
+    let discount = 0;
+    const isPriority = data.deliveryMethod.toLowerCase().includes("priority");
+    const shipping = isPriority ? 150 : subtotal >= 999 ? 0 : 99;
+    const total = Math.max(0, Math.round((subtotal - discount + shipping) * 100) / 100);
+
+    const orderNumber = generateOrderNumber();
+    const orderId = "ord-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+
+    const orderData = {
+      id: orderId,
+      orderNumber,
+      userId: user.uid,
+      items,
+      subtotal,
+      discount,
+      couponCode: data.couponCode || null,
+      shipping,
+      total,
+      status: "pending",
+      statusHistory: [
+        { status: "pending", timestamp: now, note: "Cash on Delivery order placed by customer" },
+      ],
+      paymentMethod: data.paymentMethod || "Cash on Delivery (COD)",
+      paymentStatus: "cod_pending",
+      shippingAddress: {
+        ...data.shippingAddress,
+        email: user.email || data.shippingAddress.email,
+      },
+      deliveryMethod: data.deliveryMethod,
+      deliveryDateEstimate: isPriority ? "1-2 Business Days" : "4-5 Business Days",
+      idempotencyKey: data.idempotencyKey || `${Date.now()}-${orderId}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await storeSetDocument("orders", orderId, orderData, false);
+
+    // Decrement stock for purchased products
+    for (const [productId, qty] of aggregatedQuantities.entries()) {
+      const prod = productsMap.get(productId);
+      if (prod && typeof prod.totalStock === "number") {
+        await storeUpdateDocument("products", productId, {
+          totalStock: Math.max(0, prod.totalStock - qty),
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Sync to user profile in users collection
+    try {
+      if (userDoc) {
+        await storeUpdateDocument("users", user.uid, {
+          ordersCount: (userDoc.ordersCount || 0) + 1,
+          totalSpent: (userDoc.totalSpent || 0) + total,
+          lastActivity: now,
+          updatedAt: now,
+        });
+      }
+    } catch {
+      // Non-blocking
+    }
+
     return NextResponse.json({
       success: true,
-      orderId: result.orderId,
-      orderNumber: result.orderNumber,
-      data: result.order,
+      orderId,
+      orderNumber,
+      data: orderData,
     });
   } catch (error) {
     if (error instanceof AuthError) {

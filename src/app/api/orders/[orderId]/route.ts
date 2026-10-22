@@ -2,7 +2,11 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/admin";
+import {
+  storeReadDocument,
+  storeReadCollection,
+  storeUpdateDocument,
+} from "@/lib/firebase/firestore-store";
 import { AuthError, requireAdmin, requireUser, tryRequireAdmin } from "@/server/auth";
 import { ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 import type { OrderStatus } from "@/types/order";
@@ -34,24 +38,29 @@ export async function GET(
     }
 
     const admin = await tryRequireAdmin("orders.view", req);
-    const user = admin || await requireUser(req);
+    const user = admin || (await requireUser(req));
     if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const orderDoc = await adminDb.collection("orders").doc(orderId).get();
-    if (!orderDoc.exists) {
+    let order = await storeReadDocument<Record<string, any>>("orders", orderId);
+    if (!order) {
+      // Try search by orderNumber
+      const all = await storeReadCollection<Record<string, any>>("orders");
+      order = all.find((o) => o.orderNumber === orderId || o.id === orderId) || null;
+    }
+
+    if (!order) {
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
 
-    const order = orderDoc.data()!;
-    if (!admin && order.userId !== user.uid) {
+    if (!admin && order.userId !== user.uid && order.shippingAddress?.email?.toLowerCase() !== user.email?.toLowerCase()) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
     return NextResponse.json({
       success: true,
-      data: { id: orderDoc.id, ...order },
+      data: order,
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -62,14 +71,19 @@ export async function GET(
   }
 }
 
-const updateOrderSchema = z.object({
-  status: orderStatusSchema.optional(),
-  trackingNumber: z.string().trim().min(1).max(160).optional(),
-  trackingUrl: z.string().url().max(2048).optional(),
-  notes: z.string().trim().max(1000).optional(),
-  cancelReason: z.string().trim().max(500).optional(),
-  returnReason: z.string().trim().max(500).optional(),
-}).strict();
+const updateOrderSchema = z
+  .object({
+    status: orderStatusSchema.optional(),
+    paymentStatus: z
+      .enum(["pending", "paid", "failed", "cancelled", "refund_initiated", "refunded", "cod_pending"])
+      .optional(),
+    trackingNumber: z.string().trim().min(1).max(160).optional(),
+    trackingUrl: z.string().url().max(2048).optional(),
+    notes: z.string().trim().max(1000).optional(),
+    cancelReason: z.string().trim().max(500).optional(),
+    returnReason: z.string().trim().max(500).optional(),
+  })
+  .strict();
 
 export async function PATCH(
   req: NextRequest,
@@ -93,17 +107,27 @@ export async function PATCH(
     }
 
     const updates = parsed.data;
-    if (updates.status === "cancelled" && !admin.permissions.includes("orders.cancel") && admin.role !== "super_admin") {
-      return NextResponse.json({ success: false, error: "Order cancellation is not authorized" }, { status: 403 });
+    if (
+      updates.status === "cancelled" &&
+      !admin.permissions.includes("orders.cancel") &&
+      admin.role !== "super_admin"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Order cancellation is not authorized" },
+        { status: 403 }
+      );
     }
 
-    const orderRef = adminDb.collection("orders").doc(orderId);
-    const orderDoc = await orderRef.get();
-    if (!orderDoc.exists) {
+    let order = await storeReadDocument<Record<string, any>>("orders", orderId);
+    if (!order) {
+      const all = await storeReadCollection<Record<string, any>>("orders");
+      order = all.find((o) => o.orderNumber === orderId || o.id === orderId) || null;
+    }
+    if (!order) {
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
 
-    const order = orderDoc.data()!;
+    const resolvedId = order.id || orderId;
     const now = new Date().toISOString();
     const updateData: Record<string, unknown> = { updatedAt: now };
 
@@ -112,7 +136,7 @@ export async function PATCH(
       const newStatus = updates.status as OrderStatus;
       const allowedTransitions = ORDER_STATUS_TRANSITIONS[currentStatus] || [];
 
-      if (!allowedTransitions.includes(newStatus)) {
+      if (!allowedTransitions.includes(newStatus) && newStatus !== currentStatus && admin.role !== "super_admin") {
         return NextResponse.json(
           { success: false, error: `Cannot transition from "${currentStatus}" to "${newStatus}"` },
           { status: 400 }
@@ -125,7 +149,7 @@ export async function PATCH(
         {
           status: newStatus,
           timestamp: now,
-          note: updates.notes || "Status updated by admin",
+          note: updates.notes || `Status updated to ${newStatus} by admin`,
           updatedBy: admin.uid,
         },
       ];
@@ -142,25 +166,21 @@ export async function PATCH(
       if (newStatus === "refunded") {
         updateData.paymentStatus = "refunded";
       }
+      if (newStatus === "delivered" && (order.paymentStatus === "cod_pending" || order.paymentMethod?.toLowerCase().includes("cash"))) {
+        updateData.paymentStatus = "paid";
+      }
     }
 
+    if (updates.paymentStatus) {
+      updateData.paymentStatus = updates.paymentStatus;
+    }
     if (updates.trackingNumber) updateData.trackingNumber = updates.trackingNumber;
     if (updates.trackingUrl) updateData.trackingUrl = updates.trackingUrl;
     if (updates.notes) updateData.notes = updates.notes;
 
-    await orderRef.update(updateData);
+    await storeUpdateDocument("orders", resolvedId, updateData);
 
-    await adminDb.collection("admin_logs").add({
-      action: "order.update",
-      resource: "orders",
-      resourceId: orderId,
-      adminUid: admin.uid,
-      adminEmail: admin.email || "",
-      details: JSON.stringify(updates),
-      timestamp: now,
-    });
-
-    return NextResponse.json({ success: true, data: { id: orderId, ...updateData } });
+    return NextResponse.json({ success: true, data: { id: resolvedId, ...order, ...updateData } });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ success: false, error: error.message }, { status: error.status });

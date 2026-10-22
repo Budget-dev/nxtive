@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { X, Heart, ShoppingBag, Check, ShieldCheck, Truck } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "@/components/store-context";
 import { sharpImageSrc } from "@/lib/sharp-image";
 
@@ -17,12 +18,11 @@ export function QuickViewModal() {
   const [selectedSize, setSelectedSize] = useState("M");
   const [quantity, setQuantity] = useState(1);
 
-  if (!quickViewProduct) return null;
-
-  const sizes = quickViewProduct.sizes || ["S", "M", "L", "XL"];
-  const inWishlist = isInWishlist(quickViewProduct.id);
+  const sizes = quickViewProduct?.sizes || ["S", "M", "L", "XL"];
+  const inWishlist = quickViewProduct ? isInWishlist(quickViewProduct.id) : false;
 
   const handleAdd = () => {
+    if (!quickViewProduct) return;
     for (let i = 0; i < quantity; i++) {
       addToCart(quickViewProduct, selectedSize);
     }
@@ -30,45 +30,55 @@ export function QuickViewModal() {
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
-      }}
-    >
-      {/* Backdrop */}
-      <div
-        onClick={() => setQuickViewProduct(null)}
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.65)",
-          backdropFilter: "blur(6px)",
-        }}
-      />
+    <AnimatePresence>
+      {quickViewProduct && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            onClick={() => setQuickViewProduct(null)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.65)",
+              backdropFilter: "blur(6px)",
+            }}
+          />
 
-      {/* Modal Card */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          maxWidth: "840px",
-          backgroundColor: "#FAF9F6",
-          borderRadius: "16px",
-          overflow: "hidden",
-          boxShadow: "var(--shadow-lg)",
-          zIndex: 10,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          maxHeight: "90vh",
-          overflowY: "auto",
-        }}
-      >
+          {/* Modal Card */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 10 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: "840px",
+              backgroundColor: "#FAF9F6",
+              borderRadius: "16px",
+              overflow: "hidden",
+              boxShadow: "var(--shadow-lg)",
+              zIndex: 10,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
         {/* Close Button */}
         <button
           onClick={() => setQuickViewProduct(null)}
@@ -286,7 +296,9 @@ export function QuickViewModal() {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 }

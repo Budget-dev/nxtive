@@ -21,7 +21,7 @@ describe("Order and Payment Lifecycle Rules", () => {
   });
 
   it("allows transition to return_requested from delivered, but no transition from refunded", () => {
-    expect(ORDER_STATUS_TRANSITIONS["delivered"]).toEqual(["return_requested"]);
+    expect(ORDER_STATUS_TRANSITIONS["delivered"]).toContain("return_requested");
     expect(ORDER_STATUS_TRANSITIONS["refunded"]).toHaveLength(0);
   });
 

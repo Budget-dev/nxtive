@@ -35,16 +35,16 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
 
 /** Valid next statuses from any given status (admin transitions) */
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ["payment_confirmed", "processing", "cancelled"],
-  payment_confirmed: ["processing", "cancelled"],
-  processing: ["packed", "cancelled"],
-  packed: ["shipped", "cancelled"],
-  shipped: ["out_for_delivery", "delivered"],
-  out_for_delivery: ["delivered"],
-  delivered: ["return_requested"],
-  cancelled: [],
-  return_requested: ["returned", "delivered"],
-  returned: ["refund_initiated"],
+  pending: ["payment_confirmed", "processing", "packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
+  payment_confirmed: ["processing", "packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
+  processing: ["packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
+  packed: ["shipped", "out_for_delivery", "delivered", "cancelled"],
+  shipped: ["out_for_delivery", "delivered", "cancelled"],
+  out_for_delivery: ["delivered", "shipped", "cancelled"],
+  delivered: ["return_requested", "returned", "refunded"],
+  cancelled: ["pending", "processing"],
+  return_requested: ["returned", "delivered", "refund_initiated", "refunded"],
+  returned: ["refund_initiated", "refunded"],
   refund_initiated: ["refunded"],
   refunded: [],
 };

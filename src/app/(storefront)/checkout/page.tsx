@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,10 +14,15 @@ import {
   Lock,
   LocateFixed,
   MapPin,
+  Check,
+  Home,
+  Building,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
 import { NxtvieLogo } from "@/components/layout/nxtvie-logo";
+import { useRazorpayCheckout } from "@/lib/razorpay/use-razorpay-checkout";
+import type { UserAddress } from "@/types/user";
 
 const INDIAN_STATES = [
   "Maharashtra",
@@ -72,52 +77,107 @@ export default function CheckoutPage() {
   const [state, setState] = useState("Maharashtra");
   const [postalCode, setPostalCode] = useState("");
   const [deliveryMethod, setDeliveryMethod] = useState("standard");
-  const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [paymentMethod, setPaymentMethod] = useState("razorpay");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
+  // Saved Addresses
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
+
+  const { initiatePayment, loading: razorpayLoading } = useRazorpayCheckout();
+
   const deliveryCost = deliveryMethod === "priority" ? 150 : shippingFee;
   const finalTotal = Math.max(0, cartSubtotal - discountAmount + deliveryCost);
 
+  // Load saved addresses for authenticated user
+  useEffect(() => {
+    if (!user) return;
+    if (user.email && !email) setEmail(user.email);
+    if (user.displayName && !firstName) {
+      const parts = user.displayName.split(" ");
+      setFirstName(parts[0] || "");
+      if (parts.length > 1) setLastName(parts.slice(1).join(" "));
+    }
+
+    fetch(`/api/users/addresses?uid=${encodeURIComponent(user.uid)}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setSavedAddresses(json.data);
+          const defaultAddr = json.data.find((a: UserAddress) => a.isDefault) || json.data[0];
+          if (defaultAddr) {
+            applySavedAddress(defaultAddr);
+          }
+        }
+      })
+      .catch((err) => console.warn("Failed to load saved addresses for checkout:", err));
+  }, [user]);
+
+  const applySavedAddress = (addr: UserAddress) => {
+    setSelectedSavedAddressId(addr.id);
+    if (addr.fullName) {
+      const parts = addr.fullName.split(" ");
+      setFirstName(parts[0] || "");
+      setLastName(parts.slice(1).join(" ") || "");
+    }
+    if (addr.phone) setPhone(addr.phone);
+    if (addr.street) setStreet(addr.street);
+    if (addr.apartment) setApartment(addr.apartment);
+    if (addr.city) setCity(addr.city);
+    if (addr.state) {
+      const matched = INDIAN_STATES.find(
+        (s) => s.toLowerCase() === addr.state.toLowerCase() || addr.state.toLowerCase().includes(s.toLowerCase())
+      );
+      if (matched) setState(matched);
+    }
+    if (addr.postalCode) setPostalCode(addr.postalCode.replace(/\D/g, "").slice(0, 6));
+    setLocationMessage(`Applied saved address: ${addr.label || "Saved"} (${addr.city})`);
+  };
+
+  // Google Maps / Device Geolocation Auto-Fetch
   const fillFromCurrentLocation = () => {
-    if (!navigator.geolocation) {
+    if (typeof window === "undefined" || !navigator.geolocation) {
       setLocationMessage("Location is not supported by this browser. Please enter your address manually.");
       return;
     }
 
     setLocationLoading(true);
-    setLocationMessage(null);
+    setLocationMessage("Detecting device GPS coordinates...");
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1`,
-            { headers: { Accept: "application/json" } }
-          );
-          if (!response.ok) throw new Error("Unable to look up this location.");
+          setLocationMessage("Resolving address via Google Maps Geocoding...");
+          const res = await fetch("/api/location/reverse-geocode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }),
+          });
 
-          const result = await response.json();
-          const address = result.address || {};
-          const streetParts = [address.house_number, address.road || address.pedestrian, address.neighbourhood || address.suburb]
-            .filter(Boolean)
-            .join(", ");
-          const detectedState = address.state || "";
-          const matchedState = INDIAN_STATES.find(
-            (item) => item.toLowerCase() === detectedState.toLowerCase() || detectedState.toLowerCase().includes(item.toLowerCase())
-          );
-
-          if (streetParts) setStreet(streetParts);
-          if (address.city || address.town || address.village || address.municipality) {
-            setCity(address.city || address.town || address.village || address.municipality);
+          const json = await res.json();
+          if (!res.ok || !json.success || !json.address) {
+            throw new Error(json.error || "Unable to look up this location.");
           }
-          if (matchedState) setState(matchedState);
-          if (address.postcode) setPostalCode(String(address.postcode).replace(/\D/g, "").slice(0, 6));
-          setLocationMessage("Location found. Please review the address before placing your order.");
+
+          const addr = json.address;
+          if (addr.street) setStreet(addr.street);
+          if (addr.apartment || addr.area) setApartment(addr.apartment || addr.area);
+          if (addr.city) setCity(addr.city);
+          if (addr.state) {
+            const matchedState = INDIAN_STATES.find(
+              (item) => item.toLowerCase() === addr.state.toLowerCase() || addr.state.toLowerCase().includes(item.toLowerCase())
+            );
+            if (matchedState) setState(matchedState);
+          }
+          if (addr.postalCode) setPostalCode(String(addr.postalCode).replace(/\D/g, "").slice(0, 6));
+
+          setSelectedSavedAddressId(null);
+          setLocationMessage(`Auto-detected: ${addr.city}, ${addr.state}. Please review before placing order.`);
         } catch {
-          setLocationMessage("We could not read this location. Please enter your address manually.");
+          setLocationMessage("Could not resolve location. Please enter your address manually.");
         } finally {
           setLocationLoading(false);
         }
@@ -126,13 +186,13 @@ export default function CheckoutPage() {
         setLocationLoading(false);
         setLocationMessage("Location permission was not granted. You can still enter the address manually.");
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 300000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
   };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0 || isSubmitting || hasSubmitted) return;
+    if (cart.length === 0 || isSubmitting || razorpayLoading || hasSubmitted) return;
 
     if (!user) {
       setOrderError("Please sign in before placing your order. Your order history is protected by your account.");
@@ -151,11 +211,6 @@ export default function CheckoutPage() {
     }
 
     setOrderError(null);
-    if (paymentMethod !== "cod") {
-      setOrderError("Razorpay payments are coming soon. Please select Cash on Delivery for now.");
-      return;
-    }
-
     setIsSubmitting(true);
 
     const shippingAddress = {
@@ -174,24 +229,48 @@ export default function CheckoutPage() {
       ? "Priority Express (1-2 Days)"
       : "Standard Domestic (3-5 Days)";
 
-    // COD is the currently available payment method. Razorpay is intentionally presented as coming soon.
-    try {
-      const order = await placeOrder({
-        shippingAddress,
-        paymentMethod: "Cash on Delivery (COD)",
-        deliveryMethod: deliveryMethodLabel,
-        userId: user?.uid,
-      });
+    if (paymentMethod === "cod") {
+      try {
+        const order = await placeOrder({
+          shippingAddress,
+          paymentMethod: "Cash on Delivery (COD)",
+          deliveryMethod: deliveryMethodLabel,
+          userId: user?.uid,
+        });
 
-      setHasSubmitted(true);
-      router.push(`/checkout/success?orderId=${order.id}`);
-    } catch (err: any) {
-      setOrderError(err?.message || "Something went wrong placing your order. Please try again.");
-      setIsSubmitting(false);
+        setHasSubmitted(true);
+        router.push(`/checkout/success?orderId=${order.id}`);
+      } catch (err: any) {
+        setOrderError(err?.message || "Something went wrong placing your order. Please try again.");
+        setIsSubmitting(false);
+      }
+    } else {
+      // Online payment via Razorpay with resilient fallback
+      try {
+        const res = await initiatePayment({
+          items: cart,
+          shippingAddress,
+          deliveryMethod: deliveryMethodLabel,
+          couponCode: couponCode || undefined,
+          userId: user?.uid || "guest",
+        });
+
+        if (res.success && res.orderId) {
+          clearCart();
+          setHasSubmitted(true);
+          router.push(`/checkout/success?orderId=${res.orderId}`);
+        } else {
+          setOrderError(res.error || "Payment was not completed. Please try again.");
+          setIsSubmitting(false);
+        }
+      } catch (err: any) {
+        setOrderError(err?.message || "Payment process could not be completed.");
+        setIsSubmitting(false);
+      }
     }
   };
 
-  const isLoading = isSubmitting;
+  const isLoading = isSubmitting || razorpayLoading;
 
   if (cart.length === 0 && !isSubmitting) {
     return (
@@ -365,6 +444,52 @@ export default function CheckoutPage() {
                   <div style={{ display: "flex", alignItems: "flex-start", gap: "7px", marginBottom: "14px", padding: "10px 12px", borderRadius: "8px", backgroundColor: "rgba(43,147,72,0.08)", color: "#286c3a", fontSize: "12px", lineHeight: 1.4 }}>
                     <MapPin size={14} style={{ flex: "0 0 auto", marginTop: "1px" }} />
                     <span>{locationMessage}</span>
+                  </div>
+                )}
+
+                {/* Saved Addresses Quick Selector */}
+                {savedAddresses.length > 0 && (
+                  <div style={{ marginBottom: "18px", padding: "14px", backgroundColor: "#FAF9F5", borderRadius: "10px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#6F6961", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <MapPin size={13} color="#936037" />
+                      <span>Choose from your saved addresses</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "10px" }}>
+                      {savedAddresses.map((addr) => {
+                        const isSelected = selectedSavedAddressId === addr.id;
+                        return (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => applySavedAddress(addr)}
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 12px",
+                              borderRadius: "8px",
+                              border: isSelected ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
+                              backgroundColor: "#FFFFFF",
+                              cursor: "pointer",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "3px",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <span style={{ fontSize: "12px", fontWeight: 700, color: "#111110" }}>
+                                {addr.fullName || "Address"}
+                              </span>
+                              <span style={{ fontSize: "10px", fontWeight: 700, color: "#936037", backgroundColor: "#FAF0E6", padding: "1px 6px", borderRadius: "9999px" }}>
+                                {addr.label || "Saved"}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#6A645C", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {addr.street}, {addr.city}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -574,82 +699,98 @@ export default function CheckoutPage() {
                 </h2>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {/* Razorpay — ready to connect when the account keys are configured */}
-                  <div
+                  {/* Razorpay Online Payment Option */}
+                  <label
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "16px 20px",
                       borderRadius: "10px",
-                      border: "1px solid rgba(0,0,0,0.12)",
-                      overflow: "hidden",
-                      opacity: 0.62,
+                      border: paymentMethod === "razorpay" ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
+                      backgroundColor: paymentMethod === "razorpay" ? "rgba(17,17,16,0.02)" : "#FFFFFF",
+                      cursor: "pointer",
+                      flexWrap: "wrap",
+                      gap: "10px",
                     }}
                   >
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "16px 20px",
-                         backgroundColor: "#FFFFFF",
-                         cursor: "not-allowed",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <input
-                          type="radio"
-                          name="payment"
-                          checked={false}
-                          disabled
-                          style={{ accentColor: "#111110" }}
-                        />
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <QrCode size={18} color="#111110" />
-                          <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110" }}>
-                            Razorpay (Coming Soon)
-                          </span>
-                        </div>
-                      </div>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#8A4B29", backgroundColor: "rgba(138,75,41,0.1)", padding: "2px 8px", borderRadius: "4px" }}>
-                        Soon
-                      </span>
-                    </label>
-
-                    <div style={{ padding: "14px 20px", backgroundColor: "#FAF9F6", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "#555" }}>
-                        <ShieldCheck size={14} color="#8A4B29" />
-                        <span>UPI, cards, netbanking, and wallets will be enabled after Razorpay setup.</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <input
+                        type="radio"
+                        name="payment"
+                        checked={paymentMethod === "razorpay"}
+                        onChange={() => setPaymentMethod("razorpay")}
+                        style={{ accentColor: "#111110" }}
+                      />
+                      <QrCode size={18} color="#111110" />
+                      <div>
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110", display: "block" }}>
+                          Pay Online (Cards, UPI, Netbanking)
+                        </span>
+                        <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
+                          UPI (Google Pay, PhonePe, Paytm), Credit/Debit Cards, Wallets
+                        </span>
                       </div>
                     </div>
-                  </div>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "#2B9348",
+                        backgroundColor: "rgba(43,147,72,0.1)",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      Instant & Secure
+                    </span>
+                  </label>
 
                   {/* Cash on Delivery Option */}
                   <label
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "12px",
+                      justifyContent: "space-between",
                       padding: "16px 20px",
                       borderRadius: "10px",
                       border: paymentMethod === "cod" ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
                       backgroundColor: paymentMethod === "cod" ? "rgba(17,17,16,0.02)" : "#FFFFFF",
                       cursor: "pointer",
+                      flexWrap: "wrap",
+                      gap: "10px",
                     }}
                   >
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === "cod"}
-                      onChange={() => setPaymentMethod("cod")}
-                      style={{ accentColor: "#111110" }}
-                    />
-                    <Banknote size={18} color="#111110" />
-                    <div>
-                      <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110" }}>
-                        Cash on Delivery (COD)
-                      </span>
-                      <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
-                        Pay cash upon delivery at your doorstep
-                      </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <input
+                        type="radio"
+                        name="payment"
+                        checked={paymentMethod === "cod"}
+                        onChange={() => setPaymentMethod("cod")}
+                        style={{ accentColor: "#111110" }}
+                      />
+                      <Banknote size={18} color="#111110" />
+                      <div>
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110", display: "block" }}>
+                          Cash on Delivery (COD)
+                        </span>
+                        <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
+                          Pay cash upon delivery at your doorstep
+                        </span>
+                      </div>
                     </div>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "#111110",
+                        backgroundColor: "rgba(17,17,16,0.08)",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      Doorstep Cash
+                    </span>
                   </label>
                 </div>
               </div>

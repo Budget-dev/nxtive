@@ -9,6 +9,25 @@ vi.mock("@/server/auth", () => ({
   requireAdmin: vi.fn(async () => ({ uid: "admin-1", role: "super_admin", permissions: [] })),
   requireUser: vi.fn(async () => null),
 }));
+vi.mock("@/lib/firebase/firestore-store", () => ({
+  storeReadCollection: vi.fn(async (name: string) => {
+    if (state.mode === "failure") throw new Error(`private firestore failure for ${name}`);
+    return [];
+  }),
+  storeReadDocument: vi.fn(async (name: string, id: string) => {
+    if (state.mode === "failure") throw new Error(`private firestore failure for ${name}/${id}`);
+    return null;
+  }),
+  storeSetDocument: vi.fn(async () => {
+    if (state.mode === "write-failure") throw new Error("private write failure");
+  }),
+  storeUpdateDocument: vi.fn(async () => {
+    if (state.mode === "write-failure") throw new Error("private write failure");
+  }),
+  storeDeleteDocument: vi.fn(async () => {
+    if (state.mode === "write-failure") throw new Error("private write failure");
+  }),
+}));
 vi.mock("@/lib/firebase/admin", () => ({
   hasAdminCredentials: true,
   adminDb: {

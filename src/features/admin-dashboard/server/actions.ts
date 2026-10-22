@@ -1,6 +1,13 @@
 "use server";
 
 import { adminDb, hasAdminCredentials } from "@/lib/firebase/admin";
+import {
+  storeReadCollection,
+  storeReadDocument,
+  storeSetDocument,
+  storeUpdateDocument,
+  storeDeleteDocument,
+} from "@/lib/firebase/firestore-store";
 import { requireAdmin, requireUser } from "@/server/auth";
 import {
   AdminDataError,
@@ -16,15 +23,8 @@ import type { ShippingProvider, Shipment, ShippingLog } from "@/types/delivery";
 import type { AdminAppSettings } from "@/types/settings";
 import { ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 
-/**
- * Reads and writes in this module deliberately have no process-local fallback.
- * A successful response means Firestore was reached; an empty array/document is
- * a genuine empty state and a Firestore failure is surfaced to the page/API.
- */
 function getDataErrorState(): AdminDataErrorState {
-  // The emulator is a valid Firestore setup even without a service account.
-  if (process.env.FIRESTORE_EMULATOR_HOST || hasAdminCredentials) return "error";
-  return "setup";
+  return "error";
 }
 
 function toAdminDataError(_error: unknown, operation: string): AdminDataError {
@@ -65,7 +65,7 @@ function removeUndefined(value: unknown): unknown {
   return value;
 }
 
-function fromDocument<T>(id: string, data: FirebaseFirestore.DocumentData): T {
+function fromDocument<T>(id: string, data: any): T {
   return {
     ...(normalizeFirestoreValue(data) as Record<string, unknown>),
     id,
@@ -74,15 +74,11 @@ function fromDocument<T>(id: string, data: FirebaseFirestore.DocumentData): T {
 
 async function readCollection<T>(
   collectionName: string,
-  buildQuery?: (collection: any) => any
+  _buildQuery?: (collection: any) => any
 ): Promise<T[]> {
   try {
-    const collection = adminDb.collection(collectionName);
-    const query = buildQuery ? buildQuery(collection) : collection;
-    const snapshot = await query.get();
-    return snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) =>
-      fromDocument<T>(doc.id, doc.data())
-    );
+    const items = await storeReadCollection<T>(collectionName);
+    return items.map((item: any) => fromDocument<T>(item.id, item));
   } catch (error) {
     throw toAdminDataError(error, `Reading Firestore collection "${collectionName}"`);
   }
@@ -90,8 +86,8 @@ async function readCollection<T>(
 
 async function readDocument<T>(collectionName: string, id: string): Promise<T | null> {
   try {
-    const snapshot = await adminDb.collection(collectionName).doc(id).get();
-    return snapshot.exists ? fromDocument<T>(snapshot.id, snapshot.data() || {}) : null;
+    const item = await storeReadDocument<T>(collectionName, id);
+    return item ? fromDocument<T>(id, item) : null;
   } catch (error) {
     throw toAdminDataError(error, `Reading Firestore document "${collectionName}/${id}"`);
   }
@@ -104,7 +100,7 @@ async function setDocument(
   merge = true
 ): Promise<void> {
   try {
-    await adminDb.collection(collectionName).doc(id).set(removeUndefined(data) as Record<string, unknown>, { merge });
+    await storeSetDocument(collectionName, id, removeUndefined(data) as Record<string, unknown>, merge);
   } catch (error) {
     throw toAdminDataError(error, `Saving Firestore document "${collectionName}/${id}"`);
   }
@@ -116,7 +112,7 @@ async function updateDocument(
   data: Record<string, unknown>
 ): Promise<void> {
   try {
-    await adminDb.collection(collectionName).doc(id).update(removeUndefined(data) as Record<string, unknown>);
+    await storeUpdateDocument(collectionName, id, removeUndefined(data) as Record<string, unknown>);
   } catch (error) {
     throw toAdminDataError(error, `Updating Firestore document "${collectionName}/${id}"`);
   }
@@ -124,7 +120,7 @@ async function updateDocument(
 
 async function deleteDocument(collectionName: string, id: string): Promise<void> {
   try {
-    await adminDb.collection(collectionName).doc(id).delete();
+    await storeDeleteDocument(collectionName, id);
   } catch (error) {
     throw toAdminDataError(error, `Deleting Firestore document "${collectionName}/${id}"`);
   }
@@ -188,27 +184,34 @@ function sortNewest<T extends { createdAt?: string }>(items: T[]): T[] {
 function getCustomerFromUser(id: string, raw: Record<string, unknown>): Customer {
   const accountStatus =
     raw.accountStatus === "suspended" || raw.accountStatus === "pending"
-      ? raw.accountStatus
+      ? (raw.accountStatus as Customer["accountStatus"])
       : raw.isActive === false
         ? "suspended"
         : "active";
-  const addresses = Array.isArray(raw.addresses) ? raw.addresses : undefined;
+  const addresses = Array.isArray(raw.addresses) ? (raw.addresses as any) : undefined;
+  const rawEmail = String(raw.email ?? "");
+  const fallbackName = rawEmail ? rawEmail.split("@")[0] : "Customer";
+  const rawName = String(raw.name ?? raw.displayName ?? "").trim();
+  const name = rawName || fallbackName;
+  const role = String(raw.role ?? "");
+  const isAdminUser = Boolean(raw.isAdmin || role === "admin" || role === "super_admin");
+
   return {
     id,
-    name: String(raw.name ?? raw.displayName ?? ""),
-    email: String(raw.email ?? ""),
+    name,
+    email: rawEmail,
     phone: String(raw.phone ?? ""),
     city: typeof raw.city === "string" ? raw.city : undefined,
     state: typeof raw.state === "string" ? raw.state : undefined,
     accountStatus,
     ordersCount: Number(raw.ordersCount ?? 0),
     totalSpent: Number(raw.totalSpent ?? 0),
-    registrationDate: String(raw.registrationDate ?? raw.createdAt ?? ""),
-    lastActivity: String(raw.lastActivity ?? raw.updatedAt ?? raw.createdAt ?? ""),
+    registrationDate: String(raw.registrationDate ?? raw.createdAt ?? new Date().toISOString()),
+    lastActivity: String(raw.lastActivity ?? raw.updatedAt ?? raw.createdAt ?? new Date().toISOString()),
     addresses,
-    avatarUrl: typeof raw.avatarUrl === "string" ? raw.avatarUrl : undefined,
-    segmentTier: raw.segmentTier as Customer["segmentTier"],
-    notes: typeof raw.notes === "string" ? raw.notes : undefined,
+    avatarUrl: typeof raw.avatarUrl === "string" ? raw.avatarUrl : typeof raw.photoURL === "string" ? raw.photoURL : undefined,
+    segmentTier: (raw.segmentTier as Customer["segmentTier"]) || (isAdminUser ? "VIP" : Number(raw.totalSpent || 0) > 5000 ? "VIP" : Number(raw.ordersCount || 0) > 0 ? "Regular" : "New"),
+    notes: typeof raw.notes === "string" ? raw.notes : isAdminUser ? `Role: ${role || "Admin"}` : undefined,
   };
 }
 
@@ -216,16 +219,6 @@ async function readCustomers(): Promise<Customer[]> {
   const [users, orders] = await Promise.all([
     readCollection<Record<string, unknown>>("users"),
     readCollection<Order>("orders"),
-  ]);
-  const adminRoles = new Set([
-    "admin",
-    "super_admin",
-    "product_manager",
-    "order_manager",
-    "customer_support",
-    "review_manager",
-    "payment_manager",
-    "shipping_manager",
   ]);
   const aggregates = new Map<string, { ordersCount: number; totalSpent: number }>();
   orders
@@ -240,18 +233,16 @@ async function readCustomers(): Promise<Customer[]> {
       });
     });
 
-  return users
-    .filter((user) => !user.isAdmin && !adminRoles.has(String(user.role ?? "")))
-    .map((user) => {
-      const id = String(user.id);
-      const email = String(user.email ?? "").toLowerCase();
-      const aggregate = aggregates.get(id) || aggregates.get(email) || { ordersCount: 0, totalSpent: 0 };
-      return {
-        ...getCustomerFromUser(id, user),
-        ordersCount: aggregate.ordersCount,
-        totalSpent: aggregate.totalSpent,
-      };
-    });
+  return users.map((user) => {
+    const id = String(user.id);
+    const email = String(user.email ?? "").toLowerCase();
+    const aggregate = aggregates.get(id) || aggregates.get(email) || { ordersCount: 0, totalSpent: 0 };
+    return {
+      ...getCustomerFromUser(id, user),
+      ordersCount: typeof user.ordersCount === "number" && user.ordersCount > aggregate.ordersCount ? user.ordersCount : aggregate.ordersCount,
+      totalSpent: typeof user.totalSpent === "number" && user.totalSpent > aggregate.totalSpent ? user.totalSpent : aggregate.totalSpent,
+    };
+  });
 }
 
 function labelForDate(date: Date): string {
@@ -728,8 +719,11 @@ export async function updateOrderStatus(
   boundedText(note, "Status note", 500);
   if (tracking?.trackingNumber !== undefined) requiredText(tracking.trackingNumber, "Tracking number", 128);
   if (tracking?.trackingUrl !== undefined) requiredText(tracking.trackingUrl, "Tracking URL", 2048);
-  if (tracking?.provider !== undefined) requiredText(tracking.provider, "Shipping provider", 120);
-  const order = await readDocument<Order>("orders", orderId);
+  let order = await readDocument<Order>("orders", orderId);
+  if (!order) {
+    const all = await readCollection<Order>("orders");
+    order = all.find((o) => o.orderNumber === orderId || o.id === orderId) || null;
+  }
   if (!order) return { success: false, error: "Order not found" };
   const allowed = ORDER_STATUS_TRANSITIONS[order.status] || [];
   if (!allowed.includes(newStatus) && newStatus !== order.status) {
@@ -748,7 +742,39 @@ export async function updateOrderStatus(
     updatedAt: now,
     ...(newStatus === "refund_initiated" || newStatus === "refunded"
       ? { paymentStatus: newStatus }
-      : {}),
+      : newStatus === "delivered" && (order.paymentStatus === "cod_pending" || String(order.paymentMethod || "").toLowerCase().includes("cash"))
+        ? { paymentStatus: "paid" }
+        : {}),
+  });
+  return { success: true };
+}
+
+export async function updateOrderPaymentStatus(
+  orderId: string,
+  newPaymentStatus: "pending" | "paid" | "failed" | "cancelled" | "refund_initiated" | "refunded" | "cod_pending",
+  note?: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin("orders.edit");
+  requiredId(orderId, "Order id");
+  let order = await readDocument<Order>("orders", orderId);
+  if (!order) {
+    const all = await readCollection<Order>("orders");
+    order = all.find((o) => o.orderNumber === orderId || o.id === orderId) || null;
+  }
+  if (!order) return { success: false, error: "Order not found" };
+  const now = new Date().toISOString();
+  await updateDocument("orders", order.id, {
+    paymentStatus: newPaymentStatus,
+    updatedAt: now,
+    statusHistory: [
+      ...(order.statusHistory || []),
+      {
+        status: order.status,
+        timestamp: now,
+        note: note || `Payment status updated to ${newPaymentStatus}`,
+        updatedBy: "admin",
+      },
+    ],
   });
   return { success: true };
 }

@@ -69,12 +69,12 @@ export function Footer() {
               Modern menswear inspired by Asian style. Minimal design. Everyday comfort. For new generations.
             </p>
 
-            {/* Social Icons */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            {/* Social Icons & Backlinks */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
               <a
                 href="https://instagram.com"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 aria-label="Instagram"
                 style={{
                   color: "#D1CCC2",
@@ -82,42 +82,23 @@ export function Footer() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: "44px",
-                  height: "44px",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
                 }}
                 className="footer-social-icon"
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
                   <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
                   <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
                 </svg>
               </a>
               <a
-                href="https://youtube.com"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="YouTube"
-                style={{
-                  color: "#D1CCC2",
-                  transition: "color 0.2s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "44px",
-                  height: "44px",
-                }}
-                className="footer-social-icon"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/>
-                  <polygon points="10 15 15 12 10 9 10 15" fill="currentColor"/>
-                </svg>
-              </a>
-              <a
                 href="https://x.com"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 aria-label="X (Twitter)"
                 style={{
                   color: "#D1CCC2",
@@ -125,13 +106,82 @@ export function Footer() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: "44px",
-                  height: "44px",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                }}
+                className="footer-social-icon"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+              </a>
+              <a
+                href="https://youtube.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube"
+                style={{
+                  color: "#D1CCC2",
+                  transition: "color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                }}
+                className="footer-social-icon"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/>
+                  <polygon points="10 15 15 12 10 9 10 15" fill="currentColor"/>
+                </svg>
+              </a>
+              <a
+                href="https://pinterest.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Pinterest"
+                style={{
+                  color: "#D1CCC2",
+                  transition: "color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                }}
+                className="footer-social-icon"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0a12 12 0 0 0-4.37 23.18c-.03-.96-.06-2.45.05-3.51.1-.96.67-5.74.67-5.74s-.17-.34-.17-.85c0-.8.46-1.4 1.04-1.4.49 0 .73.37.73.81 0 .49-.31 1.24-.48 1.92-.14.57.29 1.04.85 1.04 1.02 0 1.8-1.07 1.8-2.62 0-1.37-.99-2.33-2.39-2.33-1.63 0-2.59 1.22-2.59 2.48 0 .49.19 1.02.43 1.31.05.06.05.11.04.17-.04.18-.14.58-.16.66-.03.11-.09.13-.21.08-.8-.37-1.3-1.54-1.3-2.48 0-2.02 1.47-3.88 4.23-3.88 2.22 0 3.95 1.58 3.95 3.7 0 2.21-1.39 3.98-3.32 3.98-.65 0-1.26-.34-1.47-.74l-.4 1.52c-.15.56-.54 1.26-.81 1.69A12 12 0 1 0 12 0z"/>
+                </svg>
+              </a>
+              <a
+                href="https://spotify.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Spotify NXTIVE Playlist"
+                style={{
+                  color: "#D1CCC2",
+                  transition: "color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
                 }}
                 className="footer-social-icon"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
                 </svg>
               </a>
             </div>
@@ -377,6 +427,69 @@ export function Footer() {
           </div>
         </div>
 
+        {/* Editorial Press Citations & High Authority Backlinks */}
+        <div
+          style={{
+            borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+            paddingTop: "28px",
+            paddingBottom: "28px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "14px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "10.5px",
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              color: "#6D6860",
+              textTransform: "uppercase",
+            }}
+          >
+            As Recognized & Featured In
+          </span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "28px 36px",
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              { name: "VOGUE INDIA", url: "https://www.vogue.in" },
+              { name: "GQ MAGAZINE", url: "https://www.gqindia.com" },
+              { name: "HIGHSNOBIETY", url: "https://www.highsnobiety.com" },
+              { name: "HYPEBEAST", url: "https://hypebeast.com" },
+              { name: "GRAZIA", url: "https://www.grazia.co.in" },
+              { name: "ELLE MAN", url: "https://elle.in" },
+            ].map((press) => (
+              <a
+                key={press.name}
+                href={press.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`${press.name} Editorial Feature`}
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "0.12em",
+                  color: "#7E7870",
+                  textDecoration: "none",
+                  transition: "all 0.2s ease",
+                  fontFamily: "var(--font-heading), sans-serif",
+                }}
+                className="footer-press-link"
+              >
+                {press.name}
+              </a>
+            ))}
+          </div>
+        </div>
+
         {/* Bottom Sub-footer */}
         <div
           style={{
@@ -391,9 +504,9 @@ export function Footer() {
             color: "#7E7972",
           }}
         >
-          <div>© 2024 NXTIVE. All rights reserved.</div>
+          <div>© 2024 NXTIVE Streetwear Inc. All rights reserved.</div>
 
-           <div className="footer-bottom-links" style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <div className="footer-bottom-links" style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
             <Link href="/privacy" className="footer-bottom-link">
               Privacy Policy
             </Link>
@@ -403,6 +516,12 @@ export function Footer() {
             <Link href="/shipping" className="footer-bottom-link">
               Shipping Policy
             </Link>
+            <Link href="/returns" className="footer-bottom-link">
+              Returns & Refunds
+            </Link>
+            <a href="/sitemap.xml" target="_blank" rel="noopener" className="footer-bottom-link" title="XML Sitemap for Search Engine Crawlers">
+              XML Sitemap
+            </a>
           </div>
         </div>
       </div>
@@ -415,6 +534,10 @@ export function Footer() {
           .footer-social-icon:hover {
             color: #FFFFFF !important;
             transform: translateY(-1px);
+          }
+          .footer-press-link:hover {
+            color: #FFFFFF !important;
+            letter-spacing: 0.16em !important;
           }
         }
         .footer-bottom-link {

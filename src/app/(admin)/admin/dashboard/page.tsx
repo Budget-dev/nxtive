@@ -162,9 +162,30 @@ export default function AdminDashboardPage() {
         <span style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>All recorded data</span>
       </div>
 
-      {/* ─── 6 Metric Summary Cards Matching Reference ─────────────── */}
+      {/* ─── Metric Summary Cards ─────────────── */}
       <div className="admin-kpi-grid">
-        {/* 1. Total Sales */}
+        {/* 1. Total Products Added */}
+        <div className="admin-kpi-card">
+          <div className="admin-kpi-header">
+            <span className="admin-kpi-title">Total Products</span>
+            <div className="admin-kpi-icon-wrap" style={{ backgroundColor: "#F0F4FF", color: "#1A73E8" }}>
+              <Package size={18} />
+            </div>
+          </div>
+          <div className="admin-kpi-value">{stats.totalProducts}</div>
+          <div className="admin-kpi-trend">
+            <Link
+              href="/admin/products"
+              className="admin-overview-link"
+              style={{ fontSize: "11.5px" }}
+            >
+              <span>Catalog apparel items</span>
+              <span>→</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* 2. Total Sales */}
         <div className="admin-kpi-card">
           <div className="admin-kpi-header">
             <span className="admin-kpi-title">Total Sales</span>

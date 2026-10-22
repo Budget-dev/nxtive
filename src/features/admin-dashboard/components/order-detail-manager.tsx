@@ -17,7 +17,7 @@ import {
 import { formatCurrency } from "@/utils/format-currency";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 import type { Order, OrderStatus } from "@/types/order";
-import { updateOrderStatus } from "../server/actions";
+import { updateOrderStatus, updateOrderPaymentStatus } from "../server/actions";
 
 interface OrderDetailManagerProps {
   order: Order;
@@ -67,7 +67,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
 
       if (res.success) {
         setMessage({ type: "success", text: `Order status updated to ${ORDER_STATUS_LABELS[selectedStatus]}` });
-        setOrder((prev) => ({
+        setOrder((prev: Order) => ({
           ...prev,
           status: selectedStatus,
           trackingNumber: trackingNumber || prev.trackingNumber,
@@ -93,7 +93,25 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
     }
   };
 
-  const label = ORDER_STATUS_LABELS[order.status] || order.status;
+  const handleUpdatePayment = async (newPayStatus: "paid" | "refunded" | "cod_pending" | "failed") => {
+    setUpdating(true);
+    setMessage(null);
+    try {
+      const res = await updateOrderPaymentStatus(order.id, newPayStatus);
+      if (res.success) {
+        setOrder((prev: Order) => ({ ...prev, paymentStatus: newPayStatus }));
+        setMessage({ type: "success", text: `Payment status updated to ${newPayStatus.toUpperCase()}` });
+      } else {
+        setMessage({ type: "error", text: res.error || "Failed to update payment status." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err?.message || "Failed to update payment." });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const label = ORDER_STATUS_LABELS[order.status as OrderStatus] || order.status;
   let badgeClass = "info";
   if (order.status === "delivered") badgeClass = "success";
   else if (order.status === "cancelled" || order.status === "refunded") badgeClass = "danger";
@@ -224,7 +242,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                   </tr>
                 </thead>
                 <tbody>
-                  {order.items?.map((item, idx) => (
+                  {order.items?.map((item: any, idx: number) => (
                     <tr key={idx}>
                       <td>
                         <div
@@ -471,6 +489,81 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                   {order.paymentStatus.toUpperCase()}
                 </span>
               </div>
+
+              {/* Quick Payment Status Actions */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginTop: "12px",
+                  paddingTop: "12px",
+                  borderTop: "1px solid var(--adm-border)",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}
+              >
+                <span style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>Update Payment:</span>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {order.paymentStatus !== "paid" && (
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handleUpdatePayment("paid")}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        borderRadius: "5px",
+                        border: "1px solid #10B981",
+                        backgroundColor: "rgba(16, 185, 129, 0.1)",
+                        color: "#10B981",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✓ Mark Paid
+                    </button>
+                  )}
+                  {order.paymentStatus === "paid" && (
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handleUpdatePayment("refunded")}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        borderRadius: "5px",
+                        border: "1px solid #EF4444",
+                        backgroundColor: "rgba(239, 68, 68, 0.1)",
+                        color: "#EF4444",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Mark Refunded
+                    </button>
+                  )}
+                  {order.paymentStatus !== "cod_pending" && order.paymentMethod?.toLowerCase().includes("cash") && (
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handleUpdatePayment("cod_pending")}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        borderRadius: "5px",
+                        border: "1px solid var(--adm-border)",
+                        backgroundColor: "var(--adm-surface)",
+                        color: "var(--adm-text-muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      COD Pending
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -482,7 +575,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
             </h3>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", position: "relative" }}>
-              {order.statusHistory?.map((step, idx) => (
+              {order.statusHistory?.map((step: any, idx: number) => (
                 <div key={idx} style={{ display: "flex", gap: "14px", position: "relative" }}>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                     <div

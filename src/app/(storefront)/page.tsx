@@ -250,9 +250,23 @@ export default function HomePage() {
     [categories, products]
   );
 
+  const departmentCategories = useMemo(() => {
+    const primaryOrder = ["t-shirts", "shirts", "hoodies", "bottoms", "jackets", "accessories"];
+    const matched = primaryOrder
+      .map((slug) => browseCategories.find((c) => c.slug === slug))
+      .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
+    return matched.length > 0 ? matched : browseCategories.slice(0, 6);
+  }, [browseCategories]);
+
   const categorySections = useMemo(
-    () =>
-      browseCategories
+    () => {
+      const coreSlugs = ["t-shirts", "hoodies", "shirts", "bottoms", "jackets", "accessories"];
+      const sectionsList = coreSlugs
+        .map((slug) => browseCategories.find((c) => c.slug === slug))
+        .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
+      const source = sectionsList.length > 0 ? sectionsList : browseCategories;
+
+      return source
         .map((category) => ({
           slug: category.slug,
           name: category.name,
@@ -261,7 +275,8 @@ export default function HomePage() {
           href: `/categories/${category.slug}`,
           products: productsForCategory(products, category.slug).slice(0, 2),
         }))
-        .filter((section) => section.products.length > 0),
+        .filter((section) => section.products.length > 0);
+    },
     [browseCategories, products]
   );
 
@@ -710,8 +725,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. CATEGORY TILES — live catalogue only */}
-      {ready && browseCategories.length > 0 && (
+      {/* 2. CATEGORY TILES — quick browse departments */}
+      {departmentCategories.length > 0 && (
       <section style={{ padding: "28px 0 20px 0" }} className="categories-preview-section">
         <div className="container">
           <div className="section-title-wrap">
@@ -733,7 +748,7 @@ export default function HomePage() {
             }}
             className="categories-grid"
           >
-            {browseCategories.map((cat) => (
+            {departmentCategories.map((cat) => (
               <Link
                 key={cat.id}
                 href={`/categories/${cat.slug}`}

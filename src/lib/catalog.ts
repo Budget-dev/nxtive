@@ -1,6 +1,7 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { Category, Product, ProductBadge, ProductCategory } from "@/types/product";
+import { MOCK_PRODUCTS } from "@/constants/mock-products";
 
 const CATEGORIES: ProductCategory[] = [
   "T-Shirts",
@@ -107,20 +108,176 @@ async function readActiveDocuments<T>(
   return rows;
 }
 
+export const DEFAULT_CATEGORIES: Category[] = [
+  {
+    id: "t-shirts",
+    slug: "t-shirts",
+    name: "T-Shirts",
+    title: "Heavyweight T-Shirts",
+    tagline: "Oversized, boxy, and minimal tees in 260-300 GSM organic cotton.",
+    image: "/images/nxtvie/cat-tshirts.jpg",
+    sortOrder: 1,
+    isActive: true,
+  },
+  {
+    id: "shirts",
+    slug: "shirts",
+    name: "Shirts",
+    title: "Shirts & Overshirts",
+    tagline: "Breathable linen-cotton camp shirts and workwear silhouettes.",
+    image: "/images/nxtvie/cat-shirts.jpg",
+    sortOrder: 2,
+    isActive: true,
+  },
+  {
+    id: "hoodies",
+    slug: "hoodies",
+    name: "Hoodies",
+    title: "French Terry Hoodies",
+    tagline: "Substantial 450 GSM hoodies and pullovers with architectural drape.",
+    image: "/images/nxtvie/cat-hoodies.jpg",
+    sortOrder: 3,
+    isActive: true,
+  },
+  {
+    id: "bottoms",
+    slug: "bottoms",
+    name: "Bottoms",
+    title: "Pants & Cargos",
+    tagline: "Articulated ripstop cargos, wide-leg trousers, and relaxed sweats.",
+    image: "/images/nxtvie/cat-bottoms.jpg",
+    sortOrder: 4,
+    isActive: true,
+  },
+  {
+    id: "jackets",
+    slug: "jackets",
+    name: "Jackets",
+    title: "Technical Jackets",
+    tagline: "Weather-resistant urban outerwear engineered for movement.",
+    image: "/images/nxtvie/promo-jackets-hd.jpg",
+    sortOrder: 5,
+    isActive: true,
+  },
+  {
+    id: "accessories",
+    slug: "accessories",
+    name: "Accessories",
+    title: "Accessories",
+    tagline: "Structured dad caps, canvas bags, and elevated essentials.",
+    image: "/images/nxtvie/cat-accessories.jpg",
+    sortOrder: 6,
+    isActive: true,
+  },
+  {
+    id: "men",
+    slug: "men",
+    name: "Men",
+    title: "Men's Collection",
+    tagline: "Modern menswear inspired by Asian style and everyday comfort.",
+    image: "/images/nxtvie/hero-model.jpg",
+    sortOrder: 7,
+    isActive: true,
+  },
+  {
+    id: "new-arrivals",
+    slug: "new-arrivals",
+    name: "New Arrivals",
+    title: "New Releases",
+    tagline: "Fresh silhouettes, limited drops, and seasonal colorways.",
+    image: "/images/nxtvie/banner-urban-essentials-hd.jpg",
+    sortOrder: 8,
+    isActive: true,
+  },
+  {
+    id: "clothing",
+    slug: "clothing",
+    name: "Clothing",
+    title: "Apparel Collection",
+    tagline: "Heavyweight tees, structured shirts, technical outerwear and pants.",
+    image: "/images/nxtvie/promo-jackets-hd.jpg",
+    sortOrder: 9,
+    isActive: true,
+  },
+  {
+    id: "collections",
+    slug: "collections",
+    name: "Collections",
+    title: "Curated Collections",
+    tagline: "Explore Urban Essentials, Premium Basics, and Mindset Capsules.",
+    image: "/images/nxtvie/banner-premium-basics-stack-hd.jpg",
+    sortOrder: 10,
+    isActive: true,
+  },
+  {
+    id: "sale",
+    slug: "sale",
+    name: "Sale",
+    title: "Archive Sale",
+    tagline: "Past season favorites and limited-run items at special prices.",
+    image: "/images/nxtvie/promo-asian-minimal-hd.jpg",
+    sortOrder: 11,
+    isActive: true,
+  },
+  {
+    id: "urban-essentials",
+    slug: "urban-essentials",
+    name: "Urban Essentials",
+    title: "Urban Essentials Collection",
+    tagline: "Everyday boxy silhouettes and modern earth tones.",
+    image: "/images/nxtvie/banner-urban-essentials-hd.jpg",
+    sortOrder: 12,
+    isActive: true,
+  },
+  {
+    id: "premium-basics",
+    slug: "premium-basics",
+    name: "Premium Basics",
+    title: "Premium Basics",
+    tagline: "Heavyweight organic cotton staples made to last.",
+    image: "/images/nxtvie/banner-luxury-basics.jpg",
+    sortOrder: 13,
+    isActive: true,
+  },
+];
+
+const FALLBACK_PRODUCTS: Product[] = MOCK_PRODUCTS.map((prod) => ({
+  ...prod,
+  isActive: true,
+}));
+
 export async function fetchStorefrontProducts(): Promise<Product[]> {
   try {
-    return await readActiveDocuments("products", normalizeProduct);
+    const products = await readActiveDocuments("products", normalizeProduct);
+    if (products.length > 0) return products;
   } catch {
-    return [];
+    // Continue to API check
   }
+
+  try {
+    if (typeof window !== "undefined") {
+      const res = await fetch("/api/admin/products", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        return json.data;
+      }
+    }
+  } catch {
+    // Fall back to FALLBACK_PRODUCTS
+  }
+
+  return FALLBACK_PRODUCTS;
 }
 
 export async function fetchStorefrontCategories(): Promise<Category[]> {
   try {
     const categories = await readActiveDocuments("categories", normalizeCategory);
-    return categories.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+    if (categories.length > 0) {
+      return categories.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+    }
+    return DEFAULT_CATEGORIES;
   } catch {
-    return [];
+    return DEFAULT_CATEGORIES;
   }
 }
 
@@ -129,17 +286,20 @@ export function categoriesFromProducts(products: Product[]): Category[] {
   for (const product of products) {
     const slug = product.category.toLowerCase().replace(/\s+/g, "-");
     if (seen.has(slug)) continue;
+    const defaultMeta = DEFAULT_CATEGORIES.find((c) => c.slug === slug);
     seen.set(slug, {
       id: slug,
       slug,
-      name: product.category,
-      title: product.category,
-      tagline: "",
-      image: product.image,
+      name: defaultMeta?.name || product.category,
+      title: defaultMeta?.title || product.category,
+      tagline: defaultMeta?.tagline || "",
+      image: defaultMeta?.image || product.image,
+      sortOrder: defaultMeta?.sortOrder ?? 999,
       isActive: true,
     });
   }
-  return Array.from(seen.values());
+  const derived = Array.from(seen.values()).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+  return derived.length > 0 ? derived : DEFAULT_CATEGORIES;
 }
 
 export function productsForCategory(products: Product[], slug: string): Product[] {
@@ -150,7 +310,10 @@ export function productsForCategory(products: Product[], slug: string): Product[
     return (
       category === normalized ||
       category.replace(/\s+/g, "-") === normalized ||
-      product.collections.includes(normalized)
+      product.collections.includes(normalized) ||
+      (normalized === "sale" && (product.badge === "Sale" || (product.originalPrice != null && product.originalPrice > product.price))) ||
+      (normalized === "new-arrivals" && (product.badge === "New" || product.collections.includes("new-arrivals"))) ||
+      (normalized === "clothing" && category !== "accessories")
     );
   });
 }

@@ -10,7 +10,8 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/client";
 
 type User = any;
 type UserCredential = any;
@@ -23,6 +24,7 @@ interface AuthContextType {
   signupWithEmail: (email: string, pass: string, name?: string) => Promise<UserCredential>;
   loginWithGoogle: () => Promise<UserCredential>;
   logout: () => Promise<void>;
+  updateUserProfile: (profile: { displayName?: string; photoURL?: string }) => Promise<void>;
   clearError: () => void;
 }
 
@@ -33,10 +35,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const syncUserToFirestore = async (u: any, name?: string) => {
+    if (!u) return;
+    const displayName = name || u.displayName || u.email?.split("@")[0] || "Customer";
+    const now = new Date().toISOString();
+    const payload = {
+      id: u.uid,
+      name: displayName,
+      displayName,
+      email: u.email || "",
+      phone: u.phoneNumber || "",
+      photoURL: u.photoURL || "",
+      avatarUrl: u.photoURL || "",
+      role: "customer",
+      accountStatus: "active",
+      isActive: true,
+      ordersCount: 0,
+      totalSpent: 0,
+      registrationDate: u.metadata?.creationTime || now,
+      createdAt: u.metadata?.creationTime || now,
+      lastActivity: now,
+      lastLoginAt: now,
+      updatedAt: now,
+    };
+
+    // 1. Sync via server API to ensure customer appears in admin panel
+    try {
+      await fetch("/api/users/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      console.warn("Server user sync notice:", e);
+    }
+
+    // 2. Direct Firestore client write
+    try {
+      const userRef = doc(db, "users", u.uid);
+      await setDoc(userRef, payload, { merge: true });
+    } catch {
+      // Handled if restricted by client security rules
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser: any) => {
       setUser(currentUser);
       setLoading(false);
+      if (currentUser) {
+        syncUserToFirestore(currentUser);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -70,7 +119,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithEmail = async (email: string, pass: string) => {
     setError(null);
     try {
-      return await signInWithEmailAndPassword(auth, email, pass);
+      const res = await signInWithEmailAndPassword(auth, email, pass);
+      if (res.user) {
+        await syncUserToFirestore(res.user);
+      }
+      return res;
     } catch (err: any) {
       const msg = formatAuthError(err);
       setError(msg);
@@ -85,6 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (name && res.user) {
         await updateProfile(res.user, { displayName: name });
       }
+      if (res.user) {
+        await syncUserToFirestore(res.user, name);
+      }
       return res;
     } catch (err: any) {
       const msg = formatAuthError(err);
@@ -97,7 +153,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
-      return await signInWithPopup(auth, provider);
+      const res = await signInWithPopup(auth, provider);
+      if (res.user) {
+        await syncUserToFirestore(res.user);
+      }
+      return res;
     } catch (err: any) {
       const msg = formatAuthError(err);
       setError(msg);
@@ -109,6 +169,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       await signOut(auth);
+    } catch (err: any) {
+      const msg = formatAuthError(err);
+      setError(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const updateUserProfile = async (profile: { displayName?: string; photoURL?: string }) => {
+    setError(null);
+    if (!auth.currentUser) return;
+    try {
+      await updateProfile(auth.currentUser, profile);
+      setUser({ ...auth.currentUser, ...profile });
     } catch (err: any) {
       const msg = formatAuthError(err);
       setError(msg);
@@ -128,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signupWithEmail,
         loginWithGoogle,
         logout,
+        updateUserProfile,
         clearError,
       }}
     >

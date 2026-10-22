@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -15,13 +15,72 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
+import { auth } from "@/lib/firebase/client";
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
   const { orders } = useStore();
+  const [fetchedOrder, setFetchedOrder] = useState<any>(null);
 
-  const currentOrder = orderId ? orders.find((o) => o.id === orderId) : undefined;
+  useEffect(() => {
+    if (!orderId) return;
+    const existing = orders.find((o) => o.id === orderId);
+    if (existing) return;
+
+    let active = true;
+    async function load() {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/orders/${orderId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (active && json.success && json.data) {
+          const raw = json.data;
+          setFetchedOrder({
+            id: raw.id,
+            date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+            items: (raw.items || []).map((item: any) => ({
+              id: item.productId || item.id,
+              title: item.title,
+              price: item.price,
+              quantity: item.quantity,
+              selectedSize: item.selectedSize,
+              selectedColor: item.selectedColor,
+              image: item.image,
+            })),
+            subtotal: raw.subtotal || 0,
+            discount: raw.discount || 0,
+            shipping: raw.shipping || 0,
+            total: raw.total || 0,
+            status:
+              raw.status === "delivered"
+                ? "Delivered"
+                : raw.status === "shipped" || raw.status === "out_for_delivery"
+                ? "Shipped"
+                : raw.status === "processing" || raw.status === "packed"
+                ? "Processing"
+                : "Order Confirmed",
+            paymentMethod: raw.paymentMethod || "Online Payment",
+            paymentStatus: raw.paymentStatus === "paid" ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending",
+            shippingAddress: raw.shippingAddress || {},
+            deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
+            trackingNumber: raw.trackingNumber || `NXT-AWB-${raw.id?.slice(-6) || "882190"}`,
+          });
+        }
+      } catch (err) {
+        console.warn("[checkout-success] Error loading order:", err);
+      }
+    }
+    load();
+    return () => {
+      active = false;
+    };
+  }, [orderId, orders]);
+
+  const currentOrder = (orderId ? orders.find((o) => o.id === orderId) : undefined) || fetchedOrder;
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "60px 0 90px 0" }}>
@@ -186,7 +245,7 @@ function OrderSuccessContent() {
               </h3>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "28px" }}>
-                {currentOrder.items.map((item, idx) => (
+                {currentOrder.items.map((item: any, idx: number) => (
                   <div
                     key={`${item.id}-${idx}`}
                     style={{
