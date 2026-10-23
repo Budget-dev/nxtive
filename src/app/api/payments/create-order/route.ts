@@ -7,6 +7,8 @@ import { generateOrderNumber } from "@/utils/slugify";
 import { getRazorpayInstance } from "@/server/payments/razorpay/client";
 import type { Product } from "@/types/product";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest | Request) {
   try {
     const body = await req.json();
@@ -90,6 +92,7 @@ export async function POST(req: NextRequest | Request) {
       couponCode: couponCode || null,
       shipping,
       total,
+      totalAmount: total,
       status: "pending",
       statusHistory: [
         {

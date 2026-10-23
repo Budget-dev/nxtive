@@ -12,6 +12,8 @@ import { ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 import type { OrderStatus } from "@/types/order";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const orderStatusSchema = z.enum([
   "pending",
   "payment_confirmed",

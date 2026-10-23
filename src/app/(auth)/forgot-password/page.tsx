@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
       } else if (err.code === "auth/invalid-email") {
         setErrorMessage("Please enter a valid email address.");
       } else {
-        // Fallback for mock/local mode
+        // Generic error fallback to prevent enumeration
         setSubmitted(true);
       }
     } finally {

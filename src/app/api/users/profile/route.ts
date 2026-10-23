@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { storeReadDocument, storeSetDocument, storeUpdateDocument } from "@/lib/firebase/firestore-store";
 import { requireUser } from "@/server/auth";
 
+export const dynamic = "force-dynamic";
+
 async function parseBody(req: NextRequest) {
   const text = await req.text();
   if (!text) return {};

@@ -3,7 +3,7 @@
     "rules": "firestore.rules"
   },
   "hosting": {
-    "public": ".firebase/nxtive/hosting",
+    "public": ".firebase/nxtive-8fc17/hosting",
     "cleanUrls": true,
     "ignore": [
       "firebase.json",

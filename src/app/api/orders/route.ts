@@ -15,6 +15,8 @@ import { AuthError, requireUser, tryRequireAdmin } from "@/server/auth";
 import { generateOrderNumber } from "@/utils/slugify";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 class OrderRequestError extends Error {
   constructor(
     message: string,
@@ -499,6 +501,7 @@ export async function POST(req: NextRequest) {
           couponCode: couponCode || null,
           shipping,
           total,
+          totalAmount: total,
           status: "pending",
           statusHistory: [
             { status: "pending", timestamp: now, note: "COD order placed" },
@@ -634,6 +637,7 @@ export async function POST(req: NextRequest) {
       couponCode: data.couponCode || null,
       shipping,
       total,
+      totalAmount: total,
       status: "pending",
       statusHistory: [
         { status: "pending", timestamp: now, note: "Cash on Delivery order placed by customer" },

@@ -4,6 +4,8 @@ import { storeReadDocument, storeSetDocument, storeUpdateDocument } from "@/lib/
 import { requireUser } from "@/server/auth";
 import type { UserAddress } from "@/types/user";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);

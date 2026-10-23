@@ -77,6 +77,7 @@ export async function createOrder(
 
   const docRef = await addDoc(collection(db, "orders"), {
     ...order,
+    totalAmount: order.total,
     createdAt: serverTimestamp(),
   });
   return docRef.id;

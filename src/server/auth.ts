@@ -82,10 +82,10 @@ const DEV_ADMIN_IDENTITY: AdminIdentity = {
   permissions: ALL_ADMIN_PERMISSIONS,
   displayName: "Venkatesh (Super Admin)",
   isActive: true,
-  aud: "nxtive",
+  aud: "nxtive-8fc17",
   exp: Math.floor(Date.now() / 1000) + 3600 * 24,
   iat: Math.floor(Date.now() / 1000),
-  iss: "https://securetoken.google.com/nxtive",
+  iss: "https://securetoken.google.com/nxtive-8fc17",
   sub: "admin-venkatesh",
   firebase: {
     identities: { email: [PRIMARY_ADMIN_EMAIL] },

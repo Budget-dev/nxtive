@@ -1,6 +1,6 @@
-// Source: Google Maps Platform Code Assist
-// GET & POST /api/location/reverse-geocode - Reverse geocodes latitude/longitude into structured address
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 interface GeocodeAddressResult {
   fullName?: string;

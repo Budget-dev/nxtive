@@ -9,6 +9,8 @@ import {
   storeUpdateDocument,
 } from "@/lib/firebase/firestore-store";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest | Request) {
   try {
     const body = await req.json();

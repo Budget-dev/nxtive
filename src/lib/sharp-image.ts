@@ -21,7 +21,9 @@ const SHARP_IMAGE_SOURCES: Record<string, string> = {
   "/images/nxtvie/banner-premium-basics-stack.jpg": "/images/nxtvie/banner-premium-basics-stack-hd.jpg",
   "/images/nxtvie/promo-jackets.jpg": "/images/nxtvie/promo-jackets-hd.jpg",
   "/images/nxtvie/promo-asian-minimal.jpg": "/images/nxtvie/promo-asian-minimal-hd.jpg",
-  "/images/nxtvie/story-back-print.jpg": "/images/nxtvie/story-back-print-hd.jpg",
+  "/images/nxtvie/story-back-print.jpg": "/images/nxtvie/story-back-print-nxtive.jpg?v=20261023",
+  "/images/nxtvie/story-back-print-hd.jpg": "/images/nxtvie/story-back-print-nxtive.jpg?v=20261023",
+  "/images/cinematic/banner-urban-movement.jpg": "/images/cinematic/banner-urban-movement-nxtive.jpg?v=20261023",
   "/images/nxtvie/hero-model-crop.jpg": "/images/nxtvie/hero-model.jpg",
 };
 

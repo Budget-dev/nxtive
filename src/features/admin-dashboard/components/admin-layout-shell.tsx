@@ -6,24 +6,34 @@ import { AdminAuthProvider, useAdminAuth } from "./admin-auth-context";
 import { AdminSidebar } from "./admin-sidebar";
 import { AdminTopbar } from "./admin-topbar";
 
+import { auth } from "@/lib/firebase/client";
+import Link from "next/link";
+
 function AdminContentShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { isAdmin, loading } = useAdminAuth();
+  const { isAdmin, loading, adminUser } = useAdminAuth();
 
   const isLoginPage = pathname === "/admin/login";
 
+  // Explicitly check auth.currentUser.email before rendering admin routes
+  const currentFirebaseEmail = auth.currentUser?.email?.toLowerCase();
+  const adminEmail = adminUser?.email?.toLowerCase();
+  const isAuthorized =
+    currentFirebaseEmail === "venkateshchop14@gmail.com" ||
+    adminEmail === "venkateshchop14@gmail.com";
+
   useEffect(() => {
     if (!loading) {
-      if (!isAdmin && !isLoginPage) {
+      if ((!isAdmin || !isAuthorized) && !isLoginPage) {
         router.push("/admin/login");
-      } else if (isAdmin && isLoginPage) {
+      } else if (isAdmin && isAuthorized && isLoginPage) {
         router.push("/admin/dashboard");
       }
     }
-  }, [isAdmin, loading, isLoginPage, router]);
+  }, [isAdmin, isAuthorized, loading, isLoginPage, router]);
 
   if (loading) {
     return (
@@ -62,7 +72,64 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (!isAdmin) {
+  // If signed in with an unauthorized account, show Access Denied
+  if (auth.currentUser && currentFirebaseEmail !== "venkateshchop14@gmail.com") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          textAlign: "center",
+          backgroundColor: "#F8F8F7",
+          color: "#121110",
+        }}
+      >
+        <h2 style={{ fontSize: "24px", fontWeight: 800, marginBottom: "8px", color: "#DC2626" }}>
+          Access Denied
+        </h2>
+        <p style={{ color: "#736C65", maxWidth: "440px", marginBottom: "20px", fontSize: "14px" }}>
+          Only <strong>venkateshchop14@gmail.com</strong> is authorized to access the admin operations console. Your current account ({auth.currentUser.email}) does not have admin permissions.
+        </p>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <Link
+            href="/admin/login"
+            style={{
+              padding: "10px 22px",
+              backgroundColor: "#121110",
+              color: "#FFFFFF",
+              borderRadius: "9999px",
+              fontWeight: 700,
+              fontSize: "13px",
+              textDecoration: "none",
+            }}
+          >
+            Admin Sign In
+          </Link>
+          <Link
+            href="/"
+            style={{
+              padding: "10px 22px",
+              backgroundColor: "#FFFFFF",
+              color: "#121110",
+              border: "1px solid rgba(0,0,0,0.15)",
+              borderRadius: "9999px",
+              fontWeight: 700,
+              fontSize: "13px",
+              textDecoration: "none",
+            }}
+          >
+            Storefront
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin || !isAuthorized) {
     return null;
   }
 

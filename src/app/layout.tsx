@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/images/cinematic/banner-urban-movement.jpg",
+        url: "/images/cinematic/banner-urban-movement-nxtive.jpg",
         width: 1200,
         height: 630,
         alt: "NXTIVE Luxury Streetwear Collection Campaign",
@@ -81,7 +81,7 @@ export const metadata: Metadata = {
       "Minimal Asian streetwear, heavyweight specialized fabrics, and contemporary urban tailoring.",
     creator: "@nxtivestreet",
     site: "@nxtivestreet",
-    images: ["/images/cinematic/banner-urban-movement.jpg"],
+    images: ["/images/cinematic/banner-urban-movement-nxtive.jpg"],
   },
   robots: {
     index: true,

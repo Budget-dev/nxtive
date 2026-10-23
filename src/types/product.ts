@@ -36,6 +36,7 @@ export interface Product {
   price: number;
   originalPrice?: number | null;
   image: string;
+  imageUrl?: string;
   images: string[];
   category: ProductCategory;
   collections: string[];
@@ -53,6 +54,7 @@ export interface Product {
   sku?: string;
   variants?: ProductVariant[];
   totalStock?: number;
+  stock?: number;
   lowStockThreshold?: number;
   isActive?: boolean;
   createdAt?: string;

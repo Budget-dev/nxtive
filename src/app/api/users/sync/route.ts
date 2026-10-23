@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storeSetDocument, storeReadCollection } from "@/lib/firebase/firestore-store";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -12,6 +14,7 @@ export async function POST(req: NextRequest) {
     const now = new Date().toISOString();
     const userDoc = {
       id,
+      uid: id,
       name: body.name || body.displayName || body.email?.split("@")[0] || "Customer",
       displayName: body.displayName || body.name || body.email?.split("@")[0] || "Customer",
       email: body.email || "",

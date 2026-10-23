@@ -1,7 +1,6 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { Category, Product, ProductBadge, ProductCategory } from "@/types/product";
-import { MOCK_PRODUCTS } from "@/constants/mock-products";
 
 const CATEGORIES: ProductCategory[] = [
   "T-Shirts",
@@ -241,10 +240,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   },
 ];
 
-const FALLBACK_PRODUCTS: Product[] = MOCK_PRODUCTS.map((prod) => ({
-  ...prod,
-  isActive: true,
-}));
+const FALLBACK_PRODUCTS: Product[] = [];
 
 export async function fetchStorefrontProducts(): Promise<Product[]> {
   try {

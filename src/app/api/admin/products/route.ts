@@ -4,6 +4,8 @@ import { AdminDataError } from "@/features/admin-dashboard/server/admin-data";
 import { AuthError, requireAdmin } from "@/server/auth";
 import { createProductSchema } from "@/validation/product.schema";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

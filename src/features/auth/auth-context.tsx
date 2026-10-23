@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const payload = {
       id: u.uid,
+      uid: u.uid,
       name: displayName,
       displayName,
       email: u.email || "",

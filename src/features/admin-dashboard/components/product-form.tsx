@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,12 +12,13 @@ import {
   Sparkles,
   Info,
   Check,
+  FolderPlus,
 } from "lucide-react";
 import { slugify } from "@/utils/slugify";
 import type { Product, ProductCategory, ProductBadge } from "@/types/product";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { saveProduct } from "../server/actions";
+import { saveProduct, getAdminCategories, saveCategory } from "../server/actions";
 
 interface ProductFormProps {
   initialProduct?: Product;
@@ -48,7 +49,67 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const [categoryOptions] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
+  // Load existing categories from Firestore categories collection
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const cats = await getAdminCategories();
+        if (cats && cats.length > 0) {
+          const names = Array.from(new Set([...cats.map((c) => c.name), ...DEFAULT_CATEGORIES]));
+          setCategoryOptions(names);
+        }
+      } catch (err) {
+        // Fallback to DEFAULT_CATEGORIES if not yet seeded
+      }
+    }
+    fetchCategories();
+  }, []);
+
+  const handleAddNewCategory = async () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    setCreatingCategory(true);
+    try {
+      const catSlug = slugify(trimmed);
+      await saveCategory({
+        name: trimmed,
+        title: trimmed,
+        slug: catSlug,
+        isActive: true,
+      });
+
+      try {
+        await setDoc(
+          doc(db, "categories", catSlug),
+          {
+            id: catSlug,
+            name: trimmed,
+            title: trimmed,
+            slug: catSlug,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch {
+        // Firestore client write fallback handled
+      }
+
+      setCategoryOptions((prev) => Array.from(new Set([...prev, trimmed])));
+      setCategory(trimmed as ProductCategory);
+      setNewCategoryName("");
+      setShowNewCategoryInput(false);
+    } catch (err: any) {
+      alert("Failed to create category: " + (err?.message || "Unknown error"));
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
 
   // Form State
   const [title, setTitle] = useState(initialProduct?.title || "");
@@ -168,7 +229,8 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         }))
       );
 
-      const productPayload: Partial<Product> = {
+      const now = new Date().toISOString();
+      const productPayload: any = {
         id: initialProduct?.id,
         title: title.trim(),
         slug: slug.trim() || slugify(title),
@@ -177,6 +239,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         price: Number(price),
         originalPrice: originalPrice ? Number(originalPrice) : undefined,
         totalStock: Number(totalStock),
+        stock: Number(totalStock),
         lowStockThreshold: Number(lowStockThreshold),
         inStock,
         featured,
@@ -187,8 +250,11 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         details,
         fabricCare,
         image: mainImage.trim(),
+        imageUrl: mainImage.trim(),
         images: galleryImages.length > 0 ? galleryImages : [mainImage.trim()],
         variants,
+        createdAt: initialProduct?.createdAt || now,
+        updatedAt: now,
       };
 
       const res = await saveProduct(productPayload);
@@ -196,7 +262,24 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         try {
           const docId = res.id;
           const prodRef = doc(db, "products", docId);
-          await setDoc(prodRef, { ...productPayload, id: docId }, { merge: true });
+          await setDoc(
+            prodRef,
+            {
+              ...productPayload,
+              id: docId,
+              title: title.trim(),
+              description: description.trim(),
+              imageUrl: mainImage.trim(),
+              image: mainImage.trim(),
+              category,
+              price: Number(price),
+              stock: Number(totalStock),
+              totalStock: Number(totalStock),
+              createdAt: initialProduct?.createdAt || now,
+              updatedAt: now,
+            },
+            { merge: true }
+          );
         } catch {
           // Handled if restricted
         }
@@ -603,17 +686,79 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
             </h3>
 
             <div className="admin-form-group">
-              <label className="admin-form-label">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ProductCategory)}
-                className="admin-select"
-                style={{ width: "100%", padding: "10px 14px" }}
-              >
-                {categoryOptions.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label className="admin-form-label" style={{ margin: 0 }}>Category <span className="required">*</span></label>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCategoryInput((prev) => !prev)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--adm-gold)",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "2px 6px",
+                  }}
+                >
+                  <FolderPlus size={13} />
+                  <span>{showNewCategoryInput ? "Choose Existing" : "+ Create New Category"}</span>
+                </button>
+              </div>
+
+              {!showNewCategoryInput ? (
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as ProductCategory)}
+                  className="admin-select"
+                  style={{ width: "100%", padding: "10px 14px" }}
+                >
+                  {categoryOptions.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  style={{
+                    padding: "12px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(242, 172, 36, 0.08)",
+                    border: "1px dashed var(--adm-gold)",
+                  }}
+                >
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--adm-text)", marginBottom: "8px" }}>
+                    Create &amp; Save New Category to Firestore
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="e.g. Denim Jackets, Heavy Knitwear"
+                      className="admin-input"
+                      style={{ flex: 1, fontSize: "13px" }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddNewCategory();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={creatingCategory || !newCategoryName.trim()}
+                      onClick={handleAddNewCategory}
+                      className="admin-btn-primary admin-btn-sm"
+                      style={{ padding: "0 14px", whiteSpace: "nowrap" }}
+                    >
+                      {creatingCategory ? "Saving..." : "Add Category"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="admin-form-group">
@@ -642,48 +787,8 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
               </span>
             </div>
             <p style={{ fontSize: "12px", color: "var(--adm-text-muted)", marginBottom: "16px" }}>
-              Images are saved directly by URL to Firestore. Paste any external or local path, or click a quick sample preset below.
+              Images are saved directly by URL to Firestore. Paste any image URL or path below.
             </p>
-
-            {/* Quick Sample Presets */}
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--adm-text-muted)", display: "block", marginBottom: "6px" }}>
-                Quick Presets:
-              </label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {[
-                  { label: "Boxy Tee (Dark)", url: "/images/nxtvie/product-oversized-tee-hd.jpg" },
-                  { label: "Lookbook Shoot", url: "/images/nxtvie/gallery-1.jpg" },
-                  { label: "Street Drop", url: "/images/nxtvie/gallery-2.jpg" },
-                  { label: "Acid Wash", url: "/images/nxtvie/gallery-4.jpg" },
-                  { label: "Studio Black Tee", url: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80" },
-                  { label: "Street Hoodie", url: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80" },
-                ].map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => {
-                      setMainImage(preset.url);
-                      if (!galleryImages.includes(preset.url)) {
-                        setGalleryImages((prev) => [...prev, preset.url]);
-                      }
-                    }}
-                    style={{
-                      fontSize: "11px",
-                      padding: "4px 8px",
-                      borderRadius: "6px",
-                      backgroundColor: mainImage === preset.url ? "#121110" : "var(--adm-sand-pill)",
-                      color: mainImage === preset.url ? "#FFFFFF" : "#121110",
-                      border: "1px solid var(--adm-border)",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             <div className="admin-form-group">
               <label className="admin-form-label">

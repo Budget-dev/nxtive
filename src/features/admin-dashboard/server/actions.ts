@@ -518,6 +518,7 @@ export async function saveProduct(
     slug,
     category,
     image,
+    imageUrl: (product as any).imageUrl || image,
     price: Number(product.price ?? existing?.price),
     originalPrice: "originalPrice" in product ? product.originalPrice ?? null : existing?.originalPrice ?? null,
     images: product.images ?? existing?.images ?? [image],

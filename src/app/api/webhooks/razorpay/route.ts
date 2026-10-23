@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb, hasAdminCredentials } from "@/lib/firebase/admin";
 import { getRazorpayAdapter } from "@/server/payments";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
     if (!hasAdminCredentials) {

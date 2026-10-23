@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -74,7 +74,7 @@ const INDIAN_STATES = [
 
 type TabType = "overview" | "orders" | "addresses" | "settings";
 
-export default function AccountPage() {
+function AccountContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading, logout, updateUserProfile } = useAuth();
@@ -2172,5 +2172,29 @@ export default function AccountPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: "70vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "var(--bg-sand)",
+          }}
+        >
+          <div style={{ fontSize: "14px", color: "var(--text-muted)", fontWeight: 600 }}>
+            Loading your NXTIVE account...
+          </div>
+        </div>
+      }
+    >
+      <AccountContent />
+    </Suspense>
   );
 }

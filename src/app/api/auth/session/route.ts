@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { adminAuth, hasAdminCredentials } from "@/lib/firebase/admin";
 import { assertSameOrigin, AuthError, requireAdmin, PRIMARY_ADMIN_EMAIL, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/server/auth";
 
+export const dynamic = "force-dynamic";
+
 function failure(error: unknown) {
   return NextResponse.json(
     { success: false, error: error instanceof AuthError ? error.message : "Unable to establish admin session" },

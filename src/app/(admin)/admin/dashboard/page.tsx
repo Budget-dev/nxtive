@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Settings,
   Package,
+  RefreshCw,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import {
@@ -159,7 +160,17 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <span style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>All recorded data</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <button
+            onClick={loadData}
+            className="admin-btn-secondary admin-btn-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            <RefreshCw size={14} className={loading ? "spin" : ""} />
+            <span>Refresh Live Data</span>
+          </button>
+          <span style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>All recorded Firestore data</span>
+        </div>
       </div>
 
       {/* ─── Metric Summary Cards ─────────────── */}
@@ -282,6 +293,53 @@ export default function AdminDashboardPage() {
             <span>Inspect inventory</span>
             <span>→</span>
           </Link>
+        </div>
+      </div>
+
+      {/* ─── Order Status Breakdown (Firestore Overview) ─── */}
+      <div className="admin-card" style={{ marginBottom: "24px", padding: "20px 24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <div>
+            <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#121110", margin: 0 }}>
+              Order Status Breakdown
+            </h3>
+            <p style={{ fontSize: "12.5px", color: "var(--adm-text-muted)", margin: "2px 0 0 0" }}>
+              Live distribution of customer order fulfillment states in Firestore
+            </p>
+          </div>
+          <Link href="/admin/orders" style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--adm-gold)", textDecoration: "none" }}>
+            Manage All Orders →
+          </Link>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px" }}>
+          {[
+            { key: "pending", label: "Pending", count: stats.statusBreakdown?.["pending"] || stats.pendingOrdersCount || 0, color: "#D97706", bg: "rgba(245, 158, 11, 0.08)" },
+            { key: "processing", label: "Processing", count: stats.statusBreakdown?.["processing"] || 0, color: "#2563EB", bg: "rgba(37, 99, 235, 0.08)" },
+            { key: "shipped", label: "Shipped", count: stats.statusBreakdown?.["shipped"] || 0, color: "#7C3AED", bg: "rgba(124, 58, 237, 0.08)" },
+            { key: "delivered", label: "Delivered", count: stats.statusBreakdown?.["delivered"] || 0, color: "#059669", bg: "rgba(5, 150, 105, 0.08)" },
+            { key: "cancelled", label: "Cancelled", count: stats.statusBreakdown?.["cancelled"] || 0, color: "#DC2626", bg: "rgba(220, 38, 38, 0.08)" },
+            { key: "return_requested", label: "Returns", count: stats.statusBreakdown?.["return_requested"] || 0, color: "#4B5563", bg: "rgba(75, 85, 99, 0.08)" },
+          ].map((item) => (
+            <Link
+              key={item.key}
+              href={`/admin/orders?status=${item.key}`}
+              style={{
+                textDecoration: "none",
+                padding: "14px 16px",
+                borderRadius: "10px",
+                backgroundColor: item.bg,
+                border: `1px solid ${item.color}33`,
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span style={{ fontSize: "12px", fontWeight: 700, color: item.color }}>{item.label}</span>
+              <span style={{ fontSize: "22px", fontWeight: 900, color: "#121110" }}>{item.count}</span>
+            </Link>
+          ))}
         </div>
       </div>
 

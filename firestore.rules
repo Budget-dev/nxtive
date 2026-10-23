@@ -24,69 +24,50 @@ service cloud.firestore {
 
     // ─── Public catalogue data ──────────────────────────────────
     // Product and category documents are public store data for browsing.
-    // Inactive products are hidden from public.
-    // Only venkateshchop14@gmail.com can create, update, or delete products and categories.
+    // Allow read on products and categories for everyone.
+    // Allow write to products and categories only if request.auth.token.email == 'venkateshchop14@gmail.com'.
     match /products/{productId} {
-      allow read: if !resource.data.keys().hasAny(['isActive']) || resource.data.isActive == true || activeAdmin();
-      allow create: if activeAdmin()
-                    && request.resource.data.title is string
-                    && request.resource.data.price is number
-                    && request.resource.data.price >= 0;
-      allow update: if activeAdmin();
-      allow delete: if activeAdmin();
+      allow read: if true;
+      allow write: if isPrimaryAdmin();
     }
 
     match /categories/{categoryId} {
-      allow read: if !resource.data.keys().hasAny(['isActive']) || resource.data.isActive == true || activeAdmin();
-      allow create, update, delete: if activeAdmin();
+      allow read: if true;
+      allow write: if isPrimaryAdmin();
     }
 
     // Coupons contain promotion codes and discount rules. Only admin can view/manage.
     match /coupons/{couponId} {
-      allow read, create, update, delete: if activeAdmin();
+      allow read, write: if isPrimaryAdmin();
     }
 
     // ─── Users & customers ──────────────────────────────────────
+    // Allow a user to read/write their own users/{uid} document only if request.auth.uid == uid; allow the admin to read the full users collection.
     match /users/{userId} {
-      // User can read their own profile; only primary admin (venkateshchop14@gmail.com) can inspect any user profile
-      allow read: if signedIn() && (request.auth.uid == userId || activeAdmin());
-      // Users can register/create their customer profile
-      allow create: if signedIn()
-                    && (request.auth.uid == userId || activeAdmin())
-                    && (activeAdmin() || request.resource.data.role == 'customer');
-      // Customers may edit their personal contact fields, but cannot grant
-      // themselves an admin role or edit another user's document.
-      allow update: if activeAdmin()
-                    || (signedIn()
-                        && request.auth.uid == userId
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                          'displayName', 'name', 'photoURL', 'avatarUrl', 'phone', 'city', 'state', 'addresses', 'updatedAt'
-                        ])
-                        && request.resource.data.role == resource.data.role
-                        && request.resource.data.isActive == resource.data.isActive);
-      allow delete: if activeAdmin();
+      allow read: if signedIn() && (request.auth.uid == userId || isPrimaryAdmin());
+      allow write: if signedIn() && (request.auth.uid == userId || isPrimaryAdmin());
     }
 
     // ─── Reviews ─────────────────────────────────────────────────
     match /reviews/{reviewId} {
-      allow read: if (resource.data.status == 'approved') || activeAdmin();
+      allow read: if (resource.data.status == 'approved') || isPrimaryAdmin();
       allow create: if signedIn()
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.status == 'pending'
                     && request.resource.data.rating is number
                     && request.resource.data.rating >= 1
                     && request.resource.data.rating <= 5;
-      allow update, delete: if activeAdmin();
+      allow update, delete: if isPrimaryAdmin();
     }
 
     // ─── Orders ──────────────────────────────────────────────────
-    // Order creation is processed via server API. Customers can read their own orders.
-    // Only primary admin can inspect all orders or update order status / shipping details.
+    // Allow a user to create/read their own orders only if request.auth.uid == resource.data.userId (or request.resource.data.userId on create);
+    // Allow the admin to read and update all orders (to change status).
     match /orders/{orderId} {
-      allow create: if activeAdmin();
-      allow read: if signedIn()
-                  && (resource.data.userId == request.auth.uid || activeAdmin());
-      allow update, delete: if activeAdmin();
+      allow create: if signedIn() && (request.resource.data.userId == request.auth.uid || isPrimaryAdmin());
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isPrimaryAdmin());
+      allow update: if isPrimaryAdmin();
+      allow delete: if isPrimaryAdmin();
     }
 
     // ─── Shipping & logistics ───────────────────────────────────

@@ -47,7 +47,7 @@ const CINEMATIC_HERO_SLIDES = [
     primaryHref: "/categories/new-arrivals",
     secondaryCta: "Explore Urban",
     secondaryHref: "/categories/urban-essentials",
-    image: "/images/cinematic/banner-urban-movement.jpg",
+    image: "/images/cinematic/banner-urban-movement-nxtive.jpg?v=20261023",
     alt: "NXTIVE Urban Movement Indian Roots Modern Style Collection",
     scriptTag: "For\nNew\nGenerations",
     accentColor: "var(--accent-next, #C78D4E)",
@@ -96,7 +96,7 @@ const CINEMATIC_HERO_SLIDES = [
     headlineLine1: "TIMELESS PIECES.",
     headlineAccent: "BETTER",
     headlineLine2: "EVERYDAY.",
-    subtitle: "Precision-tailored organic ribbed mocknecks, boxy heavyweight tees, and architectural streetwear staples.",
+    subtitle: "Precision-tailored organic ribbed high-neck tees, boxy heavyweight tees, and architectural streetwear staples.",
     primaryCta: "Shop Premium Basics",
     primaryHref: "/categories/premium-basics",
     secondaryCta: "All Menswear",
@@ -1142,7 +1142,7 @@ export default function HomePage() {
               }}
             >
               <img
-                src="/images/nxtvie/story-back-print-hd.jpg"
+                src="/images/nxtvie/story-back-print-nxtive.jpg?v=20261023"
                 alt="NXTIVE Mindset Philosophy Editorial"
                 loading="lazy"
                 decoding="async"

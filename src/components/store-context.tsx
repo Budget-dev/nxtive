@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onIdTokenChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/client";
 
 export interface ProductItem {
   id: string;
@@ -191,11 +192,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let disposed = false;
-    const unsubscribe = onIdTokenChanged(auth, async (user: { getIdToken: () => Promise<string> } | null) => {
+    let unsubFirestore: (() => void) | null = null;
+
+    const unsubscribe = onIdTokenChanged(auth, async (user: any) => {
+      if (unsubFirestore) {
+        unsubFirestore();
+        unsubFirestore = null;
+      }
       if (!user) {
         if (!disposed) setOrders([]);
         return;
       }
+
+      // Initial / fallback load via API
       try {
         const token = await user.getIdToken();
         const response = await fetch("/api/orders?page=1&pageSize=100", {
@@ -203,14 +212,40 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           cache: "no-store",
         });
         const result = await response.json();
-        if (!response.ok || !result.success) throw new Error("Unable to load orders");
-        if (!disposed) setOrders((result.data?.items || []).map(normalizeOrder));
+        if (response.ok && result.success && !disposed) {
+          setOrders((result.data?.items || []).map(normalizeOrder));
+        }
       } catch {
         if (!disposed) setOrders([]);
       }
+
+      // Real-time Firestore onSnapshot listener for instant order status reflection
+      try {
+        const ordersQuery = query(
+          collection(db, "orders"),
+          where("userId", "==", user.uid)
+        );
+        unsubFirestore = onSnapshot(
+          ordersQuery,
+          (snapshot: any) => {
+            if (!disposed && snapshot.docs) {
+              const liveOrders = snapshot.docs.map((d: any) => normalizeOrder({ id: d.id, ...d.data() }));
+              liveOrders.sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+              setOrders(liveOrders);
+            }
+          },
+          (err: any) => {
+            console.warn("Firestore live orders snapshot notice:", err);
+          }
+        );
+      } catch (err) {
+        console.warn("Firestore live query initialization notice:", err);
+      }
     });
+
     return () => {
       disposed = true;
+      if (unsubFirestore) unsubFirestore();
       unsubscribe();
     };
   }, []);

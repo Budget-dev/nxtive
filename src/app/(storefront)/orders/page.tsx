@@ -48,7 +48,7 @@ export default function OrdersPage() {
               quantity: Number(i.quantity || 1),
               selectedSize: String(i.selectedSize || "M"),
               selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
-              image: String(i.image || "/images/nxtvie/product-oversized-tee-hd.jpg"),
+              image: String(i.image || ""),
             })),
             subtotal: Number(raw.subtotal || 0),
             discount: Number(raw.discount || 0),

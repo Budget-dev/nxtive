@@ -73,7 +73,7 @@ export function OrderDetailClient({ orderId }: Props) {
               quantity: Number(item.quantity || 1),
               selectedSize: String(item.selectedSize || "M"),
               selectedColor: item.selectedColor ? String(item.selectedColor) : undefined,
-              image: String(item.image || "/images/nxtvie/product-oversized-tee-hd.jpg"),
+              image: String(item.image || ""),
             })),
             subtotal: Number(raw.subtotal || 0),
             discount: Number(raw.discount || 0),

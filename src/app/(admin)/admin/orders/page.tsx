@@ -16,10 +16,12 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminOrders } from "@/features/admin-dashboard/server/actions";
+import { getAdminOrders, updateOrderStatus } from "@/features/admin-dashboard/server/actions";
 import { ORDER_STATUS_LABELS } from "@/constants/order-status";
 import type { Order, OrderStatus } from "@/types/order";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: "all", label: "All Orders" },
@@ -37,6 +39,32 @@ export default function AdminOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    setUpdatingOrderId(orderId);
+    try {
+      await updateOrderStatus(orderId, newStatus);
+      try {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, {
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch {
+        // Fallback handled
+      }
+      setOrders((prev) =>
+        prev.map((ord) =>
+          ord.id === orderId ? { ...ord, status: newStatus, updatedAt: new Date().toISOString() } : ord
+        )
+      );
+    } catch (err: any) {
+      alert("Failed to update status: " + (err?.message || "Unknown error"));
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
 
   const loadOrders = async () => {
     setLoading(true);
@@ -193,22 +221,49 @@ export default function AdminOrdersPage() {
                         </Link>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{o.shippingAddress?.fullName || "Guest"}</div>
-                        <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>{o.shippingAddress?.phone}</div>
+                        <div style={{ fontWeight: 700, color: "#121110" }}>{o.shippingAddress?.fullName || "Customer"}</div>
+                        <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>
+                          {o.shippingAddress?.email || (o as any).userEmail || o.userId}
+                        </div>
+                        {o.shippingAddress?.phone && (
+                          <div style={{ fontSize: "10.5px", color: "var(--adm-text-faint)" }}>
+                            {o.shippingAddress.phone}
+                          </div>
+                        )}
                       </td>
                       <td>
                         {o.items?.length || 1} {o.items?.length === 1 ? "item" : "items"}
                       </td>
-                      <td style={{ fontWeight: 800 }}>{formatCurrency(o.total)}</td>
+                      <td style={{ fontWeight: 800 }}>{formatCurrency((o as any).totalAmount || o.total)}</td>
                       <td>
                         <span className={`admin-badge ${o.paymentStatus === "paid" ? "green" : "amber"}`}>
                           {o.paymentStatus}
                         </span>
                       </td>
                       <td>
-                        <span className={`admin-badge ${badgeClass}`}>
-                          {ORDER_STATUS_LABELS[o.status] || o.status}
-                        </span>
+                        <select
+                          value={o.status}
+                          disabled={updatingOrderId === o.id}
+                          onChange={(e) => handleStatusChange(o.id, e.target.value as OrderStatus)}
+                          className="admin-select"
+                          style={{
+                            padding: "5px 10px",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            borderRadius: "6px",
+                            cursor: updatingOrderId === o.id ? "not-allowed" : "pointer",
+                            borderColor: badgeClass === "green" ? "#10B981" : badgeClass === "blue" ? "#3B82F6" : badgeClass === "red" ? "#EF4444" : "var(--adm-border)",
+                            backgroundColor: badgeClass === "green" ? "rgba(16, 185, 129, 0.08)" : badgeClass === "blue" ? "rgba(59, 130, 246, 0.08)" : badgeClass === "red" ? "rgba(239, 68, 68, 0.08)" : "#FFFFFF",
+                            color: badgeClass === "green" ? "#047857" : badgeClass === "blue" ? "#1D4ED8" : badgeClass === "red" ? "#B91C1C" : "#121110",
+                          }}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="processing">Processing</option>
+                          <option value="shipped">Shipped</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="return_requested">Return Requested</option>
+                        </select>
                       </td>
                       <td>
                         {o.trackingNumber ? (

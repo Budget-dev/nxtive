@@ -74,6 +74,12 @@ const SIDEBAR_ITEMS: NavSection[] = [
     ],
   },
   {
+    id: "users",
+    label: "Users",
+    icon: Users,
+    href: "/admin/users",
+  },
+  {
     id: "customers",
     label: "Customers",
     icon: Users,
@@ -149,6 +155,7 @@ export function AdminSidebar({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     products: pathname.startsWith("/admin/products") || pathname.startsWith("/admin/inventory") || pathname.startsWith("/admin/categories"),
     orders: pathname.startsWith("/admin/orders"),
+    users: pathname.startsWith("/admin/users"),
     customers: pathname.startsWith("/admin/customers"),
     reviews: pathname.startsWith("/admin/reviews"),
     payments: pathname.startsWith("/admin/payments"),

@@ -1,7 +1,7 @@
 import { MetadataRoute } from "next";
-import { MOCK_PRODUCTS } from "@/constants/mock-products";
+import { fetchStorefrontProducts } from "@/lib/catalog";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://nxtive.com";
   const now = new Date();
 
@@ -108,7 +108,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }));
 
   // Dynamic Product pages from catalog
-  const productPages: MetadataRoute.Sitemap = MOCK_PRODUCTS.map((prod) => ({
+  const catalogProducts = await fetchStorefrontProducts();
+  const productPages: MetadataRoute.Sitemap = catalogProducts.map((prod) => ({
     url: `${baseUrl}/products/${prod.slug || prod.id}`,
     lastModified: now,
     changeFrequency: "weekly",

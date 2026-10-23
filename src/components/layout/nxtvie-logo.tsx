@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 
 interface NxtvieLogoProps {
@@ -5,62 +7,58 @@ interface NxtvieLogoProps {
   size?: number;
   showText?: boolean;
   className?: string;
+  style?: React.CSSProperties;
+  height?: number;
 }
 
 export function NxtvieLogo({
   color = "currentColor",
   size = 28,
-  showText = true,
   className = "",
+  style,
+  height,
 }: NxtvieLogoProps) {
+  const isWhite =
+    color === "#FFFFFF" ||
+    color === "#FBF9F5" ||
+    color === "#ffffff" ||
+    color === "white";
+
+  const logoHeight = height || Math.max(size, 26);
+
   return (
     <div
-      className={`nxtvie-logo-wrap ${className}`}
+      className={`nxtive-logo-wrap ${className}`}
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: "10px",
-        textDecoration: "none",
-        color: color,
+        lineHeight: 1,
         userSelect: "none",
+        ...style,
       }}
     >
-      {/* Stylized Double Slanted Lightning Bolt Mark */}
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 40 40"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        style={{ display: "block", flexShrink: 0 }}
-      >
-        {/* Left Lightning Bolt */}
-        <polygon
-          points="14,4 5,22 13,22 8,36 21,16 13,16"
-          fill={color}
-        />
-        {/* Right Lightning Bolt */}
-        <polygon
-          points="27,4 18,22 26,22 21,36 34,16 26,16"
-          fill={color}
-        />
-      </svg>
-
-      {showText && (
-        <span
-          style={{
-            fontFamily: "var(--font-body)",
-            fontWeight: 800,
-            fontSize: `${Math.round(size * 0.72)}px`,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            lineHeight: 1,
-            color: color,
-          }}
-        >
-          NXTIVE
-        </span>
-      )}
+      {/* Official NXTIVE Lightning Logo image only - no additional text */}
+      <img
+        src="https://justtca.sirv.com/NXTIVE%20Lightning%20Logo.png"
+        alt="NXTIVE"
+        height={logoHeight}
+        style={{
+          height: `${logoHeight}px`,
+          width: "auto",
+          maxWidth: "100%",
+          display: "block",
+          objectFit: "contain",
+          filter: isWhite ? "brightness(0) invert(1)" : "none",
+          transition: "filter 0.15s ease",
+        }}
+        onError={(e) => {
+          // Fallback to local copy if network fails or offline
+          (e.currentTarget as HTMLImageElement).src = isWhite
+            ? "/images/logo/nxtive-lightning-logo-white.png"
+            : "/images/logo/nxtive-lightning-logo.png";
+        }}
+      />
     </div>
   );
 }
+
