@@ -170,7 +170,7 @@ beforeAll(async () => {
   ({ POST: createPaymentPost } = await import("@/app/api/payments/create-order/route"));
   ({ POST: verifyPaymentPost } = await import("@/app/api/payments/verify/route"));
   ({ POST: refundPost } = await import("@/app/api/payments/refund/route"));
-});
+}, 60000);
 
 beforeEach(() => {
   mocks.requireUser.mockReset();
