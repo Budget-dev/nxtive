@@ -255,7 +255,9 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
       const res = await fetch("/api/admin/products", { cache: "no-store" });
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        return json.data;
+        return json.data
+          .map((item: any) => normalizeProduct(item.id || item.slug || String(Math.random()), item))
+          .filter((p: any): p is Product => p !== null);
       }
     }
   } catch {
@@ -278,18 +280,21 @@ export async function fetchStorefrontCategories(): Promise<Category[]> {
 }
 
 export function categoriesFromProducts(products: Product[]): Category[] {
+  if (!Array.isArray(products)) return DEFAULT_CATEGORIES;
   const seen = new Map<string, Category>();
   for (const product of products) {
-    const slug = product.category.toLowerCase().replace(/\s+/g, "-");
+    if (!product || !product.category) continue;
+    const catName = String(product.category);
+    const slug = catName.toLowerCase().replace(/\s+/g, "-");
     if (seen.has(slug)) continue;
     const defaultMeta = DEFAULT_CATEGORIES.find((c) => c.slug === slug);
     seen.set(slug, {
       id: slug,
       slug,
-      name: defaultMeta?.name || product.category,
-      title: defaultMeta?.title || product.category,
+      name: defaultMeta?.name || catName,
+      title: defaultMeta?.title || catName,
       tagline: defaultMeta?.tagline || "",
-      image: defaultMeta?.image || product.image,
+      image: defaultMeta?.image || product.image || "/images/nxtvie/cat-tshirts.jpg",
       sortOrder: defaultMeta?.sortOrder ?? 999,
       isActive: true,
     });
@@ -299,26 +304,30 @@ export function categoriesFromProducts(products: Product[]): Category[] {
 }
 
 export function productsForCategory(products: Product[], slug: string): Product[] {
-  const normalized = slug.toLowerCase();
+  if (!Array.isArray(products)) return [];
+  const normalized = String(slug || "").toLowerCase();
   if (normalized === "all" || normalized === "shop") return products;
   return products.filter((product) => {
-    const category = product.category.toLowerCase();
+    if (!product) return false;
+    const category = String(product.category || "").toLowerCase();
+    const collections = Array.isArray(product.collections) ? product.collections : [];
     return (
       category === normalized ||
       category.replace(/\s+/g, "-") === normalized ||
-      product.collections.includes(normalized) ||
+      collections.includes(normalized) ||
       (normalized === "sale" && (product.badge === "Sale" || (product.originalPrice != null && product.originalPrice > product.price))) ||
-      (normalized === "new-arrivals" && (product.badge === "New" || product.collections.includes("new-arrivals"))) ||
+      (normalized === "new-arrivals" && (product.badge === "New" || collections.includes("new-arrivals"))) ||
       (normalized === "clothing" && category !== "accessories")
     );
   });
 }
 
 export function relatedProducts(products: Product[], productId: string, limit = 4): Product[] {
-  const current = products.find((product) => product.id === productId);
+  if (!Array.isArray(products)) return [];
+  const current = products.find((product) => product && product.id === productId);
   if (!current) return products.slice(0, limit);
   return products
-    .filter((product) => product.id !== productId && product.category === current.category)
-    .concat(products.filter((product) => product.id !== productId && product.category !== current.category))
+    .filter((product) => product && product.id !== productId && product.category === current.category)
+    .concat(products.filter((product) => product && product.id !== productId && product.category !== current.category))
     .slice(0, limit);
 }

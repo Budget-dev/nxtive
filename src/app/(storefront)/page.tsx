@@ -34,7 +34,7 @@ const GALLERY_PHOTOS = [
   { id: 7, image: "/images/nxtvie/product-cap-hd.jpg", alt: "NXTIVE black lightning cap detail" },
 ];
 
-// Cinematic Full-Width 16:9 Hero Banner Slides
+// Cinematic Full-Width Hero Banner Slides (16:9 Desktop & 9:16 Mobile Ad)
 const CINEMATIC_HERO_SLIDES = [
   {
     id: 1,
@@ -48,6 +48,7 @@ const CINEMATIC_HERO_SLIDES = [
     secondaryCta: "Explore Urban",
     secondaryHref: "/categories/urban-essentials",
     image: "/images/cinematic/banner-urban-movement-nxtive.jpg?v=20261023",
+    mobileImage: "/images/cinematic/mobile-hero-9-16.jpg",
     alt: "NXTIVE Urban Movement Indian Roots Modern Style Collection",
     scriptTag: "For\nNew\nGenerations",
     accentColor: "var(--accent-next, #C78D4E)",
@@ -66,6 +67,7 @@ const CINEMATIC_HERO_SLIDES = [
     secondaryCta: "Explore Fabrics",
     secondaryHref: "/about",
     image: "/images/cinematic/banner-outerwear-fabrics.jpg",
+    mobileImage: "/images/nxtvie/promo-jackets-hd.jpg",
     alt: "NXTIVE Specialized Fabrics Technical Outerwear Campaign",
     scriptTag: "Form &\nFunction",
     accentColor: "#E29D52",
@@ -84,6 +86,7 @@ const CINEMATIC_HERO_SLIDES = [
     secondaryCta: "View Lookbook",
     secondaryHref: "/products",
     image: "/images/cinematic/banner-asian-minimal-night.jpg",
+    mobileImage: "/images/nxtvie/promo-asian-minimal-hd.jpg",
     alt: "NXTIVE Asian Minimal Modern Twilight Skyline Campaign",
     scriptTag: "Nightfall\nSeries",
     accentColor: "#F4A261",
@@ -102,6 +105,7 @@ const CINEMATIC_HERO_SLIDES = [
     secondaryCta: "All Menswear",
     secondaryHref: "/products",
     image: "/images/cinematic/banner-luxury-basics.jpg",
+    mobileImage: "/images/cinematic/banner-luxury-basics.jpg",
     alt: "NXTIVE Refined Everyday Luxury Architecture Campaign",
     scriptTag: "Refined\nSimplicity",
     accentColor: "#E0A899",
@@ -339,6 +343,17 @@ export default function HomePage() {
           Slide {activeSlide + 1} of {CINEMATIC_HERO_SLIDES.length}: {currentSlide.tag}
         </span>
 
+        {/* Mobile 9:16 Story Ad Progress Bars */}
+        <div className="mobile-story-bars" aria-hidden="true">
+          {CINEMATIC_HERO_SLIDES.map((_, i) => (
+            <div
+              key={i}
+              className={`mobile-story-bar-segment ${i === activeSlide ? "active" : ""}`}
+              onClick={() => setActiveSlide(i)}
+            />
+          ))}
+        </div>
+
         {/* Slides Stack */}
         {CINEMATIC_HERO_SLIDES.map((slide, idx) => {
           const isActive = idx === activeSlide;
@@ -359,23 +374,26 @@ export default function HomePage() {
               }}
               className="hero-slide-pane"
             >
-              {/* Cinematic Background Image */}
-              <img
-                src={slide.image}
-                alt={slide.alt}
-                loading={idx === 0 ? "eager" : "lazy"}
-                fetchPriority={idx === 0 ? "high" : "low"}
-                decoding="async"
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  objectPosition: slide.objectPosition,
-                  filter: "brightness(0.92)",
-                }}
-              />
+              {/* Cinematic Background Image (16:9 Desktop & 9:16 Mobile Ad) */}
+              <picture style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+                <source media="(max-width: 640px)" srcSet={slide.mobileImage || slide.image} />
+                <img
+                  src={slide.image}
+                  alt={slide.alt}
+                  loading={idx === 0 ? "eager" : "lazy"}
+                  fetchPriority={idx === 0 ? "high" : "low"}
+                  decoding="async"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: slide.objectPosition,
+                    filter: "brightness(0.92)",
+                  }}
+                />
+              </picture>
 
               {/* Gradient Scrim Overlays */}
               <div
@@ -1729,42 +1747,83 @@ export default function HomePage() {
           }
         }
 
-        @media (max-width: 580px) {
+        /* Mobile 9:16 Campaign Hero & Compact Scrollable Categories */
+        @media (max-width: 640px) {
           .cinematic-hero-section {
-            min-height: clamp(520px, 80svh, 660px) !important;
+            min-height: 86svh !important;
+            height: 88svh !important;
+            max-height: 840px !important;
             align-items: flex-end !important;
+          }
+          .mobile-story-bars {
+            display: flex !important;
+            position: absolute !important;
+            top: 14px !important;
+            left: 16px !important;
+            right: 16px !important;
+            gap: 6px !important;
+            z-index: 25 !important;
+          }
+          .mobile-story-bar-segment {
+            flex: 1 !important;
+            height: 3px !important;
+            background: rgba(255, 255, 255, 0.35) !important;
+            border-radius: 9999px !important;
+            cursor: pointer !important;
+            transition: background 0.25s ease !important;
+          }
+          .mobile-story-bar-segment.active {
+            background: var(--accent-next, #C78D4E) !important;
+            box-shadow: 0 0 8px rgba(199, 141, 78, 0.85) !important;
           }
           .cinematic-hero-section > .container {
             padding-top: 24px !important;
-            padding-bottom: 68px !important;
+            padding-bottom: 34px !important;
           }
           .hero-script-tag {
             display: none !important;
           }
+          .hero-left-scrim {
+            background: linear-gradient(to top, rgba(10, 9, 8, 0.98) 0%, rgba(10, 9, 8, 0.65) 42%, rgba(10, 9, 8, 0.15) 75%, transparent 100%) !important;
+          }
           .hero-headline {
-            font-size: clamp(38px, 11vw, 52px) !important;
-            line-height: 0.96 !important;
-            letter-spacing: -0.04em !important;
-            margin-bottom: 14px !important;
+            font-size: clamp(34px, 9.5vw, 44px) !important;
+            line-height: 0.95 !important;
+            letter-spacing: -0.035em !important;
+            margin-bottom: 8px !important;
           }
           .hero-subtext {
             font-size: 13px !important;
-            margin-bottom: 20px !important;
+            line-height: 1.45 !important;
+            margin-bottom: 18px !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
           }
           .hero-cta-row {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 8px !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 10px !important;
+            margin-bottom: 10px !important;
           }
           .hero-cta-row > a {
-            width: 100% !important;
+            flex: 1 !important;
+            padding: 12px 14px !important;
+            font-size: 12.5px !important;
             justify-content: center !important;
+          }
+          .hero-transparent-pill {
+            display: inline-flex !important;
+            margin-bottom: 10px !important;
+            padding: 4px 12px !important;
+            font-size: 10.5px !important;
           }
 
           /* Trust bar mobile */
           .hero-trust-bar-grid {
             grid-template-columns: repeat(2, 1fr) !important;
-            gap: 10px !important;
+            gap: 8px !important;
           }
           .hero-trust-bar-grid > div {
             padding: 6px 4px;
@@ -1776,25 +1835,85 @@ export default function HomePage() {
             display: none;
           }
 
-          /* Category horizontal scroll bar */
+          /* Compact Mobile Categories Horizontal Scroll (Small & Sleek) */
+          .categories-preview-section {
+            padding: 18px 0 10px 0 !important;
+          }
+          .categories-preview-section .section-title-wrap {
+            margin-bottom: 12px !important;
+          }
+          .categories-preview-section .section-eyebrow {
+            font-size: 9.5px !important;
+            letter-spacing: 0.14em !important;
+          }
+          .categories-preview-section .section-heading-sm {
+            font-size: 18px !important;
+          }
           .categories-grid {
             display: flex !important;
-            gap: 10px !important;
+            gap: 14px !important;
             margin: 0 -16px !important;
-            padding: 0 16px 8px !important;
-            overflow-x: auto;
-            scroll-snap-type: x mandatory;
-            scrollbar-width: none;
+            padding: 4px 16px 12px !important;
+            overflow-x: auto !important;
+            scroll-snap-type: x mandatory !important;
+            -webkit-overflow-scrolling: touch !important;
+            scrollbar-width: none !important;
           }
           .categories-grid::-webkit-scrollbar {
-            display: none;
+            display: none !important;
           }
           .category-card {
-            flex: 0 0 135px !important;
-            scroll-snap-align: start;
+            flex: 0 0 74px !important;
+            width: 74px !important;
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 6px !important;
+            scroll-snap-align: start !important;
+            text-decoration: none !important;
           }
           .category-card-media {
-            height: 130px !important;
+            width: 64px !important;
+            height: 64px !important;
+            min-height: 64px !important;
+            border-radius: 50% !important;
+            border: 2px solid var(--accent-next, #C78D4E) !important;
+            overflow: hidden !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+            background: #141312 !important;
+          }
+          .category-card-media img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            transition: transform 0.3s ease !important;
+          }
+          .category-card:hover .category-card-media img {
+            transform: scale(1.12) !important;
+          }
+          .category-card-footer {
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            justify-content: center !important;
+          }
+          .cat-name {
+            font-size: 10.5px !important;
+            font-weight: 700 !important;
+            color: #1E1C1A !important;
+            text-align: center !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 74px !important;
+            display: block !important;
+            letter-spacing: 0.02em !important;
+          }
+          .cat-arrow {
+            display: none !important;
           }
 
           /* 2-Card Layout on Mobile */

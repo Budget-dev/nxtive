@@ -50,12 +50,18 @@ function ProductsContent() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((prod) => {
+      if (!prod) return false;
+      const title = String(prod.title || "").toLowerCase();
+      const desc = String(prod.description || "").toLowerCase();
+      const cat = String(prod.category || "").toLowerCase();
+      const query = (searchQ || "").toLowerCase();
+
       // Search term
       if (
-        searchQ &&
-        !prod.title.toLowerCase().includes(searchQ.toLowerCase()) &&
-        !prod.description.toLowerCase().includes(searchQ.toLowerCase()) &&
-        !prod.category.toLowerCase().includes(searchQ.toLowerCase())
+        query &&
+        !title.includes(query) &&
+        !desc.includes(query) &&
+        !cat.includes(query)
       ) {
         return false;
       }
@@ -66,20 +72,21 @@ function ProductsContent() {
       }
 
       // Size
-      if (selectedSize !== "All" && !prod.sizes.includes(selectedSize)) {
+      if (selectedSize !== "All" && !(Array.isArray(prod.sizes) && prod.sizes.includes(selectedSize))) {
         return false;
       }
 
       // Color
       if (selectedColor !== "All") {
-        const hasColor = prod.colors.some((c) =>
-          c.name.toLowerCase().includes(selectedColor.toLowerCase().split(" ")[0])
+        const colors = Array.isArray(prod.colors) ? prod.colors : [];
+        const hasColor = colors.some((c) =>
+          String(c?.name || "").toLowerCase().includes(selectedColor.toLowerCase().split(" ")[0])
         );
         if (!hasColor) return false;
       }
 
       // Price
-      if (prod.price > priceRange) {
+      if (typeof prod.price === "number" && prod.price > priceRange) {
         return false;
       }
 
