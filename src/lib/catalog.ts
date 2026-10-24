@@ -225,7 +225,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
     name: "Premium Basics",
     title: "Premium Basics",
     tagline: "Heavyweight organic cotton staples made to last.",
-    image: "/images/nxtvie/banner-luxury-basics.jpg",
+    image: "/images/cinematic/banner-luxury-basics.jpg",
     sortOrder: 13,
     isActive: true,
   },

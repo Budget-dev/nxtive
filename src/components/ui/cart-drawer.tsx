@@ -17,7 +17,7 @@ export function CartDrawer() {
     cartSubtotal,
   } = useStore();
 
-  const freeShippingThreshold = 150;
+  const freeShippingThreshold = 999;
   const progressToFreeShipping = Math.min(100, (cartSubtotal / freeShippingThreshold) * 100);
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
 
@@ -124,7 +124,7 @@ export function CartDrawer() {
             {remainingForFreeShipping === 0 ? (
               <span style={{ color: "#166534" }}>✓ You've earned Free Express Delivery!</span>
             ) : (
-              <span>Add <strong>${remainingForFreeShipping}</strong> more for Free Delivery</span>
+              <span>Add <strong>₹{remainingForFreeShipping.toLocaleString("en-IN")}</strong> more for Free Delivery</span>
             )}
             <span>{Math.round(progressToFreeShipping)}%</span>
           </div>

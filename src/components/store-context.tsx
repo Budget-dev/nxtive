@@ -166,10 +166,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Restore from localStorage on client mount
   useEffect(() => {
     try {
-      const savedCart = localStorage.getItem("nxtvie_cart");
+      const savedCart = localStorage.getItem("nxtive_cart") || localStorage.getItem("nxtvie_cart");
       if (savedCart) setCart(JSON.parse(savedCart));
 
-      const savedWishlist = localStorage.getItem("nxtvie_wishlist");
+      const savedWishlist = localStorage.getItem("nxtive_wishlist") || localStorage.getItem("nxtvie_wishlist");
       if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
 
     } catch {
@@ -180,12 +180,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Save to localStorage when state updates
   useEffect(() => {
     try {
+      localStorage.setItem("nxtive_cart", JSON.stringify(cart));
       localStorage.setItem("nxtvie_cart", JSON.stringify(cart));
     } catch {}
   }, [cart]);
 
   useEffect(() => {
     try {
+      localStorage.setItem("nxtive_wishlist", JSON.stringify(wishlist));
       localStorage.setItem("nxtvie_wishlist", JSON.stringify(wishlist));
     } catch {}
   }, [wishlist]);

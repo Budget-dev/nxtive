@@ -504,7 +504,7 @@ export function Footer() {
             color: "#7E7972",
           }}
         >
-          <div>© 2024 NXTIVE Streetwear Inc. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} NXTIVE Streetwear Inc. All rights reserved.</div>
 
           <div className="footer-bottom-links" style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
             <Link href="/privacy" className="footer-bottom-link">

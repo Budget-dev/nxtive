@@ -34,7 +34,11 @@ const addressSchema = z.object({
   apartment: z.string().trim().max(120).optional(),
   city: z.string().trim().min(2).max(80),
   state: z.string().trim().min(2).max(80),
-  postalCode: z.string().regex(/^\d{6}$/),
+  postalCode: z
+    .string()
+    .trim()
+    .transform((val) => val.replace(/\s+/g, ""))
+    .refine((val) => /^\d{6}$/.test(val), "Postal code must be a 6-digit Indian PIN code"),
   country: z
     .string()
     .trim()
