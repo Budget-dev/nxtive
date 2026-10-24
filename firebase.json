@@ -19,18 +19,11 @@
     }
   ],
   "hosting": {
-    "public": ".firebase/nxtive-80349/hosting",
-    "cleanUrls": true,
+    "source": ".",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
     ]
   }
 }
