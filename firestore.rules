@@ -7,11 +7,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // STRICT PRIMARY ADMIN: Only venkateshchop14@gmail.com is authorized as an administrator.
+    // STRICT PRIMARY ADMIN: Only nxtiveclothing@gmail.com is authorized as an administrator.
     function isPrimaryAdmin() {
       return signedIn()
         && request.auth.token.email != null
-        && request.auth.token.email == 'venkateshchop14@gmail.com';
+        && (request.auth.token.email == 'nxtiveclothing@gmail.com'
+            || request.auth.token.email.matches('(?i)^nxtiveclothing@gmail\\.com$'));
     }
 
     function activeAdmin() {
@@ -25,7 +26,7 @@ service cloud.firestore {
     // ─── Public catalogue data ──────────────────────────────────
     // Product and category documents are public store data for browsing.
     // Allow read on products and categories for everyone.
-    // Allow write to products and categories only if request.auth.token.email == 'venkateshchop14@gmail.com'.
+    // Allow write to products and categories only if request.auth.token.email == 'nxtiveclothing@gmail.com'.
     match /products/{productId} {
       allow read: if true;
       allow write: if isPrimaryAdmin();
@@ -96,7 +97,7 @@ service cloud.firestore {
     }
 
     // ─── Admin users, roles, and settings ───────────────────────
-    // Strictly locked to venkateshchop14@gmail.com
+    // Strictly locked to nxtiveclothing@gmail.com
     match /admin_users/{adminId} {
       allow read, write: if isPrimaryAdmin();
     }

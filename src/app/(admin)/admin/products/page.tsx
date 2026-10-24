@@ -261,17 +261,36 @@ export default function AdminProductsPage() {
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          <img
-                            src={p.image || "/images/nxtvie/product-oversized-tee-hd.jpg"}
-                            alt={p.title}
-                            style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "6px",
-                              objectFit: "cover",
-                              border: "1px solid var(--adm-border-light)",
-                            }}
-                          />
+                          {p.image ? (
+                            <img
+                              src={p.image}
+                              alt={p.title}
+                              style={{
+                                width: "44px",
+                                height: "44px",
+                                borderRadius: "6px",
+                                objectFit: "cover",
+                                border: "1px solid var(--adm-border-light)",
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: "44px",
+                                height: "44px",
+                                borderRadius: "6px",
+                                backgroundColor: "var(--adm-bg-input)",
+                                border: "1px solid var(--adm-border-light)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--adm-text-muted)",
+                                fontSize: "10px",
+                              }}
+                            >
+                              No img
+                            </div>
+                          )}
                           <div>
                             <div style={{ fontWeight: 700, fontSize: "13.5px", color: "#121110" }}>
                               <Link

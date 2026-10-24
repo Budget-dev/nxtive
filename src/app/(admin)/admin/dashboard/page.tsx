@@ -579,17 +579,29 @@ export default function AdminDashboardPage() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <img
-                      src={item.image || "/images/nxtvie/product-oversized-tee-hd.jpg"}
-                      alt={item.name}
-                      style={{
-                        width: "36px",
-                        height: "36px",
-                        borderRadius: "6px",
-                        objectFit: "cover",
-                        border: "1px solid var(--adm-border-light)",
-                      }}
-                    />
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "6px",
+                          objectFit: "cover",
+                          border: "1px solid var(--adm-border-light)",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "6px",
+                          backgroundColor: "var(--adm-bg-input)",
+                          border: "1px solid var(--adm-border-light)",
+                        }}
+                      />
+                    )}
                     <div>
                       <div style={{ fontWeight: 700, fontSize: "13px", color: "#121110" }}>
                         {item.name}
@@ -726,17 +738,29 @@ export default function AdminDashboardPage() {
                         </td>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <img
-                              src={p.image || "/images/nxtvie/product-oversized-tee-hd.jpg"}
-                              alt={p.title}
-                              style={{
-                                width: "40px",
-                                height: "40px",
-                                borderRadius: "6px",
-                                objectFit: "cover",
-                                border: "1px solid var(--adm-border-light)",
-                              }}
-                            />
+                            {p.image ? (
+                              <img
+                                src={p.image}
+                                alt={p.title}
+                                style={{
+                                  width: "40px",
+                                  height: "40px",
+                                  borderRadius: "6px",
+                                  objectFit: "cover",
+                                  border: "1px solid var(--adm-border-light)",
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: "40px",
+                                  height: "40px",
+                                  borderRadius: "6px",
+                                  backgroundColor: "var(--adm-bg-input)",
+                                  border: "1px solid var(--adm-border-light)",
+                                }}
+                              />
+                            )}
                             <div>
                               <div style={{ fontWeight: 700, fontSize: "13.5px", color: "#121110" }}>
                                 {p.title}

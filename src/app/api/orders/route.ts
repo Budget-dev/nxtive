@@ -595,11 +595,11 @@ export async function POST(req: NextRequest) {
         return {
           productId: item.productId,
           title: item.title || "Apparel Item",
-          price: money(item.price || 1299),
+          price: money(item.price || 0),
           quantity: item.quantity,
           selectedSize: item.selectedSize,
           selectedColor: item.selectedColor,
-          image: item.image || "/images/nxtvie/product-oversized-tee-hd.jpg",
+          image: item.image || "",
         };
       }
       return {

@@ -71,92 +71,7 @@ function loadInitialCollectionData(collectionName: string): Record<string, any> 
     });
     saveCollectionData(collectionName, initialMap);
   } else if (collectionName === "products") {
-    initialMap["prod-oversized-tee"] = {
-      id: "prod-oversized-tee",
-      title: "Oversized Heavyweight Boxy Tee",
-      slug: "oversized-heavyweight-boxy-tee",
-      description: "Crafted from custom 280 GSM combed organic cotton. Features architectural draping, drop-shoulder silhouette, and reinforced ribbed collar.",
-      imageUrl: "/images/nxtvie/product-oversized-tee-hd.jpg",
-      image: "/images/nxtvie/product-oversized-tee-hd.jpg",
-      images: [
-        "/images/nxtvie/product-oversized-tee-hd.jpg",
-        "/images/nxtvie/gallery-1.jpg"
-      ],
-      category: "T-Shirts",
-      price: 1299,
-      originalPrice: 1799,
-      stock: 85,
-      totalStock: 85,
-      lowStockThreshold: 10,
-      inStock: true,
-      featured: true,
-      badge: "Bestseller",
-      sizes: ["S", "M", "L", "XL"],
-      colors: [
-        { name: "Pitch Black", hex: "#121212" },
-        { name: "Bone White", hex: "#EAE6DF" }
-      ],
-      fit: "Oversized Fit",
-      createdAt: "2026-01-10T00:00:00.000Z",
-      updatedAt: "2026-01-10T00:00:00.000Z"
-    };
-    initialMap["prod-french-terry-hoodie"] = {
-      id: "prod-french-terry-hoodie",
-      title: "French Terry Relaxed Hoodie",
-      slug: "french-terry-relaxed-hoodie",
-      description: "Substantial 450 GSM custom French terry knit with double-lined structured hood and raw kangaroo pocket styling.",
-      imageUrl: "/images/nxtvie/cat-hoodies.jpg",
-      image: "/images/nxtvie/cat-hoodies.jpg",
-      images: [
-        "/images/nxtvie/cat-hoodies.jpg",
-        "/images/nxtvie/gallery-2.jpg"
-      ],
-      category: "Hoodies",
-      price: 2899,
-      originalPrice: 3499,
-      stock: 40,
-      totalStock: 40,
-      lowStockThreshold: 8,
-      inStock: true,
-      featured: true,
-      badge: "New",
-      sizes: ["M", "L", "XL"],
-      colors: [
-        { name: "Concrete Grey", hex: "#8A8D8F" },
-        { name: "Pitch Black", hex: "#121212" }
-      ],
-      fit: "Relaxed Fit",
-      createdAt: "2026-01-15T00:00:00.000Z",
-      updatedAt: "2026-01-15T00:00:00.000Z"
-    };
-    initialMap["prod-ripstop-cargo-pant"] = {
-      id: "prod-ripstop-cargo-pant",
-      title: "Articulated Ripstop Cargo Pants",
-      slug: "articulated-ripstop-cargo-pant",
-      description: "Durable cotton-nylon ripstop construction with 3D pleated cargo pockets, darted knee articulation, and adjustable cuff toggles.",
-      imageUrl: "/images/nxtvie/cat-bottoms.jpg",
-      image: "/images/nxtvie/cat-bottoms.jpg",
-      images: [
-        "/images/nxtvie/cat-bottoms.jpg"
-      ],
-      category: "Bottoms",
-      price: 2499,
-      originalPrice: 2999,
-      stock: 30,
-      totalStock: 30,
-      lowStockThreshold: 5,
-      inStock: true,
-      featured: false,
-      badge: "Trending",
-      sizes: ["30", "32", "34", "36"],
-      colors: [
-        { name: "Army Green", hex: "#4B5320" },
-        { name: "Shadow Charcoal", hex: "#2B2D2F" }
-      ],
-      fit: "Relaxed Fit",
-      createdAt: "2026-02-01T00:00:00.000Z",
-      updatedAt: "2026-02-01T00:00:00.000Z"
-    };
+    // Zero hardcoded products; true empty catalog until added in Firestore/admin
     saveCollectionData(collectionName, initialMap);
   }
 
@@ -180,9 +95,7 @@ export async function storeReadCollection<T>(collectionName: string): Promise<T[
   if (hasAdminCredentials) {
     try {
       const snapshot = await adminDb.collection(collectionName).get();
-      if (!snapshot.empty) {
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
-      }
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
     } catch (err) {
       console.warn(`[firestore-store] adminDb read error for ${collectionName}:`, err);
     }

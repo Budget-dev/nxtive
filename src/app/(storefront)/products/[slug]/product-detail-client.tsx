@@ -771,67 +771,25 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                 </div>
               </div>
             ))}
-
-            {/* Static Verified Testimonials */}
-            <div style={{ backgroundColor: "#FFFFFF", padding: "24px", borderRadius: "12px", border: "1px solid rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <div style={{ display: "flex", color: "#F2AC24" }}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} size={13} fill="#F2AC24" />
-                  ))}
-                </div>
-                <span style={{ fontSize: "11px", color: "#8E8880" }}>2 weeks ago</span>
+            {approvedReviews.length === 0 && (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  textAlign: "center",
+                  padding: "48px 24px",
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: "12px",
+                  border: "1px dashed rgba(0,0,0,0.1)",
+                }}
+              >
+                <p style={{ fontSize: "14px", fontWeight: 600, color: "#111110", marginBottom: "6px" }}>
+                  No customer reviews yet
+                </p>
+                <p style={{ fontSize: "13px", color: "#8E8880" }}>
+                  Be the first to review this piece and share your thoughts.
+                </p>
               </div>
-              <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
-                "Heavy cotton feel is unreal"
-              </h4>
-              <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.5, marginBottom: "12px" }}>
-                Easily one of the highest quality oversized silhouettes I have owned in India. Collar stays structured even after 3 washes.
-              </p>
-              <div style={{ fontSize: "11.5px", color: "#8E8880" }}>
-                <strong>Aarav V.</strong> • Verified Buyer • Size L
-              </div>
-            </div>
-
-            <div style={{ backgroundColor: "#FFFFFF", padding: "24px", borderRadius: "12px", border: "1px solid rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <div style={{ display: "flex", color: "#F2AC24" }}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} size={13} fill="#F2AC24" />
-                  ))}
-                </div>
-                <span style={{ fontSize: "11px", color: "#8E8880" }}>1 month ago</span>
-              </div>
-              <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
-                "Perfect drape and tone"
-              </h4>
-              <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.5, marginBottom: "12px" }}>
-                The color tone is muted and luxury, exactly like the photoshoot. Goes well with cargos or trousers.
-              </p>
-              <div style={{ fontSize: "11.5px", color: "#8E8880" }}>
-                <strong>Devansh K.</strong> • Verified Buyer • Size M
-              </div>
-            </div>
-
-            <div style={{ backgroundColor: "#FFFFFF", padding: "24px", borderRadius: "12px", border: "1px solid rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <div style={{ display: "flex", color: "#F2AC24" }}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} size={13} fill="#F2AC24" />
-                  ))}
-                </div>
-                <span style={{ fontSize: "11px", color: "#8E8880" }}>3 weeks ago</span>
-              </div>
-              <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
-                "Super fast delivery to Delhi"
-              </h4>
-              <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.5, marginBottom: "12px" }}>
-                Package arrived in 3 days. Clean luxury unboxing and premium feel. Highly recommend this brand.
-              </p>
-              <div style={{ fontSize: "11.5px", color: "#8E8880" }}>
-                <strong>Rohan S.</strong> • Verified Buyer • Size XL
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Write Review Modal */}

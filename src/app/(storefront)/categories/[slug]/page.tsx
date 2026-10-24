@@ -4,7 +4,7 @@ import { fetchStorefrontCategories, fetchStorefrontProducts, productsForCategory
 import type { Category } from "@/types/product";
 import { CategoryViewClient } from "./category-view-client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 export const dynamicParams = true;
 
 interface CategoryPageProps {

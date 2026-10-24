@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       admin = await requireAdmin(undefined, request);
     } else if (!hasAdminCredentials && reqEmail === PRIMARY_ADMIN_EMAIL.toLowerCase()) {
       admin = {
-        uid: "admin-venkatesh",
+        uid: "admin-nxtive",
         email: PRIMARY_ADMIN_EMAIL,
         email_verified: true,
         auth_time: Math.floor(Date.now() / 1000),
@@ -95,13 +95,13 @@ export async function POST(request: Request) {
           "admins.manage",
           "settings.manage",
         ] as any,
-        displayName: "Venkatesh (Super Admin)",
+        displayName: "NXTIVE Admin",
         isActive: true,
         aud: "nxtive-80349",
         exp: Math.floor(Date.now() / 1000) + 3600 * 24,
         iat: Math.floor(Date.now() / 1000),
         iss: "https://securetoken.google.com/nxtive-80349",
-        sub: "admin-venkatesh",
+        sub: "admin-nxtive",
         firebase: {
           identities: { email: [PRIMARY_ADMIN_EMAIL] },
           sign_in_provider: "password",

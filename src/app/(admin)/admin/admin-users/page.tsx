@@ -61,7 +61,7 @@ export default function AdminUsersPage() {
   }, []);
 
   const handleToggleActive = async (u: AdminUser) => {
-    if (u.role === "super_admin" && u.email === "venkatesh@nxtvie.com") {
+    if (u.role === "super_admin" && (u.email === "nxtiveclothing@gmail.com" || u.email === "venkatesh@nxtvie.com")) {
       alert("Cannot deactivate primary Super Administrator.");
       return;
     }

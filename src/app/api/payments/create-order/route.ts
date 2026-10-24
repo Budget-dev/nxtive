@@ -31,11 +31,11 @@ export async function POST(req: NextRequest | Request) {
       return {
         productId: item.productId || item.id,
         title: String(prod?.title || item.title || "Apparel Item"),
-        price: Number(prod?.price !== undefined ? prod.price : item.price || 1299),
+        price: Number(prod?.price !== undefined ? prod.price : item.price || 0),
         quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
         selectedSize: String(item.selectedSize || "M"),
         selectedColor: item.selectedColor || null,
-        image: String(prod?.image || item.image || "/images/nxtvie/product-oversized-tee-hd.jpg"),
+        image: String(prod?.image || item.image || ""),
         slug: prod?.slug,
         sku: prod?.sku,
       };

@@ -128,17 +128,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       case "auth/too-many-requests":
         return "Access temporarily disabled due to too many failed attempts. Please wait a few minutes.";
       case "auth/popup-closed-by-user":
-        return "Google sign-in popup was closed before completing.";
+        return "Google sign-in was closed before completing.";
       case "auth/popup-blocked":
-        return "Sign-in popup was blocked by your browser. Attempting redirect...";
+        return "Google sign-in popup was blocked by your browser. Please allow popups or sign in with email & password.";
       case "auth/cancelled-popup-request":
-        return "Sign-in request was cancelled. Please try again.";
-      case "auth/unauthorized-domain":
-        return "This domain is not authorized in Firebase. Please open via http://localhost:3005";
+        return "Sign-in was cancelled. Please try again.";
+      case "auth/unauthorized-domain": {
+        const host = typeof window !== "undefined" ? window.location.hostname : "this domain";
+        return `Google Sign-In is not yet authorized for ${host}. Please sign in directly with email & password, or add "${host}" under Firebase Console > Authentication > Settings > Authorized domains.`;
+      }
       case "auth/network-request-failed":
         return "Network connection issue. Please check your internet connection.";
       case "auth/operation-not-allowed":
         return "This sign-in method is not enabled in Firebase Console. Please verify Authentication settings.";
+      case "auth/user-disabled":
+        return "This account has been disabled. Please contact customer support.";
       default:
         return err?.message?.replace(/^Firebase:\s*/i, "") || "An authentication error occurred. Please try again.";
     }
@@ -204,10 +208,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return res;
     } catch (err: any) {
-      if (err?.code === "auth/popup-blocked" || err?.code === "auth/cancelled-popup-request") {
-        console.warn("Popup blocked, falling back to signInWithRedirect...");
-        await signInWithRedirect(auth, provider);
-        return null;
+      if (err?.code === "auth/popup-blocked") {
+        try {
+          console.warn("Popup blocked, falling back to signInWithRedirect...");
+          await signInWithRedirect(auth, provider);
+          return null;
+        } catch (redirectErr: any) {
+          const msg = formatAuthError(redirectErr);
+          setError(msg);
+          throw new Error(msg);
+        }
+      }
+      if (err?.code === "auth/popup-closed-by-user" || err?.code === "auth/cancelled-popup-request") {
+        const msg = "Sign-in was cancelled. Please try again.";
+        setError(msg);
+        throw new Error(msg);
       }
       const msg = formatAuthError(err);
       setError(msg);

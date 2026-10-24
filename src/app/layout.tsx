@@ -154,15 +154,29 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Preconnect & DNS Prefetch for Google Fonts and CDNs */}
+        {/* Preconnect & Non-blocking Google Fonts loading for maximum FCP/LCP performance */}
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
+          rel="preload"
+          as="style"
           href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Caveat:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap"
-          rel="stylesheet"
         />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Caveat:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap"
+          media="print"
+          // @ts-expect-error Next.js jsx onLoad for link
+          onLoad="this.media='all'"
+        />
+        <noscript>
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Caveat:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap"
+          />
+        </noscript>
 
         {/* Structured Data JSON-LD for Search Engines */}
         <script

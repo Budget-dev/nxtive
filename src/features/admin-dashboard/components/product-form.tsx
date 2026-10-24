@@ -116,51 +116,41 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
   const [slug, setSlug] = useState(initialProduct?.slug || "");
   const [category, setCategory] = useState<ProductCategory>(initialProduct?.category || "T-Shirts");
   const [badge, setBadge] = useState<ProductBadge | "None">(initialProduct?.badge || "None");
-  const [price, setPrice] = useState<number>(initialProduct?.price || 999);
+  const [price, setPrice] = useState<number>(initialProduct?.price || 0);
   const [originalPrice, setOriginalPrice] = useState<number | undefined>(initialProduct?.originalPrice || undefined);
-  const [totalStock, setTotalStock] = useState<number>(initialProduct?.totalStock ?? 80);
-  const [lowStockThreshold, setLowStockThreshold] = useState<number>(initialProduct?.lowStockThreshold ?? 10);
+  const [totalStock, setTotalStock] = useState<number>(initialProduct?.totalStock ?? 0);
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(initialProduct?.lowStockThreshold ?? 5);
   const [inStock, setInStock] = useState<boolean>(initialProduct?.inStock ?? true);
   const [featured, setFeatured] = useState<boolean>(initialProduct?.featured ?? false);
 
   // Clothing Attributes
-  const [fit, setFit] = useState(initialProduct?.fit || "Relaxed Fit");
+  const [fit, setFit] = useState(initialProduct?.fit || "");
   const [selectedSizes, setSelectedSizes] = useState<string[]>(
-    initialProduct?.sizes || ["S", "M", "L", "XL"]
+    initialProduct?.sizes || []
   );
   const [colors, setColors] = useState<{ name: string; hex: string }[]>(
-    initialProduct?.colors || [
-      { name: "Pitch Black", hex: "#121212" },
-      { name: "Bone White", hex: "#EAE6DF" },
-    ]
+    initialProduct?.colors || []
   );
   const [newColorName, setNewColorName] = useState("");
   const [newColorHex, setNewColorHex] = useState("#936037");
 
   // Descriptions & Details
   const [description, setDescription] = useState(
-    initialProduct?.description ||
-      "Crafted from premium heavyweight combed organic cotton. Features architectural draping with reinforced seams."
+    initialProduct?.description || ""
   );
   const [detailsText, setDetailsText] = useState(
-    initialProduct?.details?.join("\n") ||
-      "280 GSM heavyweight combed cotton\nDrop-shoulder silhouette\nPre-shrunk to retain drape"
+    initialProduct?.details?.join("\n") || ""
   );
   const [fabricCareText, setFabricCareText] = useState(
-    initialProduct?.fabricCare?.join("\n") ||
-      "100% Organic Combed Cotton\nMachine wash cold inside out\nDo not tumble dry"
+    initialProduct?.fabricCare?.join("\n") || ""
   );
 
   // Images
   const [mainImage, setMainImage] = useState(
-    initialProduct?.image || "/images/nxtvie/product-oversized-tee-hd.jpg"
+    initialProduct?.image || ""
   );
   const [galleryImages, setGalleryImages] = useState<string[]>(
-    initialProduct?.images || [
-      "/images/nxtvie/product-oversized-tee-hd.jpg",
-      "/images/nxtvie/gallery-1.jpg",
-      "/images/nxtvie/gallery-4.jpg",
-    ]
+    initialProduct?.images || []
   );
   const [newImageUrl, setNewImageUrl] = useState("");
 
@@ -798,7 +788,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                 type="text"
                 value={mainImage}
                 onChange={(e) => setMainImage(e.target.value)}
-                placeholder="https://... or /images/nxtvie/product-oversized-tee-hd.jpg"
+                placeholder="https://... or /images/..."
                 required
                 className="admin-input"
               />
@@ -810,7 +800,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
                       alt="Cover preview"
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/images/nxtvie/product-oversized-tee-hd.jpg";
+                        (e.target as HTMLImageElement).style.opacity = "0.3";
                       }}
                     />
                   </div>

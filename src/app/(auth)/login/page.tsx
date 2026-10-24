@@ -26,10 +26,10 @@ export default function LoginPage() {
     }
   }, []);
 
-  // If already logged in, redirect to account
+  // If already logged in, redirect to homepage
   React.useEffect(() => {
     if (user) {
-      router.push("/account");
+      router.push("/");
     }
   }, [user, router]);
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
 
     try {
       await loginWithEmail(email, password);
-      router.push("/account");
+      router.push("/");
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to sign in. Please verify your credentials.");
     } finally {
@@ -59,7 +59,7 @@ export default function LoginPage() {
     try {
       const res = await loginWithGoogle();
       if (res && res.user) {
-        router.push("/account");
+        router.push("/");
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Google sign-in was cancelled or failed.");
@@ -264,7 +264,10 @@ export default function LoginPage() {
               required
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               placeholder="you@example.com"
               style={{
                 width: "100%",
@@ -316,7 +319,10 @@ export default function LoginPage() {
                 required
                 autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="••••••••"
                 style={{
                   width: "100%",

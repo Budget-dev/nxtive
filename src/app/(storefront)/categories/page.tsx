@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Explore all NXTIVE collections: Men, New Arrivals, Heavyweight Tees, Hoodies, Technical Jackets, and Accessories.",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function CategoriesIndexPage() {
   const [storedCategories, products] = await Promise.all([

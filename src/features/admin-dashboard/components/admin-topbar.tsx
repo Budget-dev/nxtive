@@ -60,7 +60,7 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
     }
   };
 
-  const displayName = adminUser?.displayName || "Venkatesh";
+  const displayName = adminUser?.displayName || "NXTIVE Admin";
   const displayRole =
     adminUser?.role === "super_admin"
       ? "Super Admin"
@@ -270,7 +270,7 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
           >
             <img
               src={adminUser?.avatarUrl || "/images/nxtvie/hero-model-crop.jpg"}
-              alt="Venkatesh"
+              alt={displayName}
               className="admin-profile-avatar"
             />
             <div className="admin-profile-info">
@@ -298,7 +298,7 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
               <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--adm-border-light)" }}>
                 <div style={{ fontSize: "13.5px", fontWeight: 700 }}>{displayName}</div>
                 <div style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>
-                  {adminUser?.email || "venkatesh@nxtvie.com"}
+                  {adminUser?.email || "nxtiveclothing@gmail.com"}
                 </div>
                 <div
                   style={{

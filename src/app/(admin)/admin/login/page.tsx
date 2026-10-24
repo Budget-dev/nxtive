@@ -7,7 +7,7 @@ import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Loader2, ShieldCheck 
 
 export default function AdminLoginPage() {
   const { loginAsAdmin, loginWithGoogleAsAdmin } = useAdminAuth();
-  const [email, setEmail] = useState("venkateshchop14@gmail.com");
+  const [email, setEmail] = useState("nxtiveclothing@gmail.com");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -29,8 +29,8 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (email.trim().toLowerCase() !== "venkateshchop14@gmail.com") {
-      setError("Access denied: Only venkateshchop14@gmail.com is authorized to access the admin operations console.");
+    if (email.trim().toLowerCase() !== "nxtiveclothing@gmail.com") {
+      setError("Access denied: Only nxtiveclothing@gmail.com is authorized to access the admin operations console.");
       return;
     }
 
@@ -122,7 +122,7 @@ export default function AdminLoginPage() {
             }}
           >
             <ShieldCheck size={14} />
-            <span>Strict Access: venkateshchop14@gmail.com</span>
+            <span>Strict Access: nxtiveclothing@gmail.com</span>
           </div>
         </div>
 
@@ -256,8 +256,11 @@ export default function AdminLoginPage() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="venkateshchop14@gmail.com"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  placeholder="nxtiveclothing@gmail.com"
                   required
                   style={{
                     width: "100%",
@@ -304,7 +307,10 @@ export default function AdminLoginPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError(null);
+                  }}
                   placeholder="Enter your password"
                   required
                   style={{

@@ -36,7 +36,7 @@ interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
-export const AUTHORIZED_ADMIN_EMAIL = "venkateshchop14@gmail.com";
+export const AUTHORIZED_ADMIN_EMAIL = "nxtiveclothing@gmail.com";
 
 interface FirebaseUserLike {
   uid: string;
@@ -193,8 +193,8 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: profile.uid,
-            name: profile.displayName || "Venkatesh (Admin)",
-            displayName: profile.displayName || "Venkatesh (Admin)",
+            name: profile.displayName || "NXTIVE Admin",
+            displayName: profile.displayName || "NXTIVE Admin",
             email: AUTHORIZED_ADMIN_EMAIL,
             role: profile.role || "super_admin",
             accountStatus: "active",
@@ -229,10 +229,17 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       try {
         result = await signInWithPopup(auth, provider);
       } catch (popupErr: any) {
-        if (popupErr?.code === "auth/popup-blocked" || popupErr?.code === "auth/cancelled-popup-request") {
+        if (popupErr?.code === "auth/popup-blocked") {
           console.warn("Popup blocked, falling back to redirect...");
           await signInWithRedirect(auth, provider);
           return;
+        }
+        if (popupErr?.code === "auth/popup-closed-by-user" || popupErr?.code === "auth/cancelled-popup-request") {
+          throw new Error("Google sign-in was cancelled.");
+        }
+        if (popupErr?.code === "auth/unauthorized-domain") {
+          const host = typeof window !== "undefined" ? window.location.hostname : "this domain";
+          throw new Error(`Google Sign-In is not yet authorized for ${host}. Please log in with email and password, or add "${host}" under Firebase Console > Authentication > Settings > Authorized domains.`);
         }
         throw popupErr;
       }
@@ -252,8 +259,8 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: profile.uid,
-            name: profile.displayName || "Venkatesh (Admin)",
-            displayName: profile.displayName || "Venkatesh (Admin)",
+            name: profile.displayName || "NXTIVE Admin",
+            displayName: profile.displayName || "NXTIVE Admin",
             email: AUTHORIZED_ADMIN_EMAIL,
             role: "super_admin",
             accountStatus: "active",

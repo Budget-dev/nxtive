@@ -23,8 +23,8 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
   const currentFirebaseEmail = auth.currentUser?.email?.toLowerCase();
   const adminEmail = adminUser?.email?.toLowerCase();
   const isAuthorized =
-    currentFirebaseEmail === "venkateshchop14@gmail.com" ||
-    adminEmail === "venkateshchop14@gmail.com";
+    currentFirebaseEmail === "nxtiveclothing@gmail.com" ||
+    adminEmail === "nxtiveclothing@gmail.com";
 
   useEffect(() => {
     if (!loading) {
@@ -74,7 +74,7 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
   }
 
   // If signed in with an unauthorized account, show Access Denied
-  if (auth.currentUser && currentFirebaseEmail !== "venkateshchop14@gmail.com") {
+  if (auth.currentUser && currentFirebaseEmail !== "nxtiveclothing@gmail.com") {
     return (
       <div
         style={{
@@ -93,7 +93,7 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
           Access Denied
         </h2>
         <p style={{ color: "#736C65", maxWidth: "440px", marginBottom: "20px", fontSize: "14px" }}>
-          Only <strong>venkateshchop14@gmail.com</strong> is authorized to access the admin operations console. Your current account ({auth.currentUser.email}) does not have admin permissions.
+          Only <strong>nxtiveclothing@gmail.com</strong> is authorized to access the admin operations console. Your current account ({auth.currentUser.email}) does not have admin permissions.
         </p>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
           <button

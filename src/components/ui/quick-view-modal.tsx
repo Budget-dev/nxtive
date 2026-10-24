@@ -189,8 +189,7 @@ export function QuickViewModal() {
                 marginBottom: "24px",
               }}
             >
-              {quickViewProduct.description ||
-                "Engineered from organic heavyweight combed cotton. Cut for an effortless oversized drape with reinforced collar ribbing and drop-shoulder tailoring."}
+              {quickViewProduct.description || ""}
             </p>
 
             {/* Size Picker */}

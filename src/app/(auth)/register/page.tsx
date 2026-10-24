@@ -31,7 +31,7 @@ export default function RegisterPage() {
 
   React.useEffect(() => {
     if (user) {
-      router.push("/account");
+      router.push("/");
     }
   }, [user, router]);
 
@@ -63,7 +63,7 @@ export default function RegisterPage() {
 
     try {
       await signupWithEmail(email, password, name);
-      router.push("/account");
+      router.push("/");
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to create account. Please try again.");
     } finally {
@@ -77,7 +77,7 @@ export default function RegisterPage() {
     try {
       const res = await loginWithGoogle();
       if (res && res.user) {
-        router.push("/account");
+        router.push("/");
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Google sign-up was cancelled or failed.");
@@ -281,7 +281,10 @@ export default function RegisterPage() {
               type="text"
               autoComplete="name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               placeholder="e.g. Aryan Sharma"
               style={{
                 width: "100%",
@@ -320,7 +323,10 @@ export default function RegisterPage() {
               required
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               placeholder="you@example.com"
               style={{
                 width: "100%",
@@ -360,7 +366,10 @@ export default function RegisterPage() {
                 required
                 autoComplete="new-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="••••••••"
                 style={{
                   width: "100%",
@@ -418,7 +427,10 @@ export default function RegisterPage() {
               required
               autoComplete="new-password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                if (errorMessage) setErrorMessage(null);
+              }}
               placeholder="••••••••"
               style={{
                 width: "100%",

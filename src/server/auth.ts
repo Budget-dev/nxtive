@@ -31,8 +31,27 @@ export class AuthError extends Error {
 
 export function assertSameOrigin(request: Request): void {
   const origin = request.headers.get("origin");
-  const fetchSite = request.headers.get("sec-fetch-site");
-  if (origin !== new URL(request.url).origin || (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none")) {
+  if (!origin) return;
+
+  const rawForwarded = request.headers.get("x-forwarded-host");
+  const forwardedHost = rawForwarded ? rawForwarded.split(",")[0].trim() : null;
+  const host = forwardedHost || request.headers.get("host") || new URL(request.url).host;
+
+  let originHost = "";
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    throw new AuthError("Invalid request origin", 403);
+  }
+
+  const cleanHost = host.split(":")[0].toLowerCase().trim();
+  const cleanOriginHost = originHost.split(":")[0].toLowerCase().trim();
+
+  const isMatch = cleanHost === cleanOriginHost;
+  const isLocal = (cleanHost === "localhost" || cleanHost === "127.0.0.1") &&
+                  (cleanOriginHost === "localhost" || cleanOriginHost === "127.0.0.1");
+
+  if (!isMatch && !isLocal) {
     throw new AuthError("Invalid request origin", 403);
   }
 }
@@ -71,22 +90,22 @@ const ALL_ADMIN_PERMISSIONS: AdminPermission[] = [
   "settings.manage",
 ];
 
-export const PRIMARY_ADMIN_EMAIL = "venkateshchop14@gmail.com";
+export const PRIMARY_ADMIN_EMAIL = "nxtiveclothing@gmail.com";
 
 const DEV_ADMIN_IDENTITY: AdminIdentity = {
-  uid: "admin-venkatesh",
+  uid: "admin-nxtive",
   email: PRIMARY_ADMIN_EMAIL,
   email_verified: true,
   auth_time: Math.floor(Date.now() / 1000),
   role: "super_admin",
   permissions: ALL_ADMIN_PERMISSIONS,
-  displayName: "Venkatesh (Super Admin)",
+  displayName: "NXTIVE Admin",
   isActive: true,
   aud: "nxtive-80349",
   exp: Math.floor(Date.now() / 1000) + 3600 * 24,
   iat: Math.floor(Date.now() / 1000),
   iss: "https://securetoken.google.com/nxtive-80349",
-  sub: "admin-venkatesh",
+  sub: "admin-nxtive",
   firebase: {
     identities: { email: [PRIMARY_ADMIN_EMAIL] },
     sign_in_provider: "password",
@@ -121,19 +140,19 @@ export async function requireUser(request?: Request): Promise<AuthenticatedUser 
           if (payload && payload.email) {
             const isSuper = payload.email.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase();
             return {
-              uid: payload.user_id || payload.sub || "admin-venkatesh",
+              uid: payload.user_id || payload.sub || "admin-nxtive",
               email: payload.email,
               email_verified: Boolean(payload.email_verified),
               auth_time: payload.auth_time || Math.floor(Date.now() / 1000),
               role: isSuper ? "super_admin" : "customer",
               permissions: isSuper ? ALL_ADMIN_PERMISSIONS : [],
-              displayName: payload.name || "Venkatesh (Super Admin)",
+              displayName: payload.name || "NXTIVE Admin",
               isActive: true,
               aud: payload.aud || "nxtive-80349",
               exp: payload.exp || Math.floor(Date.now() / 1000) + 3600,
               iat: payload.iat || Math.floor(Date.now() / 1000),
               iss: payload.iss || "https://securetoken.google.com/nxtive-80349",
-              sub: payload.sub || payload.user_id || "admin-venkatesh",
+              sub: payload.sub || payload.user_id || "admin-nxtive",
               firebase: payload.firebase || { identities: { email: [payload.email] }, sign_in_provider: "google.com" },
             } as any;
           }
@@ -165,7 +184,7 @@ export async function requireUser(request?: Request): Promise<AuthenticatedUser 
   }
 }
 
-/** Only venkateshchop14@gmail.com is authorized as administrator. */
+/** Only nxtiveclothing@gmail.com is authorized as administrator. */
 export async function requireAdmin(
   permission?: AdminPermission,
   request?: Request
@@ -175,7 +194,7 @@ export async function requireAdmin(
     throw new AuthError("Unauthorized", 401);
   }
 
-  // Strict enforcement: Only venkateshchop14@gmail.com is authorized
+  // Strict enforcement: Only nxtiveclothing@gmail.com is authorized
   if (user.email?.toLowerCase() !== PRIMARY_ADMIN_EMAIL.toLowerCase()) {
     throw new AuthError(`Access Denied: Only ${PRIMARY_ADMIN_EMAIL} is authorized to access the admin operations console.`, 403);
   }
@@ -213,7 +232,7 @@ export async function requireAdmin(
     throw new AuthError("Admin access required", 403);
   }
 
-  // Auto-provision admin document in Firestore for venkateshchop14@gmail.com if missing
+  // Auto-provision admin document in Firestore for nxtiveclothing@gmail.com if missing
   if (isSuperAdmin && (!data || data.role !== "super_admin")) {
     try {
       await adminDb.collection("admin_users").doc(user.uid).set(
@@ -224,7 +243,7 @@ export async function requireAdmin(
           role: "super_admin",
           isActive: true,
           permissions: ALL_ADMIN_PERMISSIONS,
-          displayName: user.name || "Venkatesh (Super Admin)",
+          displayName: user.name || "NXTIVE Admin",
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -238,7 +257,7 @@ export async function requireAdmin(
     ...user,
     role,
     permissions,
-    displayName: typeof data?.displayName === "string" ? data.displayName : user.name || "Venkatesh (Admin)",
+    displayName: typeof data?.displayName === "string" ? data.displayName : user.name || "NXTIVE Admin",
     ...(typeof data?.avatarUrl === "string" ? { avatarUrl: data.avatarUrl } : {}),
     isActive: true,
   };
