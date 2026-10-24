@@ -1,27 +1,26 @@
 // Razorpay webhook receiver — verifies signature server-side, never exposed to client bundle.
-// Handles payment.captured, payment.failed, refund.created events.
+// Handles payment.authorized, payment.captured, payment.failed, order.paid, refund.created events.
+// Final source of truth for payment status.
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, hasAdminCredentials } from "@/lib/firebase/admin";
 import { getRazorpayAdapter } from "@/server/payments";
+import { storeReadCollection, storeUpdateDocument } from "@/lib/firebase/firestore-store";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    if (!hasAdminCredentials) {
-      return NextResponse.json({ success: false, error: "Webhook service unavailable" }, { status: 503 });
-    }
-
     const rawBody = await req.text();
     const signature = req.headers.get("x-razorpay-signature");
 
     if (!signature) {
+      console.error("[razorpay-webhook] Missing signature header");
       return new Response("Missing signature", { status: 400 });
     }
 
-    // -- Verify webhook signature --
+    // 1. Verify webhook signature using RAZORPAY_WEBHOOK_SECRET
     const adapter = getRazorpayAdapter();
     const isValid = adapter.validateWebhookSignature(rawBody, signature);
 
@@ -36,10 +35,67 @@ export async function POST(req: NextRequest) {
     } catch {
       return new Response("Invalid payload", { status: 400 });
     }
+
     const eventType: string = typeof event.event === "string" ? event.event : "";
     const payload = event.payload && typeof event.payload === "object" ? event.payload : {};
+    const eventId =
+      req.headers.get("x-razorpay-event-id") ||
+      event.event_id ||
+      `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    console.info(`[razorpay-webhook] Received event: ${eventType} (ID: ${eventId})`);
+
+    // 2. Idempotency Check
+    if (hasAdminCredentials) {
+      const eventRef = adminDb.collection("webhook_events").doc(eventId);
+      const eventDoc = await eventRef.get();
+      if (eventDoc.exists && eventDoc.data()?.status === "processed") {
+        console.info(`[razorpay-webhook] Event ${eventId} was already processed. Returning 200 OK.`);
+        return NextResponse.json({ success: true, message: "Already processed" });
+      }
+
+      await eventRef.set(
+        {
+          eventId,
+          eventType,
+          receivedAt: new Date().toISOString(),
+          status: "processing",
+        },
+        { merge: true }
+      );
+    }
 
     const now = new Date().toISOString();
+
+    // Helper to find order
+    const findOrder = async (razorpayOrderId?: string, directOrderId?: string): Promise<any | null> => {
+      if (hasAdminCredentials) {
+        if (directOrderId) {
+          const snap = await adminDb.collection("orders").doc(directOrderId).get();
+          if (snap.exists) return { id: snap.id, ref: snap.ref, data: snap.data()! };
+        }
+        if (razorpayOrderId) {
+          const snap = await adminDb
+            .collection("orders")
+            .where("razorpayOrderId", "==", razorpayOrderId)
+            .limit(1)
+            .get();
+          if (!snap.empty) {
+            const doc = snap.docs[0];
+            return { id: doc.id, ref: doc.ref, data: doc.data() };
+          }
+        }
+      }
+
+      // Fallback via store layer
+      const allOrders = await storeReadCollection<any>("orders");
+      const matched = allOrders.find(
+        (o) =>
+          (directOrderId && (o.id === directOrderId || o.orderNumber === directOrderId)) ||
+          (razorpayOrderId && o.razorpayOrderId === razorpayOrderId)
+      );
+      return matched ? { id: matched.id, data: matched } : null;
+    };
 
     switch (eventType) {
       case "payment.captured": {
@@ -47,48 +103,67 @@ export async function POST(req: NextRequest) {
         if (!payment) break;
 
         const razorpayOrderId = payment.order_id;
-        if (typeof razorpayOrderId !== "string" || typeof payment.id !== "string") break;
+        const paymentId = payment.id;
+        const paymentMethod = payment.method || "online";
 
-        // Update payment record
-        const paymentSnap = await adminDb
-          .collection("payments")
-          .where("razorpayOrderId", "==", razorpayOrderId)
-          .limit(1)
-          .get();
+        const orderResult = await findOrder(razorpayOrderId, payment.notes?.orderId);
+        if (!orderResult) {
+          console.warn(`[razorpay-webhook] No order found for Razorpay order ID ${razorpayOrderId}`);
+          break;
+        }
 
-        if (!paymentSnap.empty) {
-          const paymentDoc = paymentSnap.docs[0];
-          await paymentDoc.ref.update({
-            status: "captured",
-            razorpayPaymentId: payment.id,
-            method: payment.method || null,
-            webhookVerified: true,
-            updatedAt: now,
-          });
+        const order = orderResult.data;
 
-          // If order exists, confirm payment status
-          const orderData = paymentDoc.data();
-          if (orderData.orderId) {
-            const orderRef = adminDb.collection("orders").doc(orderData.orderId);
-            const orderSnap = await orderRef.get();
-            if (orderSnap.exists) {
-              const order = orderSnap.data()!;
-               if (order.paymentStatus !== "paid" && order.paymentStatus !== "refunded" && order.paymentStatus !== "refund_initiated") {
-                await orderRef.update({
-                  paymentStatus: "paid",
-                  status: "payment_confirmed",
-                  updatedAt: now,
-                  statusHistory: [
-                    ...(order.statusHistory || []),
-                    {
-                      status: "payment_confirmed",
-                      timestamp: now,
-                      note: "Payment confirmed via Razorpay webhook",
-                    },
-                  ],
-                });
-              }
+        // State guard: if already marked success or refunded, do not overwrite
+        if (order.status === "success") {
+          console.info(`[razorpay-webhook] Order ${orderResult.id} already marked success. Idempotent skip.`);
+          break;
+        }
+        if (order.status === "refunded") {
+          console.warn(`[razorpay-webhook] Order ${orderResult.id} already refunded. Ignoring late capture.`);
+          break;
+        }
+
+        const updatedOrder = {
+          status: "success",
+          paymentStatus: "paid",
+          razorpayPaymentId: paymentId,
+          paymentMethod,
+          errorCode: null,
+          errorDescription: null,
+          updatedAt: now,
+          statusHistory: [
+            ...(order.statusHistory || []),
+            {
+              status: "success",
+              timestamp: now,
+              note: `Payment confirmed via Razorpay webhook (${paymentId})`,
+            },
+          ],
+        };
+
+        if (orderResult.ref) {
+          await orderResult.ref.update(updatedOrder);
+        } else {
+          await storeUpdateDocument("orders", orderResult.id, updatedOrder);
+        }
+
+        // Sync user profile
+        if (order.userId && order.userId !== "guest" && hasAdminCredentials) {
+          try {
+            const userRef = adminDb.collection("users").doc(order.userId);
+            const userDoc = await userRef.get();
+            if (userDoc.exists) {
+              const uData = userDoc.data()!;
+              await userRef.update({
+                ordersCount: (uData.ordersCount || 0) + 1,
+                totalSpent: (uData.totalSpent || 0) + (order.total || 0),
+                lastActivity: now,
+                updatedAt: now,
+              });
             }
+          } catch (uErr) {
+            console.warn("[razorpay-webhook] User profile sync warning:", uErr);
           }
         }
         break;
@@ -99,95 +174,141 @@ export async function POST(req: NextRequest) {
         if (!payment) break;
 
         const razorpayOrderId = payment.order_id;
-        if (typeof razorpayOrderId !== "string") break;
+        const errorCode = payment.error_code || "PAYMENT_FAILED";
+        const errorDescription = payment.error_description || "Payment failed at bank/gateway";
+        const errorReason = payment.error_reason || "unknown";
 
-        const paymentSnap = await adminDb
-          .collection("payments")
-          .where("razorpayOrderId", "==", razorpayOrderId)
-          .limit(1)
-          .get();
+        const orderResult = await findOrder(razorpayOrderId, payment.notes?.orderId);
+        if (!orderResult) break;
 
-        if (!paymentSnap.empty) {
-          await paymentSnap.docs[0].ref.update({
-            status: "failed",
-            failureReason: payment.error_description || "Payment failed",
-            webhookVerified: true,
-            updatedAt: now,
-          });
+        const order = orderResult.data;
+
+        // CRITICAL: A late "failed" webhook can't overwrite an already-verified "success"
+        if (order.status === "success") {
+          console.warn(
+            `[razorpay-webhook CONFLICT] Late payment.failed received for order ${orderResult.id} which is already in 'success' state. Ignoring failure.`
+          );
+          break;
+        }
+
+        if (order.status === "refunded") break;
+
+        const updatedOrder = {
+          status: "failed",
+          paymentStatus: "failed",
+          errorCode,
+          errorDescription,
+          errorReason,
+          updatedAt: now,
+          statusHistory: [
+            ...(order.statusHistory || []),
+            {
+              status: "failed",
+              timestamp: now,
+              note: `Payment failed (${errorCode}: ${errorDescription})`,
+            },
+          ],
+        };
+
+        if (orderResult.ref) {
+          await orderResult.ref.update(updatedOrder);
+        } else {
+          await storeUpdateDocument("orders", orderResult.id, updatedOrder);
         }
         break;
       }
 
-      case "refund.created": {
-        const refund = payload.refund?.entity;
-        if (!refund) break;
+      case "order.paid": {
+        const orderEntity = payload.order?.entity;
+        if (!orderEntity) break;
 
-        const paymentId = refund.payment_id;
-        const refundPaise = Number(refund.amount);
-        if (typeof paymentId !== "string" || typeof refund.id !== "string" || !Number.isInteger(refundPaise) || refundPaise <= 0) break;
+        const razorpayOrderId = orderEntity.id;
+        const orderResult = await findOrder(razorpayOrderId, orderEntity.notes?.orderId);
+        if (!orderResult) break;
 
-        const paymentSnap = await adminDb
-          .collection("payments")
-          .where("razorpayPaymentId", "==", paymentId)
-          .limit(1)
-          .get();
-
-        if (!paymentSnap.empty) {
-          const paymentDoc = paymentSnap.docs[0];
-           await paymentDoc.ref.update({
-             status: "refunded",
-             refundId: refund.id,
-             refundAmount: refundPaise,
-             updatedAt: now,
-           });
-
-          const paymentData = paymentDoc.data();
-          if (paymentData.orderId) {
-            const orderRef = adminDb.collection("orders").doc(paymentData.orderId);
-            const orderSnap = await orderRef.get();
-             if (orderSnap.exists) {
-               const order = orderSnap.data()!;
-               const orderTotal = Number(order.total);
-               const previousRefund = Number(order.refundAmount || 0);
-               const refundInr = refundPaise / 100;
-               const totalRefunded = Math.round((previousRefund + refundInr) * 100) / 100;
-               if (!Number.isFinite(orderTotal) || orderTotal <= 0 || !Number.isFinite(previousRefund) || previousRefund < 0 || totalRefunded > orderTotal) {
-                 console.error("[razorpay-webhook] Ignoring refund greater than order total", refund.id);
-                 break;
-               }
-               if (order.refundId === refund.id && order.paymentStatus === "refunded") break;
-               const fullyRefunded = totalRefunded >= orderTotal;
-               const refundStatus = fullyRefunded ? "refunded" : "refund_initiated";
-               await orderRef.update({
-                 paymentStatus: refundStatus,
-                 status: refundStatus,
-                 refundId: refund.id,
-                 refundAmount: totalRefunded,
-                 updatedAt: now,
-                 statusHistory: [
-                   ...(Array.isArray(order.statusHistory) ? order.statusHistory : []),
-                   {
-                     status: refundStatus,
-                     timestamp: now,
-                     note: fullyRefunded ? `Refund processed: ${refund.id}` : `Partial refund processed: ${refund.id}`,
-                   },
-                 ],
-               });
-             }
+        const order = orderResult.data;
+        if (order.status !== "success" && order.status !== "refunded") {
+          const updatedOrder = {
+            status: "success",
+            paymentStatus: "paid",
+            updatedAt: now,
+            statusHistory: [
+              ...(order.statusHistory || []),
+              {
+                status: "success",
+                timestamp: now,
+                note: "Order confirmed via order.paid webhook",
+              },
+            ],
+          };
+          if (orderResult.ref) {
+            await orderResult.ref.update(updatedOrder);
+          } else {
+            await storeUpdateDocument("orders", orderResult.id, updatedOrder);
           }
         }
         break;
       }
 
+      case "refund.created":
+      case "refund.processed": {
+        const refund = payload.refund?.entity;
+        if (!refund) break;
+
+        const paymentId = refund.payment_id;
+        const refundPaise = Number(refund.amount || 0);
+
+        if (hasAdminCredentials) {
+          const snap = await adminDb
+            .collection("orders")
+            .where("razorpayPaymentId", "==", paymentId)
+            .limit(1)
+            .get();
+
+          if (!snap.empty) {
+            const orderDoc = snap.docs[0];
+            await orderDoc.ref.update({
+              status: "refunded",
+              paymentStatus: "refunded",
+              refundId: refund.id,
+              refundAmount: refundPaise / 100,
+              updatedAt: now,
+              statusHistory: [
+                ...(orderDoc.data().statusHistory || []),
+                {
+                  status: "refunded",
+                  timestamp: now,
+                  note: `Refund processed: ${refund.id} (INR ${refundPaise / 100})`,
+                },
+              ],
+            });
+          }
+        }
+        break;
+      }
+
+      case "payment.authorized": {
+        console.info(`[razorpay-webhook] Payment authorized: ${payload.payment?.entity?.id}`);
+        break;
+      }
+
       default:
-        // Acknowledge unhandled events
-        console.log(`[razorpay-webhook] Unhandled event: ${eventType}`);
+        console.info(`[razorpay-webhook] Unhandled event acknowledged: ${eventType}`);
+    }
+
+    if (hasAdminCredentials) {
+      await adminDb.collection("webhook_events").doc(eventId).set(
+        {
+          status: "processed",
+          processedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("[razorpay-webhook] Error:", error);
-    // Return a generic retryable response without exposing exception text.
     return NextResponse.json({ success: false, error: "Webhook processing failed" }, { status: 500 });
   }
 }

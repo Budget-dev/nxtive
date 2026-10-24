@@ -1,8 +1,8 @@
-// POST /api/payments/create-order — Creates Razorpay order with resilient fallback
+// POST /api/payments/create-order — Server-side Razorpay order creation
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
-import { storeReadCollection, storeSetDocument } from "@/lib/firebase/firestore-store";
+import { storeReadCollection, storeSetDocument, storeUpdateDocument } from "@/lib/firebase/firestore-store";
 import { generateOrderNumber } from "@/utils/slugify";
 import { getRazorpayInstance } from "@/server/payments/razorpay/client";
 import type { Product } from "@/types/product";
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest | Request) {
       return NextResponse.json({ success: false, error: "Shipping address is required" }, { status: 400 });
     }
 
-    // Resolve products against store
+    // 1. Resolve products against Firestore store (Server-side amount calculation - NEVER trust client amounts)
     const products = await storeReadCollection<Product>("products");
     const productsMap = new Map<string, Product>();
     products.forEach((p) => productsMap.set(p.id, p));
@@ -31,10 +31,10 @@ export async function POST(req: NextRequest | Request) {
       return {
         productId: item.productId || item.id,
         title: String(prod?.title || item.title || "Apparel Item"),
-        price: Number(prod?.price || item.price || 1299),
-        quantity: Number(item.quantity || 1),
+        price: Number(prod?.price !== undefined ? prod.price : item.price || 1299),
+        quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
         selectedSize: String(item.selectedSize || "M"),
-        selectedColor: item.selectedColor,
+        selectedColor: item.selectedColor || null,
         image: String(prod?.image || item.image || "/images/nxtvie/product-oversized-tee-hd.jpg"),
         slug: prod?.slug,
         sku: prod?.sku,
@@ -44,18 +44,66 @@ export async function POST(req: NextRequest | Request) {
     const subtotal = Math.round(
       resolvedItems.reduce((acc, i) => acc + i.price * i.quantity, 0) * 100
     ) / 100;
+
+    let discount = 0;
+    if (couponCode) {
+      const clean = String(couponCode).trim().toUpperCase();
+      if (clean === "NEXT10") discount = Math.round(subtotal * 0.1);
+      else if (clean === "NXTIVE20") discount = Math.round(subtotal * 0.2);
+    }
+
     const isPriority = String(deliveryMethod || "").toLowerCase().includes("priority");
     const shipping = isPriority ? 150 : subtotal >= 999 ? 0 : 99;
-    const total = Math.max(0, Math.round((subtotal + shipping) * 100) / 100);
+    const total = Math.max(0, Math.round((subtotal - discount + shipping) * 100) / 100);
     const amountInPaise = Math.round(total * 100);
 
     const orderNumber = generateOrderNumber();
-    const orderId = "ord-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+    const orderId = `ord-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const now = new Date().toISOString();
 
     const key_id = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
     const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
+    // 2. Write Firestore document with status: "created" BEFORE calling Razorpay Orders API
+    const initialOrderData = {
+      id: orderId,
+      orderNumber,
+      userId: userId || "guest",
+      amount: total,
+      amountPaise: amountInPaise,
+      currency: "INR",
+      status: "created" as const,
+      paymentStatus: "created",
+      razorpayOrderId: null as string | null,
+      razorpayPaymentId: null as string | null,
+      errorCode: null as string | null,
+      errorDescription: null as string | null,
+      items: resolvedItems,
+      subtotal,
+      discount,
+      couponCode: couponCode || null,
+      shipping,
+      total,
+      shippingAddress: {
+        ...shippingAddress,
+      },
+      deliveryMethod: deliveryMethod || "Standard Domestic",
+      deliveryDateEstimate: isPriority ? "1-2 Business Days" : "4-5 Business Days",
+      idempotencyKey: idempotencyKey || `${Date.now()}-${orderId}`,
+      createdAt: now,
+      updatedAt: now,
+      statusHistory: [
+        {
+          status: "created",
+          timestamp: now,
+          note: "Order created in Firestore, awaiting Razorpay order generation",
+        },
+      ],
+    };
+
+    await storeSetDocument("orders", orderId, initialOrderData, false);
+
+    // 3. Call Razorpay Orders API server-side
     let razorpayOrderId = `order_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let isFallback = true;
 
@@ -76,47 +124,46 @@ export async function POST(req: NextRequest | Request) {
           razorpayOrderId = rzpOrder.id;
           isFallback = false;
         }
-      } catch (rzpErr) {
+      } catch (rzpErr: any) {
         console.warn("[Razorpay] Order create fallback activated:", rzpErr);
-        isFallback = true;
+        await storeUpdateDocument("orders", orderId, {
+          status: "failed",
+          errorCode: rzpErr?.code || "RAZORPAY_API_ERROR",
+          errorDescription: rzpErr?.message || "Failed to create order on payment gateway",
+          updatedAt: new Date().toISOString(),
+          statusHistory: [
+            ...initialOrderData.statusHistory,
+            {
+              status: "failed",
+              timestamp: new Date().toISOString(),
+              note: `Failed to create order with Razorpay: ${rzpErr?.message || "Gateway error"}`,
+            },
+          ],
+        });
+        return NextResponse.json(
+          { success: false, error: rzpErr?.message || "Failed to create order with payment gateway" },
+          { status: 500 }
+        );
       }
     }
 
-    const orderData = {
-      id: orderId,
-      orderNumber,
-      userId: userId || "guest",
-      items: resolvedItems,
-      subtotal,
-      discount: 0,
-      couponCode: couponCode || null,
-      shipping,
-      total,
-      totalAmount: total,
+    // 4. Update the Firestore order document with razorpayOrderId
+    await storeUpdateDocument("orders", orderId, {
+      razorpayOrderId,
       status: "pending",
+      paymentStatus: "pending",
+      updatedAt: new Date().toISOString(),
       statusHistory: [
+        ...initialOrderData.statusHistory,
         {
           status: "pending",
-          timestamp: now,
+          timestamp: new Date().toISOString(),
           note: isFallback
             ? "Initiated Online Payment (Gateway Fallback Mode)"
-            : "Initiated Razorpay payment order",
+            : `Linked Razorpay Order ID: ${razorpayOrderId}`,
         },
       ],
-      paymentMethod: "Razorpay (Online)",
-      paymentStatus: "pending",
-      razorpayOrderId,
-      shippingAddress: {
-        ...shippingAddress,
-      },
-      deliveryMethod: deliveryMethod || "Standard Domestic",
-      deliveryDateEstimate: isPriority ? "1-2 Business Days" : "4-5 Business Days",
-      idempotencyKey: idempotencyKey || `${Date.now()}-${orderId}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await storeSetDocument("orders", orderId, orderData, false);
+    });
 
     return NextResponse.json({
       success: true,

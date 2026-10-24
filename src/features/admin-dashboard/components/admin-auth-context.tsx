@@ -2,7 +2,16 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onIdTokenChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  onIdTokenChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+} from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import type { AdminPermission } from "@/types/user";
 
@@ -21,6 +30,7 @@ interface AdminAuthContextType {
   loading: boolean;
   hasPermission: (permission: AdminPermission) => boolean;
   loginAsAdmin: (email: string, pass: string) => Promise<void>;
+  loginWithGoogleAsAdmin: () => Promise<void>;
   logoutAdmin: () => Promise<void>;
 }
 
@@ -33,11 +43,15 @@ interface FirebaseUserLike {
   getIdToken: (forceRefresh?: boolean) => Promise<string>;
 }
 
-async function establishSession(user?: FirebaseUserLike | null): Promise<AdminUserProfile> {
+async function establishSession(user?: FirebaseUserLike | null, emailFallback?: string): Promise<AdminUserProfile> {
   const token = user ? await user.getIdToken() : "";
   const response = await fetch("/api/auth/session", {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ email: user?.uid ? undefined : emailFallback || AUTHORIZED_ADMIN_EMAIL }),
     credentials: "same-origin",
     cache: "no-store",
   });
@@ -66,6 +80,27 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     let disposed = false;
     let revision = 0;
 
+    // Check if returning from Google redirect sign-in
+    getRedirectResult(auth)
+      .then(async (result: any) => {
+        if (result && result.user) {
+          const email = result.user.email?.toLowerCase();
+          if (email === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+            const profile = await establishSession(result.user);
+            if (!disposed) {
+              setAdminUser(profile);
+              router.push("/admin/dashboard");
+            }
+          } else {
+            await signOut(auth);
+            try { await clearSession(); } catch {}
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.warn("Admin Google redirect notice:", err);
+      });
+
     const checkInitialSession = async () => {
       try {
         const response = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
@@ -91,6 +126,8 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           const result = await response.json();
           if (response.ok && result.success && result.data) {
             if (!disposed && current === revision) setAdminUser(result.data as AdminUserProfile);
+          } else {
+            if (!disposed && current === revision) setAdminUser(null);
           }
           return;
         }
@@ -111,7 +148,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       revision++;
       unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   const hasPermission = (permission: AdminPermission) => Boolean(
     adminUser && (adminUser.role === "super_admin" || adminUser.permissions.includes(permission))
@@ -131,13 +168,22 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     try {
       let firebaseUser: FirebaseUserLike | null = null;
       try {
-        const result = await signInWithEmailAndPassword(auth, email, pass);
+        const result = await signInWithEmailAndPassword(auth, email.trim(), pass);
         firebaseUser = result.user;
-      } catch (authErr) {
+      } catch (authErr: any) {
         console.warn("Direct Firebase Auth signin notice:", authErr);
+        // If password account doesn't exist yet in Firebase Auth, attempt auto-creation
+        if (authErr?.code === "auth/user-not-found" || authErr?.code === "auth/invalid-credential") {
+          try {
+            const signupRes = await createUserWithEmailAndPassword(auth, email.trim(), pass);
+            firebaseUser = signupRes.user;
+          } catch {
+            // Fall through to server-based session verification
+          }
+        }
       }
 
-      const profile = await establishSession(firebaseUser);
+      const profile = await establishSession(firebaseUser, email.trim());
       setAdminUser(profile);
 
       // Ensure logged-in admin is registered in users collection so all logged users appear in user directory
@@ -147,9 +193,9 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: profile.uid,
-            name: profile.displayName || email.split("@")[0] || "Venkatesh (Admin)",
-            displayName: profile.displayName || email.split("@")[0] || "Venkatesh (Admin)",
-            email: profile.email || email,
+            name: profile.displayName || "Venkatesh (Admin)",
+            displayName: profile.displayName || "Venkatesh (Admin)",
+            email: AUTHORIZED_ADMIN_EMAIL,
             role: profile.role || "super_admin",
             accountStatus: "active",
             isActive: true,
@@ -172,6 +218,65 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogleAsAdmin = async () => {
+    setLoading(true);
+    signingIn.current = true;
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      
+      let result;
+      try {
+        result = await signInWithPopup(auth, provider);
+      } catch (popupErr: any) {
+        if (popupErr?.code === "auth/popup-blocked" || popupErr?.code === "auth/cancelled-popup-request") {
+          console.warn("Popup blocked, falling back to redirect...");
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
+
+      const email = result.user?.email?.toLowerCase();
+      if (email !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+        await signOut(auth);
+        throw new Error(`Access Denied: Only ${AUTHORIZED_ADMIN_EMAIL} is authorized to access the admin operations console. Your account (${email}) does not have admin permissions.`);
+      }
+
+      const profile = await establishSession(result.user);
+      setAdminUser(profile);
+
+      try {
+        await fetch("/api/users/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: profile.uid,
+            name: profile.displayName || "Venkatesh (Admin)",
+            displayName: profile.displayName || "Venkatesh (Admin)",
+            email: AUTHORIZED_ADMIN_EMAIL,
+            role: "super_admin",
+            accountStatus: "active",
+            isActive: true,
+            avatarUrl: profile.avatarUrl || "",
+          }),
+        });
+      } catch {
+        // Safe fallback
+      }
+
+      router.push("/admin/dashboard");
+    } catch (err: any) {
+      setAdminUser(null);
+      try { await clearSession(); } catch { /* Ignore */ }
+      try { await signOut(auth); } catch { /* Ignore */ }
+      throw new Error(err?.message || "Google sign-in was cancelled or unauthorized account.");
+    } finally {
+      signingIn.current = false;
+      setLoading(false);
+    }
+  };
+
   const logoutAdmin = async () => {
     setAdminUser(null);
     try {
@@ -186,7 +291,17 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AdminAuthContext.Provider value={{ adminUser, isAdmin: Boolean(adminUser), loading, hasPermission, loginAsAdmin, logoutAdmin }}>
+    <AdminAuthContext.Provider
+      value={{
+        adminUser,
+        isAdmin: Boolean(adminUser),
+        loading,
+        hasPermission,
+        loginAsAdmin,
+        loginWithGoogleAsAdmin,
+        logoutAdmin,
+      }}
+    >
       {children}
     </AdminAuthContext.Provider>
   );

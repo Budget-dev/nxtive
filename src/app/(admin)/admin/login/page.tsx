@@ -3,15 +3,24 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useAdminAuth } from "@/features/admin-dashboard/components/admin-auth-context";
-import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 
 export default function AdminLoginPage() {
-  const { loginAsAdmin } = useAdminAuth();
-  const [email, setEmail] = useState("");
+  const { loginAsAdmin, loginWithGoogleAsAdmin } = useAdminAuth();
+  const [email, setEmail] = useState("venkateshchop14@gmail.com");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Auto-switch 127.0.0.1 to localhost to satisfy Google OAuth authorized domains
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
+      const newUrl = window.location.href.replace("127.0.0.1", "localhost");
+      window.location.replace(newUrl);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +45,18 @@ export default function AdminLoginPage() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogleAsAdmin();
+    } catch (err: any) {
+      setError(err?.message || "Google sign-in was cancelled or account is unauthorized.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -51,11 +72,11 @@ export default function AdminLoginPage() {
       <div
         style={{
           width: "100%",
-          maxWidth: "420px",
+          maxWidth: "440px",
         }}
       >
         {/* Brand Header */}
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+        <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <div
             style={{
               width: "48px",
@@ -76,18 +97,33 @@ export default function AdminLoginPage() {
           </div>
           <h1
             style={{
-              fontSize: "1.25rem",
-              fontWeight: 700,
+              fontSize: "1.35rem",
+              fontWeight: 800,
               color: "#FFFFFF",
               letterSpacing: "0.04em",
-              marginBottom: "6px",
+              marginBottom: "8px",
             }}
           >
-            NXTIVE ADMIN
+            NXTIVE ADMIN PORTAL
           </h1>
-          <p style={{ fontSize: "0.82rem", color: "#6B6B6B" }}>
-            Authorized portal strictly for venkateshchop14@gmail.com
-          </p>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 12px",
+              borderRadius: "9999px",
+              backgroundColor: "rgba(209, 155, 104, 0.12)",
+              border: "1px solid rgba(209, 155, 104, 0.25)",
+              color: "#D19B68",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              marginBottom: "4px",
+            }}
+          >
+            <ShieldCheck size={14} />
+            <span>Strict Access: venkateshchop14@gmail.com</span>
+          </div>
         </div>
 
         {/* Login Card */}
@@ -95,29 +131,101 @@ export default function AdminLoginPage() {
           style={{
             backgroundColor: "#141414",
             border: "1px solid #222222",
-            borderRadius: "12px",
-            padding: "28px",
+            borderRadius: "14px",
+            padding: "30px",
+            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.5)",
           }}
         >
           {error && (
             <div
               style={{
-                padding: "10px 12px",
+                padding: "12px 14px",
                 borderRadius: "8px",
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.25)",
+                backgroundColor: "rgba(239, 68, 68, 0.12)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
                 color: "#F87171",
                 fontSize: "0.82rem",
+                lineHeight: "1.45",
                 marginBottom: "20px",
                 display: "flex",
-                alignItems: "center",
-                gap: "8px",
+                alignItems: "flex-start",
+                gap: "10px",
               }}
             >
-              <AlertCircle size={15} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+              <div>{error}</div>
             </div>
           )}
+
+          {/* Direct Google Sign-In Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading || googleLoading}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "10px",
+              backgroundColor: "#FFFFFF",
+              color: "#121110",
+              border: "none",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              fontSize: "0.88rem",
+              fontWeight: 700,
+              cursor: googleLoading ? "not-allowed" : "pointer",
+              transition: "all 0.2s ease",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+              opacity: googleLoading ? 0.7 : 1,
+            }}
+          >
+            {googleLoading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Authenticating with Google...</span>
+              </>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
+              </>
+            )}
+          </button>
+
+          {/* Divider */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              margin: "20px 0",
+            }}
+          >
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#2A2A2A" }} />
+            <span style={{ fontSize: "0.75rem", color: "#666666", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              or enter password
+            </span>
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#2A2A2A" }} />
+          </div>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div>
@@ -132,7 +240,7 @@ export default function AdminLoginPage() {
                   marginBottom: "6px",
                 }}
               >
-                Email
+                Admin Email (Strict)
               </label>
               <div style={{ position: "relative" }}>
                 <Mail
@@ -150,6 +258,7 @@ export default function AdminLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="venkateshchop14@gmail.com"
+                  required
                   style={{
                     width: "100%",
                     backgroundColor: "#0A0A0A",
@@ -161,7 +270,7 @@ export default function AdminLoginPage() {
                     outline: "none",
                     transition: "border-color 0.2s ease",
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#444444")}
+                  onFocus={(e) => (e.target.style.borderColor = "#D19B68")}
                   onBlur={(e) => (e.target.style.borderColor = "#2A2A2A")}
                 />
               </div>
@@ -197,6 +306,7 @@ export default function AdminLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
+                  required
                   style={{
                     width: "100%",
                     backgroundColor: "#0A0A0A",
@@ -208,7 +318,7 @@ export default function AdminLoginPage() {
                     outline: "none",
                     transition: "border-color 0.2s ease",
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#444444")}
+                  onFocus={(e) => (e.target.style.borderColor = "#D19B68")}
                   onBlur={(e) => (e.target.style.borderColor = "#2A2A2A")}
                 />
                 <button
@@ -234,15 +344,15 @@ export default function AdminLoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || googleLoading}
               style={{
                 width: "100%",
                 marginTop: "4px",
-                padding: "11px",
+                padding: "12px",
                 borderRadius: "8px",
-                background: "#FFFFFF",
+                background: "#D19B68",
                 color: "#0A0A0A",
-                fontWeight: 700,
+                fontWeight: 800,
                 fontSize: "0.88rem",
                 border: "none",
                 cursor: loading ? "not-allowed" : "pointer",
@@ -251,11 +361,20 @@ export default function AdminLoginPage() {
                 justifyContent: "center",
                 gap: "8px",
                 opacity: loading ? 0.6 : 1,
-                transition: "opacity 0.2s ease",
+                transition: "all 0.2s ease",
               }}
             >
-              {loading ? "Signing in..." : "Sign In"}
-              {!loading && <ArrowRight size={15} />}
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Verifying credentials...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In as Admin</span>
+                  <ArrowRight size={15} />
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -265,15 +384,25 @@ export default function AdminLoginPage() {
             href="/"
             style={{
               fontSize: "0.8rem",
-              color: "#555555",
+              color: "#777777",
               textDecoration: "none",
               transition: "color 0.2s ease",
             }}
           >
-            ← Back to store
+            ← Return to storefront
           </Link>
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }

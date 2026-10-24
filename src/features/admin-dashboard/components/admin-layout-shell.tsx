@@ -7,6 +7,7 @@ import { AdminSidebar } from "./admin-sidebar";
 import { AdminTopbar } from "./admin-topbar";
 
 import { auth } from "@/lib/firebase/client";
+import { signOut } from "firebase/auth";
 import Link from "next/link";
 
 function AdminContentShell({ children }: { children: React.ReactNode }) {
@@ -94,13 +95,35 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
         <p style={{ color: "#736C65", maxWidth: "440px", marginBottom: "20px", fontSize: "14px" }}>
           Only <strong>venkateshchop14@gmail.com</strong> is authorized to access the admin operations console. Your current account ({auth.currentUser.email}) does not have admin permissions.
         </p>
-        <div style={{ display: "flex", gap: "12px" }}>
-          <Link
-            href="/admin/login"
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await signOut(auth);
+              } catch {}
+              router.push("/admin/login");
+            }}
             style={{
               padding: "10px 22px",
               backgroundColor: "#121110",
               color: "#FFFFFF",
+              borderRadius: "9999px",
+              fontWeight: 700,
+              fontSize: "13px",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Switch to Admin Account
+          </button>
+          <Link
+            href="/admin/login"
+            style={{
+              padding: "10px 22px",
+              backgroundColor: "#FFFFFF",
+              color: "#121110",
+              border: "1px solid rgba(0,0,0,0.15)",
               borderRadius: "9999px",
               fontWeight: 700,
               fontSize: "13px",
@@ -113,13 +136,12 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
             href="/"
             style={{
               padding: "10px 22px",
-              backgroundColor: "#FFFFFF",
-              color: "#121110",
-              border: "1px solid rgba(0,0,0,0.15)",
+              backgroundColor: "transparent",
+              color: "#736C65",
               borderRadius: "9999px",
-              fontWeight: 700,
+              fontWeight: 600,
               fontSize: "13px",
-              textDecoration: "none",
+              textDecoration: "underline",
             }}
           >
             Storefront

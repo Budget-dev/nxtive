@@ -88,7 +88,14 @@ export default function CheckoutPage() {
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
 
-  const { initiatePayment, loading: razorpayLoading } = useRazorpayCheckout();
+  const {
+    initiatePayment,
+    loading: razorpayLoading,
+    status: checkoutStatus,
+    confirmingMessage,
+    mappedError,
+    reset: resetCheckout,
+  } = useRazorpayCheckout();
 
   const deliveryCost = deliveryMethod === "priority" ? 150 : shippingFee;
   const finalTotal = Math.max(0, cartSubtotal - discountAmount + deliveryCost);
@@ -957,18 +964,78 @@ export default function CheckoutPage() {
                   By completing order, you agree to NXTIVE Terms of Service & 7-Day Return Policy.
                 </p>
 
+                {/* Network / Timeout Confirming State */}
+                {confirmingMessage && (
+                  <div
+                    style={{
+                      marginTop: "16px",
+                      padding: "14px 18px",
+                      borderRadius: "10px",
+                      backgroundColor: "#EFF6FF",
+                      border: "1px solid #BFDBFE",
+                      color: "#1E40AF",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <Loader2 size={18} className="animate-spin" color="#2563EB" />
+                    <div>
+                      <div style={{ fontWeight: 700 }}>Confirming transaction</div>
+                      <div style={{ fontSize: "12px", color: "#3B82F6", marginTop: "2px" }}>
+                        {confirmingMessage}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Banner with Retry Action */}
                 {orderError && (
-                  <div style={{
-                    marginTop: "12px",
-                    padding: "12px 16px",
-                    borderRadius: "8px",
-                    backgroundColor: "#FEF2F2",
-                    border: "1px solid #FECACA",
-                    color: "#991B1B",
-                    fontSize: "12.5px",
-                    fontWeight: 600,
-                  }}>
-                    {orderError}
+                  <div
+                    style={{
+                      marginTop: "14px",
+                      padding: "14px 16px",
+                      borderRadius: "10px",
+                      backgroundColor: "#FEF2F2",
+                      border: "1px solid #FECACA",
+                      color: "#991B1B",
+                    }}
+                  >
+                    <div style={{ fontSize: "13px", fontWeight: 700 }}>Payment Unsuccessful</div>
+                    <div style={{ fontSize: "12.5px", marginTop: "4px", lineHeight: 1.4 }}>
+                      {mappedError ? mappedError.userMessage : orderError}
+                    </div>
+                    {mappedError?.actionHint && (
+                      <div style={{ fontSize: "11.5px", color: "#B91C1C", marginTop: "4px" }}>
+                        💡 {mappedError.actionHint}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetCheckout();
+                        setOrderError(null);
+                        setIsSubmitting(false);
+                      }}
+                      style={{
+                        marginTop: "10px",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        backgroundColor: "#991B1B",
+                        color: "#FFFFFF",
+                        border: "none",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <span>Retry Payment (Fresh Order)</span>
+                    </button>
                   </div>
                 )}
               </div>

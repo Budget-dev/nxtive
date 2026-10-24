@@ -2,8 +2,24 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
   "hosting": {
-    "public": ".firebase/nxtive-8fc17/hosting",
+    "public": ".firebase/nxtive-80349/hosting",
     "cleanUrls": true,
     "ignore": [
       "firebase.json",

@@ -8,6 +8,8 @@ import {
   signOut,
   updateProfile,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -22,7 +24,7 @@ interface AuthContextType {
   error: string | null;
   loginWithEmail: (email: string, pass: string) => Promise<UserCredential>;
   signupWithEmail: (email: string, pass: string, name?: string) => Promise<UserCredential>;
-  loginWithGoogle: () => Promise<UserCredential>;
+  loginWithGoogle: () => Promise<UserCredential | null>;
   logout: () => Promise<void>;
   updateUserProfile: (profile: { displayName?: string; photoURL?: string }) => Promise<void>;
   clearError: () => void;
@@ -81,11 +83,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // 1. Handle redirect sign-in result when returning to the site from Google OAuth
+    getRedirectResult(auth)
+      .then(async (result: any) => {
+        if (result && result.user) {
+          setUser(result.user);
+          try {
+            await syncUserToFirestore(result.user);
+          } catch {
+            // Non-blocking
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.warn("Google redirect sign-in notice:", err);
+      });
+
+    // 2. Listen for auth state changes across tabs/sessions
     const unsubscribe = onAuthStateChanged(auth, (currentUser: any) => {
       setUser(currentUser);
       setLoading(false);
       if (currentUser) {
-        syncUserToFirestore(currentUser);
+        syncUserToFirestore(currentUser).catch(() => {});
       }
     });
     return () => unsubscribe();
@@ -97,32 +116,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       case "auth/invalid-email":
         return "Please enter a valid email address.";
       case "auth/user-not-found":
-        return "No account found with this email.";
+        return "No account found with this email. If you're new, please click 'Create an account' below.";
       case "auth/wrong-password":
-        return "Incorrect password. Please try again.";
+        return "Incorrect password. Please verify or use 'Forgot password?'.";
       case "auth/invalid-credential":
-        return "Invalid email or password. Please try again.";
+        return "Invalid email or password. If you haven't created an account yet, please click 'Create an account' below.";
       case "auth/email-already-in-use":
-        return "An account with this email already exists. Try signing in.";
+        return "An account with this email already exists. Try signing in or reset your password.";
       case "auth/weak-password":
-        return "Password must be at least 6 characters.";
+        return "Password must be at least 6 characters long.";
       case "auth/too-many-requests":
-        return "Access temporarily disabled due to too many failed attempts. Try again later.";
+        return "Access temporarily disabled due to too many failed attempts. Please wait a few minutes.";
       case "auth/popup-closed-by-user":
-        return "Google sign-in was cancelled.";
+        return "Google sign-in popup was closed before completing.";
+      case "auth/popup-blocked":
+        return "Sign-in popup was blocked by your browser. Attempting redirect...";
+      case "auth/cancelled-popup-request":
+        return "Sign-in request was cancelled. Please try again.";
+      case "auth/unauthorized-domain":
+        return "This domain is not authorized in Firebase. Please open via http://localhost:3005";
+      case "auth/network-request-failed":
+        return "Network connection issue. Please check your internet connection.";
       case "auth/operation-not-allowed":
-        return "Email/Password sign-in is not enabled in Firebase Console. Please enable it in Authentication > Sign-in method.";
+        return "This sign-in method is not enabled in Firebase Console. Please verify Authentication settings.";
       default:
-        return err?.message || "An authentication error occurred.";
+        return err?.message?.replace(/^Firebase:\s*/i, "") || "An authentication error occurred. Please try again.";
     }
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
     setError(null);
     try {
-      const res = await signInWithEmailAndPassword(auth, email, pass);
+      const res = await signInWithEmailAndPassword(auth, email.trim(), pass);
       if (res.user) {
-        await syncUserToFirestore(res.user);
+        try {
+          await syncUserToFirestore(res.user);
+        } catch {
+          // Never block user on background sync
+        }
       }
       return res;
     } catch (err: any) {
@@ -135,12 +166,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signupWithEmail = async (email: string, pass: string, name?: string) => {
     setError(null);
     try {
-      const res = await createUserWithEmailAndPassword(auth, email, pass);
+      const res = await createUserWithEmailAndPassword(auth, email.trim(), pass);
       if (name && res.user) {
-        await updateProfile(res.user, { displayName: name });
+        try {
+          await updateProfile(res.user, { displayName: name });
+        } catch {
+          // Non-blocking
+        }
       }
       if (res.user) {
-        await syncUserToFirestore(res.user, name);
+        try {
+          await syncUserToFirestore(res.user, name);
+        } catch {
+          // Non-blocking
+        }
       }
       return res;
     } catch (err: any) {
@@ -152,14 +191,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = async () => {
     setError(null);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
     try {
-      const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
       if (res.user) {
-        await syncUserToFirestore(res.user);
+        try {
+          await syncUserToFirestore(res.user);
+        } catch {
+          // Non-blocking
+        }
       }
       return res;
     } catch (err: any) {
+      if (err?.code === "auth/popup-blocked" || err?.code === "auth/cancelled-popup-request") {
+        console.warn("Popup blocked, falling back to signInWithRedirect...");
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
       const msg = formatAuthError(err);
       setError(msg);
       throw new Error(msg);

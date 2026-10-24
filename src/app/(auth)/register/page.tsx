@@ -21,6 +21,14 @@ export default function RegisterPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Auto-switch 127.0.0.1 to localhost to satisfy Google OAuth authorized domains
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
+      const newUrl = window.location.href.replace("127.0.0.1", "localhost");
+      window.location.replace(newUrl);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (user) {
       router.push("/account");
@@ -67,8 +75,10 @@ export default function RegisterPage() {
     setErrorMessage(null);
     setGoogleLoading(true);
     try {
-      await loginWithGoogle();
-      router.push("/account");
+      const res = await loginWithGoogle();
+      if (res && res.user) {
+        router.push("/account");
+      }
     } catch (err: any) {
       setErrorMessage(err.message || "Google sign-up was cancelled or failed.");
     } finally {

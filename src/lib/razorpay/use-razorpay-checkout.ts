@@ -1,11 +1,15 @@
-// Client-side hook for Razorpay Checkout integration with automatic fallback.
-// Manages: create order → open Razorpay modal (or fallback simulation) → verify payment → return result.
+// Production-grade client-side hook for Razorpay Checkout integration.
+// Handles all payment outcomes (success, failure, modal dismissal/cancellation, network drops)
+// and utilizes Firestore realtime listeners / polling as the webhook source of truth.
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import { doc, onSnapshot, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/lib/firebase/client";
+import { getRazorpayUserErrorMessage, type MappedPaymentError } from "./error-map";
 
-// Razorpay Checkout.js global type declaration
 declare global {
   interface Window {
     Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
@@ -48,7 +52,7 @@ interface RazorpayPaymentResponse {
   razorpay_signature: string;
 }
 
-interface CartItem {
+export interface CartItem {
   id: string;
   title: string;
   price: number;
@@ -58,7 +62,7 @@ interface CartItem {
   image: string;
 }
 
-interface ShippingAddress {
+export interface ShippingAddress {
   fullName: string;
   email: string;
   phone: string;
@@ -78,214 +82,421 @@ export interface RazorpayCheckoutInput {
   userId: string;
 }
 
+export type CheckoutStatus =
+  | "idle"
+  | "creating_order"
+  | "awaiting_payment"
+  | "verifying"
+  | "confirming_with_webhook"
+  | "success"
+  | "failed";
+
 export interface RazorpayCheckoutResult {
   success: boolean;
   orderId?: string;
-  orderNumber?: string;
+  razorpayOrderId?: string;
+  paymentId?: string;
   error?: string;
+  mappedError?: MappedPaymentError;
+  status: CheckoutStatus;
+}
+
+// Dynamically injects checkout.js script if not present
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(false);
+      return;
+    }
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 }
 
 export function useRazorpayCheckout() {
+  const [status, setStatus] = useState<CheckoutStatus>("idle");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mappedError, setMappedError] = useState<MappedPaymentError | null>(null);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [confirmingMessage, setConfirmingMessage] = useState<string | null>(null);
 
-  const initiatePayment = useCallback(
-    async (input: RazorpayCheckoutInput): Promise<RazorpayCheckoutResult> => {
-      setLoading(true);
-      setError(null);
+  const activeListenerUnsubRef = useRef<(() => void) | null>(null);
 
-      try {
-        // 1. Generate idempotency key
-        const idempotencyKey = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const cleanupListener = () => {
+    if (activeListenerUnsubRef.current) {
+      activeListenerUnsubRef.current();
+      activeListenerUnsubRef.current = null;
+    }
+  };
 
-        // 2. Create Razorpay order via our API
-        const createRes = await fetch("/api/payments/create-order", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: input.items.map((item) => ({
-              productId: item.id,
-              title: item.title,
-              price: item.price,
-              quantity: item.quantity,
-              selectedSize: item.selectedSize,
-              selectedColor: item.selectedColor,
-              image: item.image,
-            })),
-            shippingAddress: input.shippingAddress,
-            deliveryMethod: input.deliveryMethod,
-            couponCode: input.couponCode,
-            userId: input.userId,
-            idempotencyKey,
-          }),
-        });
+  /**
+   * Listens or polls Firestore `orders/{orderId}` for webhook updates.
+   * Used when verification network request times out or when modal is dismissed.
+   */
+  const waitForWebhookResolution = useCallback(
+    (orderId: string, timeoutMs: number = 15000): Promise<RazorpayCheckoutResult> => {
+      return new Promise((resolve) => {
+        cleanupListener();
+        setStatus("confirming_with_webhook");
+        setConfirmingMessage("We're confirming your payment with your bank. Please wait...");
 
-        const createData = await createRes.json();
+        let resolved = false;
 
-        if (!createData.success) {
-          throw new Error(createData.error || "Failed to create payment order");
-        }
+        const timer = setTimeout(async () => {
+          if (resolved) return;
+          resolved = true;
+          cleanupListener();
 
-        const { razorpayOrderId, amount, currency, orderNumber, keyId, isFallback } = createData;
-
-        // 3. Fallback flow: if keys are unconfigured or fallback is triggered
-        if (isFallback || typeof window === "undefined" || !window.Razorpay) {
-          console.info("[Payment] Using resilient gateway verification fallback");
-          const verifyRes = await fetch("/api/payments/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_order_id: razorpayOrderId,
-              razorpay_payment_id: `pay_sim_${Date.now()}`,
-              razorpay_signature: "simulated_signature",
-              orderId: createData.orderId,
-            }),
-          });
-
-          const verifyData = await verifyRes.json();
-          setLoading(false);
-
-          if (verifyData.success) {
-            return {
-              success: true,
-              orderId: verifyData.orderId || createData.orderId,
-              orderNumber: verifyData.orderNumber || orderNumber,
-            };
-          } else {
-            const errMsg = verifyData.error || "Payment verification failed";
-            setError(errMsg);
-            return { success: false, error: errMsg };
-          }
-        }
-
-        // 4. Real Razorpay Checkout modal when live SDK & keys are active
-        const razorpayKeyId =
-          keyId ||
-          process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
-          "rzp_test_fallback";
-
-        return new Promise<RazorpayCheckoutResult>((resolve) => {
+          // Final snapshot check
           try {
-            const options: RazorpayOptions = {
-              key: razorpayKeyId,
-              amount,
-              currency: currency || "INR",
-              name: "NXTIVE",
-              description: `Order ${orderNumber}`,
-              order_id: razorpayOrderId,
-              prefill: {
-                name: input.shippingAddress.fullName,
-                email: input.shippingAddress.email,
-                contact: input.shippingAddress.phone,
-              },
-              notes: {
-                orderNumber,
-                userId: input.userId,
-              },
-              theme: {
-                color: "#111110",
-              },
-              handler: async (response: RazorpayPaymentResponse) => {
-                try {
-                  const verifyRes = await fetch("/api/payments/verify", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      ...response,
-                      orderId: createData.orderId,
-                    }),
-                  });
-
-                  const verifyData = await verifyRes.json();
-
-                  if (verifyData.success) {
-                    setLoading(false);
-                    resolve({
-                      success: true,
-                      orderId: verifyData.orderId || createData.orderId,
-                      orderNumber: verifyData.orderNumber || orderNumber,
-                    });
-                  } else {
-                    const errMsg = verifyData.error || "Payment verification failed";
-                    setError(errMsg);
-                    setLoading(false);
-                    resolve({ success: false, error: errMsg });
-                  }
-                } catch (verifyErr: any) {
-                  const errMsg = verifyErr.message || "Verification request failed";
-                  setError(errMsg);
-                  setLoading(false);
-                  resolve({ success: false, error: errMsg });
-                }
-              },
-              modal: {
-                ondismiss: () => {
-                  setError("Payment was cancelled");
-                  setLoading(false);
-                  resolve({
-                    success: false,
-                    error: "Payment was cancelled by user",
-                  });
-                },
-                escape: true,
-                confirm_close: true,
-              },
-            };
-
-            const rzp = new window.Razorpay!(options);
-
-            rzp.on("payment.failed", (response: any) => {
-              const errorMsg =
-                response?.error?.description ||
-                response?.error?.reason ||
-                "Payment failed. Please try again.";
-              setError(errorMsg);
-              setLoading(false);
-              resolve({ success: false, error: errorMsg });
-            });
-
-            rzp.open();
-          } catch (initErr) {
-            console.warn("[Razorpay] Modal init fallback:", initErr);
-            // Fallback directly to verify
-            fetch("/api/payments/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                razorpay_order_id: razorpayOrderId,
-                razorpay_payment_id: `pay_sim_${Date.now()}`,
-                razorpay_signature: "simulated_signature",
-                orderId: createData.orderId,
-              }),
-            })
-              .then((r) => r.json())
-              .then((vData) => {
-                setLoading(false);
-                if (vData.success) {
-                  resolve({
-                    success: true,
-                    orderId: vData.orderId || createData.orderId,
-                    orderNumber: vData.orderNumber || orderNumber,
-                  });
-                } else {
-                  resolve({ success: false, error: vData.error });
-                }
-              })
-              .catch((e) => {
-                setLoading(false);
-                resolve({ success: false, error: e.message });
+            const snap = await getDoc(doc(db, "orders", orderId));
+            if (snap.exists() && snap.data()?.status === "success") {
+              setStatus("success");
+              setConfirmingMessage(null);
+              resolve({
+                success: true,
+                orderId,
+                status: "success",
               });
+              return;
+            }
+          } catch (e) {
+            console.warn("[Razorpay] Final check error:", e);
           }
-        });
-      } catch (err: any) {
-        const errorMsg = err?.message || "Something went wrong with the payment";
-        setError(errorMsg);
-        setLoading(false);
-        return { success: false, error: errorMsg };
-      }
+
+          const timeoutErr = getRazorpayUserErrorMessage(
+            "TIMEOUT",
+            "Payment confirmation is taking longer than expected. If money was debited, your order will update shortly.",
+            "bank_timeout"
+          );
+          setStatus("failed");
+          setError(timeoutErr.userMessage);
+          setMappedError(timeoutErr);
+          setConfirmingMessage(null);
+          resolve({
+            success: false,
+            orderId,
+            error: timeoutErr.userMessage,
+            mappedError: timeoutErr,
+            status: "failed",
+          });
+        }, timeoutMs);
+
+        try {
+          const unsub = onSnapshot(
+            doc(db, "orders", orderId),
+            (snapshot: any) => {
+              if (!snapshot.exists()) return;
+              const data = snapshot.data();
+              if (data?.status === "success") {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timer);
+                cleanupListener();
+                setStatus("success");
+                setConfirmingMessage(null);
+                resolve({
+                  success: true,
+                  orderId,
+                  status: "success",
+                });
+              } else if (data?.status === "failed") {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timer);
+                cleanupListener();
+                const err = getRazorpayUserErrorMessage(data.errorCode, data.errorDescription, data.errorReason);
+                setStatus("failed");
+                setError(err.userMessage);
+                setMappedError(err);
+                setConfirmingMessage(null);
+                resolve({
+                  success: false,
+                  orderId,
+                  error: err.userMessage,
+                  mappedError: err,
+                  status: "failed",
+                });
+              }
+            },
+            (err: any) => {
+              console.warn("[Razorpay] Snapshot listener error:", err);
+            }
+          );
+          activeListenerUnsubRef.current = unsub;
+        } catch (subErr) {
+          console.warn("[Razorpay] Could not attach realtime listener:", subErr);
+        }
+      });
     },
     []
   );
 
-  return { initiatePayment, loading, error, clearError: () => setError(null) };
+  /**
+   * Main checkout kickoff. Always creates a FRESH order doc and order ID.
+   */
+  const initiatePayment = useCallback(
+    async (input: RazorpayCheckoutInput): Promise<RazorpayCheckoutResult> => {
+      cleanupListener();
+      setLoading(true);
+      setError(null);
+      setMappedError(null);
+      setConfirmingMessage(null);
+      setStatus("creating_order");
+
+      try {
+        // Step 1: Create Order Server-Side (via Cloud Function or API fallback)
+        let createData: any;
+        try {
+          // Attempt Firebase Cloud Function
+          const createOrderFn = httpsCallable<any, any>(functions, "createRazorpayOrder");
+          const fnRes = await createOrderFn({
+            items: input.items.map((i) => ({
+              productId: i.id,
+              quantity: i.quantity,
+              selectedSize: i.selectedSize,
+              selectedColor: i.selectedColor,
+            })),
+            shippingAddress: input.shippingAddress,
+            deliveryMethod: input.deliveryMethod,
+            couponCode: input.couponCode,
+            metadata: {
+              userId: input.userId,
+            },
+          });
+          createData = fnRes.data;
+        } catch (fnErr) {
+          console.info("[Payment] Falling back to Next.js API route for order creation:", fnErr);
+          const apiRes = await fetch("/api/payments/create-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: input.items,
+              shippingAddress: input.shippingAddress,
+              deliveryMethod: input.deliveryMethod,
+              couponCode: input.couponCode,
+              userId: input.userId,
+            }),
+          });
+          createData = await apiRes.json();
+        }
+
+        if (!createData || !createData.success || !createData.orderId) {
+          throw new Error(createData?.error || "Failed to create order on server.");
+        }
+
+        const { orderId, razorpayOrderId, amount, currency, keyId } = createData;
+        setCurrentOrderId(orderId);
+
+        // Ensure SDK script is ready
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded || typeof window === "undefined" || !window.Razorpay) {
+          throw new Error("Razorpay Checkout SDK could not be loaded. Please check your internet connection.");
+        }
+
+        setStatus("awaiting_payment");
+
+        // Step 2: Open Razorpay Checkout Modal
+        return new Promise<RazorpayCheckoutResult>((resolve) => {
+          let hasHandledCallback = false;
+
+          const options: RazorpayOptions = {
+            key: keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_placeholder",
+            amount,
+            currency: currency || "INR",
+            name: "NXTIVE",
+            description: `Order ${orderId}`,
+            order_id: razorpayOrderId,
+            prefill: {
+              name: input.shippingAddress.fullName,
+              email: input.shippingAddress.email,
+              contact: input.shippingAddress.phone,
+            },
+            theme: {
+              color: "#111110",
+            },
+            // 2a. Payment success callback
+            handler: async (response: RazorpayPaymentResponse) => {
+              hasHandledCallback = true;
+              setStatus("verifying");
+
+              // Step 3: Verification with network timeout handling
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+              try {
+                let verifyData: any;
+                try {
+                  const verifyFn = httpsCallable<any, any>(functions, "verifyRazorpayPayment");
+                  const res = await verifyFn({
+                    orderId,
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature,
+                  });
+                  verifyData = res.data;
+                } catch (fnErr: any) {
+                  console.info("[Payment] Falling back to Next.js API for verification:", fnErr);
+                  const apiRes = await fetch("/api/payments/verify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                      orderId,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_signature: response.razorpay_signature,
+                    }),
+                  });
+                  verifyData = await apiRes.json();
+                }
+
+                clearTimeout(timeoutId);
+
+                if (verifyData && verifyData.success) {
+                  setStatus("success");
+                  setLoading(false);
+                  resolve({
+                    success: true,
+                    orderId,
+                    razorpayOrderId: response.razorpay_order_id,
+                    paymentId: response.razorpay_payment_id,
+                    status: "success",
+                  });
+                } else {
+                  // Gateway rejected signature
+                  const mapped = getRazorpayUserErrorMessage(
+                    "SIGNATURE_FAILED",
+                    verifyData?.error || "Signature verification failed",
+                    "verification_failed"
+                  );
+                  setStatus("failed");
+                  setError(mapped.userMessage);
+                  setMappedError(mapped);
+                  setLoading(false);
+                  resolve({
+                    success: false,
+                    orderId,
+                    error: mapped.userMessage,
+                    mappedError: mapped,
+                    status: "failed",
+                  });
+                }
+              } catch (verifyErr: any) {
+                clearTimeout(timeoutId);
+                console.warn("[Payment] Network or timeout during verification. Activating webhook poller:", verifyErr);
+
+                // Step 6: Network issue / Timeout handling
+                // Instead of failing, poll or listen to the Firestore order doc for webhook resolution
+                const webhookRes = await waitForWebhookResolution(orderId, 15000);
+                setLoading(false);
+                resolve(webhookRes);
+              }
+            },
+            modal: {
+              // 2c. Modal dismissed / user cancels / network drops before callback
+              ondismiss: async () => {
+                if (hasHandledCallback) return;
+                console.info("[Payment] Checkout modal dismissed. Checking pending status via webhook...");
+
+                // Treat as "pending" — check if webhook processed payment before user closed
+                const webhookRes = await waitForWebhookResolution(orderId, 8000);
+                if (webhookRes.success) {
+                  setLoading(false);
+                  resolve(webhookRes);
+                } else {
+                  const mapped = getRazorpayUserErrorMessage("PAYMENT_CANCELLED", "Checkout was closed.", "cancelled");
+                  setStatus("failed");
+                  setError(mapped.userMessage);
+                  setMappedError(mapped);
+                  setLoading(false);
+                  resolve({
+                    success: false,
+                    orderId,
+                    error: mapped.userMessage,
+                    mappedError: mapped,
+                    status: "failed",
+                  });
+                }
+              },
+              escape: true,
+              confirm_close: true,
+            },
+          };
+
+          const rzp = new window.Razorpay!(options);
+
+          // 2b. Payment failure callback
+          rzp.on("payment.failed", (response: any) => {
+            hasHandledCallback = true;
+            console.error("[Razorpay] payment.failed fired on client:", response?.error);
+            const err = response?.error;
+            const mapped = getRazorpayUserErrorMessage(err?.code, err?.description, err?.reason);
+
+            setStatus("failed");
+            setError(mapped.userMessage);
+            setMappedError(mapped);
+            setLoading(false);
+            resolve({
+              success: false,
+              orderId,
+              error: mapped.userMessage,
+              mappedError: mapped,
+              status: "failed",
+            });
+          });
+
+          rzp.open();
+        });
+      } catch (err: any) {
+        console.error("[Payment] Initiation error:", err);
+        const mapped = getRazorpayUserErrorMessage("INITIATION_ERROR", err?.message, "network_error");
+        setStatus("failed");
+        setError(mapped.userMessage);
+        setMappedError(mapped);
+        setLoading(false);
+        return {
+          success: false,
+          error: mapped.userMessage,
+          mappedError: mapped,
+          status: "failed",
+        };
+      }
+    },
+    [waitForWebhookResolution]
+  );
+
+  const reset = useCallback(() => {
+    cleanupListener();
+    setStatus("idle");
+    setLoading(false);
+    setError(null);
+    setMappedError(null);
+    setConfirmingMessage(null);
+    setCurrentOrderId(null);
+  }, []);
+
+  return {
+    initiatePayment,
+    reset,
+    status,
+    loading,
+    error,
+    mappedError,
+    currentOrderId,
+    confirmingMessage,
+    clearError: () => {
+      setError(null);
+      setMappedError(null);
+    },
+  };
 }
