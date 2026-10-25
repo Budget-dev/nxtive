@@ -1271,7 +1271,7 @@ function AccountContent() {
                               Total
                             </div>
                             <div style={{ fontSize: "14px", fontWeight: 800, color: "#111110", marginTop: "2px" }}>
-                              ₹{order.total.toLocaleString("en-IN")}
+                              ₹{(Number(order.total) || 0).toLocaleString("en-IN")}
                             </div>
                           </div>
 
@@ -1280,7 +1280,7 @@ function AccountContent() {
                               Tracking AWB
                             </div>
                             <div style={{ fontSize: "12px", fontWeight: 700, color: "#936037", marginTop: "2px" }}>
-                              {order.trackingNumber || `NXT-AWB-${order.id.slice(-6)}`}
+                              {order.trackingNumber || (order.id ? `NXT-AWB-${String(order.id).slice(-6)}` : "NXT-AWB")}
                             </div>
                           </div>
                         </div>
@@ -1334,7 +1334,7 @@ function AccountContent() {
                       {/* Items */}
                       <div style={{ padding: "20px 24px" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                          {order.items.map((item, idx) => (
+                          {(order.items || []).map((item, idx) => (
                             <div
                               key={`${item.id}-${idx}`}
                               style={{
@@ -1356,7 +1356,7 @@ function AccountContent() {
                                     flexShrink: 0,
                                   }}
                                 >
-                                  <Image src={item.image} alt={item.title} fill style={{ objectFit: "cover" }} sizes="50px" />
+                                  <Image src={item.image || "/images/placeholder.jpg"} alt={item.title || "Apparel item"} fill style={{ objectFit: "cover" }} sizes="50px" />
                                 </div>
                                 <div>
                                   <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
@@ -1371,7 +1371,7 @@ function AccountContent() {
 
                               <div style={{ textAlign: "right" }}>
                                 <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
-                                  ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                                  ₹{((Number(item.price) || 0) * (Number(item.quantity) || 1)).toLocaleString("en-IN")}
                                 </div>
                               </div>
                             </div>

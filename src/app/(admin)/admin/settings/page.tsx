@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   ExternalLink,
+  Database,
 } from "lucide-react";
 import {
   getAdminSettings,
@@ -128,6 +129,26 @@ export default function AdminSettingsPage() {
             Store profile, logistics rules, review moderation policy, and notification preferences
           </p>
         </div>
+
+        <Link
+          href="/admin/database"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            backgroundColor: "#1C1917",
+            color: "#FFFFFF",
+            fontSize: "13.5px",
+            fontWeight: 700,
+            textDecoration: "none",
+            border: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
+          <Database size={16} color="#D19B68" />
+          <span>Firestore Collections Manager</span>
+        </Link>
       </div>
 
       {saved && (

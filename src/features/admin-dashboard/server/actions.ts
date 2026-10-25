@@ -1446,3 +1446,627 @@ export async function deleteCoupon(id: string): Promise<{ success: boolean; erro
   await deleteDocument("coupons", id);
   return { success: true };
 }
+
+// ─────────────────────────────────────────────────────────────
+// DATABASE & COLLECTIONS MANAGEMENT (DIRECT CLOUD FIRESTORE)
+// ─────────────────────────────────────────────────────────────
+
+export interface CollectionMeta {
+  name: string;
+  label: string;
+  description: string;
+  count: number;
+  status: "ready" | "empty";
+  isCore: boolean;
+}
+
+export interface DatabaseStatus {
+  connected: boolean;
+  project: string;
+  source: string;
+  error?: string;
+  collections: CollectionMeta[];
+  totalDocuments: number;
+}
+
+const ALL_COLLECTIONS: { name: string; label: string; description: string; isCore: boolean }[] = [
+  { name: "products", label: "Products", description: "Apparel catalog items, variants, stock & pricing", isCore: true },
+  { name: "categories", label: "Categories", description: "Store departments and navigation categories", isCore: true },
+  { name: "orders", label: "Orders", description: "Customer purchases, fulfillment and tracking", isCore: true },
+  { name: "users", label: "Users & Customers", description: "Registered customer profiles and account data", isCore: true },
+  { name: "coupons", label: "Coupons", description: "Discount codes, promotion rules and usage limits", isCore: true },
+  { name: "reviews", label: "Reviews", description: "Customer ratings, feedback and approvals", isCore: false },
+  { name: "shipping_providers", label: "Shipping Providers", description: "Couriers (Blue Dart, Delhivery, DTDC, India Post)", isCore: true },
+  { name: "shipments", label: "Shipments", description: "Dispatched packages, tracking and AWB numbers", isCore: false },
+  { name: "shipping_logs", label: "Shipping Logs", description: "Logistics audit history and delivery milestones", isCore: false },
+  { name: "payments", label: "Payments", description: "Transaction logs, payment gateways and receipts", isCore: false },
+  { name: "settings", label: "Settings", description: "Store settings, taxes, currency and policies", isCore: true },
+  { name: "admin_users", label: "Admin Users", description: "Authorized staff accounts and RBAC bindings", isCore: true },
+  { name: "admin_roles", label: "Admin Roles", description: "Permission sets (Super Admin, Catalog, Orders)", isCore: true },
+  { name: "admin_logs", label: "Admin Logs", description: "System audit logs and operational history", isCore: false },
+];
+
+export async function getDatabaseOverview(): Promise<DatabaseStatus> {
+  await requireAdmin("settings.manage");
+
+  const collectionsMeta: CollectionMeta[] = [];
+  let totalDocs = 0;
+
+  for (const c of ALL_COLLECTIONS) {
+    try {
+      const docs = await readCollection(c.name);
+      const count = Array.isArray(docs) ? docs.length : 0;
+      totalDocs += count;
+      collectionsMeta.push({
+        name: c.name,
+        label: c.label,
+        description: c.description,
+        count,
+        status: count > 0 ? "ready" : "empty",
+        isCore: c.isCore,
+      });
+    } catch {
+      collectionsMeta.push({
+        name: c.name,
+        label: c.label,
+        description: c.description,
+        count: 0,
+        status: "empty",
+        isCore: c.isCore,
+      });
+    }
+  }
+
+  const { firestoreRestCheckConnection } = await import("@/lib/firebase/firestore-rest");
+  const conn = await firestoreRestCheckConnection();
+
+  return {
+    connected: conn.connected,
+    project: conn.project,
+    source: conn.source,
+    error: conn.error,
+    collections: collectionsMeta,
+    totalDocuments: totalDocs,
+  };
+}
+
+export async function initializeFirestoreCollections(): Promise<{
+  success: boolean;
+  message: string;
+  results: Record<string, number>;
+}> {
+  await requireAdmin("settings.manage");
+  const now = new Date().toISOString();
+  const results: Record<string, number> = {};
+
+  // 1. Categories
+  const defaultCategories: Category[] = [
+    {
+      id: "t-shirts",
+      slug: "t-shirts",
+      name: "T-Shirts",
+      title: "Heavyweight T-Shirts",
+      tagline: "Oversized, boxy, and minimal tees in 260-300 GSM organic cotton.",
+      image: "/images/nxtvie/cat-tshirts.jpg",
+      sortOrder: 1,
+      isActive: true,
+    },
+    {
+      id: "shirts",
+      slug: "shirts",
+      name: "Shirts",
+      title: "Shirts & Overshirts",
+      tagline: "Breathable linen-cotton camp shirts and workwear silhouettes.",
+      image: "/images/nxtvie/cat-shirts.jpg",
+      sortOrder: 2,
+      isActive: true,
+    },
+    {
+      id: "hoodies",
+      slug: "hoodies",
+      name: "Hoodies",
+      title: "French Terry Hoodies",
+      tagline: "Substantial 450 GSM hoodies and pullovers with architectural drape.",
+      image: "/images/nxtvie/cat-hoodies.jpg",
+      sortOrder: 3,
+      isActive: true,
+    },
+    {
+      id: "bottoms",
+      slug: "bottoms",
+      name: "Bottoms",
+      title: "Pants & Cargos",
+      tagline: "Articulated ripstop cargos, wide-leg trousers, and relaxed sweats.",
+      image: "/images/nxtvie/cat-bottoms.jpg",
+      sortOrder: 4,
+      isActive: true,
+    },
+    {
+      id: "jackets",
+      slug: "jackets",
+      name: "Jackets",
+      title: "Technical Jackets",
+      tagline: "Weather-resistant urban outerwear engineered for movement.",
+      image: "/images/nxtvie/promo-jackets-hd.jpg",
+      sortOrder: 5,
+      isActive: true,
+    },
+    {
+      id: "accessories",
+      slug: "accessories",
+      name: "Accessories",
+      title: "Accessories",
+      tagline: "Structured dad caps, canvas bags, and elevated essentials.",
+      image: "/images/nxtvie/cat-accessories.jpg",
+      sortOrder: 6,
+      isActive: true,
+    },
+  ];
+
+  for (const cat of defaultCategories) {
+    await setDocument("categories", cat.id, cat as any, true);
+  }
+  results["categories"] = defaultCategories.length;
+
+  // 2. Starter Products
+  const starterProducts: Product[] = [
+    {
+      id: "prod-oversized-tee",
+      slug: "heavyweight-oversized-boxy-tee",
+      title: "Heavyweight Oversized Boxy Tee",
+      price: 1299,
+      originalPrice: 1799,
+      image: "/images/nxtvie/product-oversized-tee-hd.jpg",
+      imageUrl: "/images/nxtvie/product-oversized-tee-hd.jpg",
+      images: [
+        "/images/nxtvie/product-oversized-tee-hd.jpg",
+        "/images/nxtvie/story-back-print-hd.jpg",
+      ],
+      category: "T-Shirts",
+      collections: ["urban-essentials", "new-arrivals"],
+      badge: "Bestseller",
+      colors: [
+        { name: "Washed Black", hex: "#1A1A1A" },
+        { name: "Off White", hex: "#F2EFE9" },
+        { name: "Olive Earth", hex: "#3D4133" },
+      ],
+      sizes: ["S", "M", "L", "XL"],
+      description: "Crafted from 280 GSM combed organic cotton with dropped shoulders and a boxy silhouette. Pre-shrunk with a ribbed collar that maintains shape wash after wash.",
+      details: ["280 GSM 100% Combed Cotton", "Boxy oversized fit", "Seamless drop shoulder", "High-density screenprint on back"],
+      fabricCare: ["Machine wash cold inside out", "Do not tumble dry", "Warm iron on reverse", "Dry flat in shade"],
+      fit: "Oversized Boxy Fit",
+      rating: 4.9,
+      reviewCount: 38,
+      inStock: true,
+      totalStock: 85,
+      stock: 85,
+      lowStockThreshold: 10,
+      featured: true,
+      sku: "NXT-TEE-001",
+      variants: [
+        { sku: "NXT-TEE-S-BLK", size: "S", color: "Washed Black", stock: 15, price: 1299 },
+        { sku: "NXT-TEE-M-BLK", size: "M", color: "Washed Black", stock: 25, price: 1299 },
+        { sku: "NXT-TEE-L-BLK", size: "L", color: "Washed Black", stock: 25, price: 1299 },
+        { sku: "NXT-TEE-XL-BLK", size: "XL", color: "Washed Black", stock: 20, price: 1299 },
+      ],
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-french-terry-hoodie",
+      slug: "french-terry-heavyweight-hoodie",
+      title: "French Terry Heavyweight Hoodie",
+      price: 2499,
+      originalPrice: 3299,
+      image: "/images/nxtvie/product-core-hoodie-hd.jpg",
+      imageUrl: "/images/nxtvie/product-core-hoodie-hd.jpg",
+      images: [
+        "/images/nxtvie/product-core-hoodie-hd.jpg",
+        "/images/nxtvie/gallery-5.jpg",
+      ],
+      category: "Hoodies",
+      collections: ["urban-essentials", "premium-basics"],
+      badge: "Trending",
+      colors: [
+        { name: "Charcoal Ash", hex: "#222224" },
+        { name: "Desert Sand", hex: "#D6C7B2" },
+      ],
+      sizes: ["M", "L", "XL"],
+      description: "450 GSM French Terry heavyweight pullover with a double-layered structured hood, hidden kangaroo pockets, and custom ribbed hems.",
+      details: ["450 GSM French Terry", "Double-layered structured hood", "Reinforced cuff ribs", "Minimal chest embroidery"],
+      fabricCare: ["Cold machine wash", "Do not bleach", "Dry in shade", "Cool iron if needed"],
+      fit: "Relaxed Boxy Draped",
+      rating: 4.8,
+      reviewCount: 24,
+      inStock: true,
+      totalStock: 60,
+      stock: 60,
+      lowStockThreshold: 8,
+      featured: true,
+      sku: "NXT-HD-002",
+      variants: [
+        { sku: "NXT-HD-M-CHA", size: "M", color: "Charcoal Ash", stock: 20, price: 2499 },
+        { sku: "NXT-HD-L-CHA", size: "L", color: "Charcoal Ash", stock: 20, price: 2499 },
+        { sku: "NXT-HD-XL-CHA", size: "XL", color: "Charcoal Ash", stock: 20, price: 2499 },
+      ],
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-camp-shirt",
+      slug: "camp-collar-structured-shirt",
+      title: "Camp Collar Structured Overshirt",
+      price: 1899,
+      originalPrice: 2499,
+      image: "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg",
+      imageUrl: "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg",
+      images: [
+        "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg",
+        "/images/nxtvie/cat-shirts.jpg",
+      ],
+      category: "Shirts",
+      collections: ["new-arrivals"],
+      badge: "New",
+      colors: [
+        { name: "Bone White", hex: "#EAE6DF" },
+        { name: "Slate Grey", hex: "#4A5056" },
+      ],
+      sizes: ["M", "L", "XL"],
+      description: "Relaxed resort-collar shirt woven from premium cotton-linen blend. Features custom matte horn buttons and dual chest flap pockets.",
+      details: ["60% Cotton, 40% Linen", "Camp cuban open collar", "Twin chest pockets", "Matte horn buttons"],
+      fabricCare: ["Hand wash or gentle cycle", "Hang dry", "Steam iron"],
+      fit: "Relaxed Straight Fit",
+      rating: 4.7,
+      reviewCount: 15,
+      inStock: true,
+      totalStock: 45,
+      stock: 45,
+      lowStockThreshold: 5,
+      featured: true,
+      sku: "NXT-SHT-003",
+      variants: [
+        { sku: "NXT-SHT-M-BON", size: "M", color: "Bone White", stock: 15, price: 1899 },
+        { sku: "NXT-SHT-L-BON", size: "L", color: "Bone White", stock: 15, price: 1899 },
+        { sku: "NXT-SHT-XL-BON", size: "XL", color: "Bone White", stock: 15, price: 1899 },
+      ],
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-ripstop-cargos",
+      slug: "articulated-ripstop-cargo-pant",
+      title: "Articulated Ripstop Cargo Pants",
+      price: 2299,
+      originalPrice: 2999,
+      image: "/images/nxtvie/product-cargo-pants-hd.jpg",
+      imageUrl: "/images/nxtvie/product-cargo-pants-hd.jpg",
+      images: [
+        "/images/nxtvie/product-cargo-pants-hd.jpg",
+        "/images/nxtvie/cat-bottoms.jpg",
+      ],
+      category: "Bottoms",
+      collections: ["urban-essentials"],
+      badge: "Bestseller",
+      colors: [
+        { name: "Tactical Olive", hex: "#3A3D30" },
+        { name: "Matte Black", hex: "#161616" },
+      ],
+      sizes: ["30", "32", "34", "36"],
+      description: "Technical articulated cargos in tear-resistant cotton ripstop. Features 6 deep utility pockets, knee darting, and toggle drawcords at hems.",
+      details: ["Cotton-nylon high density ripstop", "Knee dart articulation", "Adjustable ankle toggle cords", "YKK zippers"],
+      fabricCare: ["Machine wash cold", "Tumble dry low", "Do not iron prints"],
+      fit: "Relaxed Tapered with Hem Toggles",
+      rating: 4.9,
+      reviewCount: 42,
+      inStock: true,
+      totalStock: 50,
+      stock: 50,
+      lowStockThreshold: 6,
+      featured: true,
+      sku: "NXT-PNT-004",
+      variants: [
+        { sku: "NXT-PNT-30-OLV", size: "30", color: "Tactical Olive", stock: 10, price: 2299 },
+        { sku: "NXT-PNT-32-OLV", size: "32", color: "Tactical Olive", stock: 15, price: 2299 },
+        { sku: "NXT-PNT-34-OLV", size: "34", color: "Tactical Olive", stock: 15, price: 2299 },
+        { sku: "NXT-PNT-36-OLV", size: "36", color: "Tactical Olive", stock: 10, price: 2299 },
+      ],
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-tech-jacket",
+      slug: "technical-minimal-windbreaker",
+      title: "Technical Minimal Windbreaker",
+      price: 3499,
+      originalPrice: 4499,
+      image: "/images/nxtvie/promo-jackets-hd.jpg",
+      imageUrl: "/images/nxtvie/promo-jackets-hd.jpg",
+      images: [
+        "/images/nxtvie/promo-jackets-hd.jpg",
+      ],
+      category: "Jackets",
+      collections: ["new-arrivals"],
+      badge: "Trending",
+      colors: [
+        { name: "Onyx Black", hex: "#111111" },
+      ],
+      sizes: ["M", "L", "XL"],
+      description: "Water-resistant matte shell jacket with two-way waterproof front zipper, concealed storm hood, and breathable underarm vents.",
+      details: ["DWR coated windproof nylon", "Waterproof two-way zipper", "Concealed hood", "Elasticized cuffs with velcro adjustment"],
+      fabricCare: ["Wipe clean with damp cloth", "Do not dry clean", "Do not iron"],
+      fit: "Structured Technical Layering",
+      rating: 5.0,
+      reviewCount: 19,
+      inStock: true,
+      totalStock: 30,
+      stock: 30,
+      lowStockThreshold: 4,
+      featured: true,
+      sku: "NXT-JKT-005",
+      variants: [
+        { sku: "NXT-JKT-M-BLK", size: "M", color: "Onyx Black", stock: 10, price: 3499 },
+        { sku: "NXT-JKT-L-BLK", size: "L", color: "Onyx Black", stock: 10, price: 3499 },
+        { sku: "NXT-JKT-XL-BLK", size: "XL", color: "Onyx Black", stock: 10, price: 3499 },
+      ],
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "prod-structured-cap",
+      slug: "minimalist-structured-dad-cap",
+      title: "Minimalist Structured Dad Cap",
+      price: 799,
+      originalPrice: 1199,
+      image: "/images/nxtvie/product-cap-hd.jpg",
+      imageUrl: "/images/nxtvie/product-cap-hd.jpg",
+      images: [
+        "/images/nxtvie/product-cap-hd.jpg",
+        "/images/nxtvie/cat-accessories.jpg",
+      ],
+      category: "Accessories",
+      collections: ["urban-essentials"],
+      badge: "Bestseller",
+      colors: [
+        { name: "Washed Charcoal", hex: "#2A2A2A" },
+        { name: "Ecru White", hex: "#EBE7DF" },
+      ],
+      sizes: ["One Size"],
+      description: "Low-profile six-panel cap in heavy washed cotton twill. Features antique brass tri-glide buckle and tonal embroidered NXTIVE monogram.",
+      details: ["100% Cotton Chino Twill", "Antique brass slider buckle", "Embroidered eyelets", "Structured front panel"],
+      fabricCare: ["Spot clean only", "Do not machine wash"],
+      fit: "Adjustable Curved Brim",
+      rating: 4.8,
+      reviewCount: 31,
+      inStock: true,
+      totalStock: 70,
+      stock: 70,
+      lowStockThreshold: 10,
+      featured: true,
+      sku: "NXT-ACC-006",
+      variants: [
+        { sku: "NXT-ACC-OS-CHR", size: "One Size", color: "Washed Charcoal", stock: 40, price: 799 },
+        { sku: "NXT-ACC-OS-ECR", size: "One Size", color: "Ecru White", stock: 30, price: 799 },
+      ],
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+
+  for (const prod of starterProducts) {
+    await setDocument("products", prod.id, prod as any, true);
+  }
+  results["products"] = starterProducts.length;
+
+  // 3. Coupons
+  const defaultCoupons: Coupon[] = [
+    {
+      id: "cpn-welcome10",
+      code: "WELCOME10",
+      description: "10% off for first-time orders",
+      type: "percentage",
+      value: 10,
+      minOrderValue: 999,
+      validFrom: now,
+      validUntil: "2028-12-31T23:59:59.000Z",
+      usageCount: 0,
+      usageLimit: 1000,
+      isActive: true,
+      createdAt: now,
+    },
+    {
+      id: "cpn-nxtive100",
+      code: "NXTIVE100",
+      description: "Flat ₹100 off on orders above ₹1499",
+      type: "fixed",
+      value: 100,
+      minOrderValue: 1499,
+      validFrom: now,
+      validUntil: "2028-12-31T23:59:59.000Z",
+      usageCount: 0,
+      usageLimit: 500,
+      isActive: true,
+      createdAt: now,
+    },
+    {
+      id: "cpn-freeship",
+      code: "FREESHIP",
+      description: "Free shipping voucher",
+      type: "fixed",
+      value: 99,
+      minOrderValue: 999,
+      validFrom: now,
+      validUntil: "2028-12-31T23:59:59.000Z",
+      usageCount: 0,
+      usageLimit: 2000,
+      isActive: true,
+      createdAt: now,
+    },
+  ];
+
+  for (const cpn of defaultCoupons) {
+    await setDocument("coupons", cpn.id, cpn as any, true);
+  }
+  results["coupons"] = defaultCoupons.length;
+
+  // 4. Settings
+  const storeSettings = {
+    id: "general",
+    storeName: "NXTIVE",
+    tagline: "Minimalist High-Fashion Asian Streetwear",
+    supportEmail: "nxtiveclothing@gmail.com",
+    supportPhone: "+91 98765 43210",
+    currency: "INR",
+    currencySymbol: "₹",
+    freeShippingThreshold: 1499,
+    defaultShippingFee: 99,
+    taxRatePercent: 12,
+    primaryAdminEmail: "nxtiveclothing@gmail.com",
+    orderIdPrefix: "NXT-",
+    inventoryTracking: true,
+    lowStockThresholdDefault: 5,
+    returnsWindowDays: 7,
+    updatedAt: now,
+  };
+  await setDocument("settings", "general", storeSettings, true);
+  results["settings"] = 1;
+
+  // 5. Shipping Providers
+  const shippingProviders = [
+    {
+      id: "bluedart",
+      name: "Blue Dart Express",
+      code: "bluedart",
+      serviceType: "Air Express",
+      estimatedDays: "1-3 Days",
+      trackingUrlTemplate: "https://www.bluedart.com/trackdartresult.html?trackFor=0&trackNo={trackingNumber}",
+      isActive: true,
+      createdAt: now,
+    },
+    {
+      id: "delhivery",
+      name: "Delhivery",
+      code: "delhivery",
+      serviceType: "Surface & Air",
+      estimatedDays: "2-4 Days",
+      trackingUrlTemplate: "https://www.delhivery.com/track/package/{trackingNumber}",
+      isActive: true,
+      createdAt: now,
+    },
+    {
+      id: "dtdc",
+      name: "DTDC Premier",
+      code: "dtdc",
+      serviceType: "Express",
+      estimatedDays: "2-5 Days",
+      trackingUrlTemplate: "https://www.dtdc.in/tracking/tracking_results.asp?pin={trackingNumber}",
+      isActive: true,
+      createdAt: now,
+    },
+    {
+      id: "india-post",
+      name: "India Post Speed Post",
+      code: "india-post",
+      serviceType: "Economy / Regional",
+      estimatedDays: "4-7 Days",
+      trackingUrlTemplate: "https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx?consNo={trackingNumber}",
+      isActive: true,
+      createdAt: now,
+    },
+  ];
+
+  for (const prov of shippingProviders) {
+    await setDocument("shipping_providers", prov.id, prov, true);
+  }
+  results["shipping_providers"] = shippingProviders.length;
+
+  // 6. Admin Roles
+  const adminRoles = [
+    {
+      id: "super_admin",
+      name: "Super Administrator",
+      description: "Full unconstrained administrative rights across all catalog, orders, payments and settings.",
+      permissions: [
+        "dashboard.view", "products.view", "products.create", "products.edit", "products.delete",
+        "orders.view", "orders.edit", "orders.cancel", "customers.view", "customers.edit", "customers.suspend",
+        "reviews.view", "reviews.approve", "reviews.reject", "reviews.delete", "payments.view", "payments.manage",
+        "shipping.view", "shipping.manage", "categories.view", "categories.edit", "coupons.view", "coupons.manage",
+        "admins.view", "admins.manage", "settings.manage"
+      ],
+      isSystem: true,
+      createdAt: now,
+    },
+    {
+      id: "catalog_manager",
+      name: "Catalog Manager",
+      description: "Manages apparel products, inventory counts, categories and promotional coupons.",
+      permissions: [
+        "dashboard.view", "products.view", "products.create", "products.edit",
+        "categories.view", "categories.edit", "coupons.view", "coupons.manage"
+      ],
+      isSystem: true,
+      createdAt: now,
+    },
+    {
+      id: "order_manager",
+      name: "Fulfillment & Orders Lead",
+      description: "Manages orders, shipping dispatches, delivery partner status and reviews.",
+      permissions: [
+        "dashboard.view", "orders.view", "orders.edit", "shipping.view", "shipping.manage",
+        "customers.view", "reviews.view", "reviews.approve"
+      ],
+      isSystem: true,
+      createdAt: now,
+    },
+    {
+      id: "support_agent",
+      name: "Support Specialist",
+      description: "Customer service agent with view permissions for orders and customer queries.",
+      permissions: ["dashboard.view", "orders.view", "customers.view", "reviews.view"],
+      isSystem: true,
+      createdAt: now,
+    },
+  ];
+
+  for (const role of adminRoles) {
+    await setDocument("admin_roles", role.id, role, true);
+  }
+  results["admin_roles"] = adminRoles.length;
+
+  // 7. Primary Admin User
+  const primaryAdmin = {
+    id: "admin-nxtive",
+    email: "nxtiveclothing@gmail.com",
+    displayName: "NXTIVE Super Admin",
+    role: "super_admin",
+    isActive: true,
+    accountStatus: "active",
+    createdAt: now,
+    lastLogin: now,
+  };
+  await setDocument("admin_users", primaryAdmin.id, primaryAdmin, true);
+  results["admin_users"] = 1;
+
+  // 8. Admin Log Entry
+  const initLog = {
+    id: `log-${Date.now()}`,
+    action: "DATABASE_INITIALIZED",
+    adminEmail: "nxtiveclothing@gmail.com",
+    details: "All core Firestore collections successfully seeded and initialized in Cloud Firestore.",
+    timestamp: now,
+  };
+  await setDocument("admin_logs", initLog.id, initLog, true);
+  results["admin_logs"] = 1;
+
+  return {
+    success: true,
+    message: "All collections have been initialized and created directly in Cloud Firestore!",
+    results,
+  };
+}
+

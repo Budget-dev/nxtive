@@ -16,6 +16,7 @@ import {
   Ruler,
   X,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import type { Product } from "@/types/product";
@@ -31,7 +32,7 @@ interface ProductDetailClientProps {
 
 export function ProductDetailClient({ product, relatedProducts }: ProductDetailClientProps) {
   const router = useRouter();
-  const { addToCart, toggleWishlist, isInWishlist, showToast } = useStore();
+  const { addToCart, toggleWishlist, isInWishlist, showToast, setIsCartOpen } = useStore();
 
   const gallery = (product.images.length ? product.images : [product.image]).map((image) => sharpImageSrc(image));
   const [selectedImage, setSelectedImage] = useState<string>(gallery[0] || "");
@@ -41,6 +42,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   const [showSizeGuide, setShowSizeGuide] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("details");
   const [isAdding, setIsAdding] = useState<boolean>(false);
+  const [isBuyingNow, setIsBuyingNow] = useState<boolean>(false);
 
   // Reviews workflow: customer submits -> pending -> approved reviews displayed
   const [approvedReviews, setApprovedReviews] = useState<Review[]>([]);
@@ -52,10 +54,11 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   const [submittingRev, setSubmittingRev] = useState(false);
 
   React.useEffect(() => {
+    router.prefetch("/checkout");
     getPublicApprovedReviews(product.id)
       .then((data) => setApprovedReviews(data))
       .catch(() => {});
-  }, [product.id]);
+  }, [product.id, router]);
 
   const handlePostReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +103,9 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   };
 
   const handleBuyNow = () => {
-    addToCart(product, selectedSize, activeColor, quantity);
+    setIsBuyingNow(true);
+    setIsCartOpen(false);
+    addToCart(product, selectedSize, activeColor, quantity, false);
     router.push("/checkout");
   };
 
@@ -541,7 +546,9 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
 
               {/* Buy Now Direct Button */}
               <button
+                type="button"
                 onClick={handleBuyNow}
+                disabled={isBuyingNow}
                 style={{
                   width: "100%",
                   padding: "13px",
@@ -550,12 +557,27 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                   color: "#FFFFFF",
                   fontSize: "13.5px",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: isBuyingNow ? "not-allowed" : "pointer",
                   border: "none",
                   transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  opacity: isBuyingNow ? 0.8 : 1,
                 }}
               >
-                Instant Buy Now
+                {isBuyingNow ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Proceeding to Checkout…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Instant Buy Now</span>
+                    <ArrowRight size={15} />
+                  </>
+                )}
               </button>
             </div>
 

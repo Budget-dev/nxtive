@@ -79,8 +79,8 @@ const updateOrderSchema = z
     paymentStatus: z
       .enum(["pending", "paid", "failed", "cancelled", "refund_initiated", "refunded", "cod_pending"])
       .optional(),
-    trackingNumber: z.string().trim().min(1).max(160).optional(),
-    trackingUrl: z.string().url().max(2048).optional(),
+    trackingNumber: z.union([z.string().trim().min(1).max(160), z.literal(""), z.null()]).optional(),
+    trackingUrl: z.union([z.string().trim().url().max(2048), z.literal(""), z.null()]).optional(),
     notes: z.string().trim().max(1000).optional(),
     cancelReason: z.string().trim().max(500).optional(),
     returnReason: z.string().trim().max(500).optional(),
@@ -176,9 +176,9 @@ export async function PATCH(
     if (updates.paymentStatus) {
       updateData.paymentStatus = updates.paymentStatus;
     }
-    if (updates.trackingNumber) updateData.trackingNumber = updates.trackingNumber;
-    if (updates.trackingUrl) updateData.trackingUrl = updates.trackingUrl;
-    if (updates.notes) updateData.notes = updates.notes;
+    if (updates.trackingNumber !== undefined) updateData.trackingNumber = updates.trackingNumber || "";
+    if (updates.trackingUrl !== undefined) updateData.trackingUrl = updates.trackingUrl || "";
+    if (updates.notes !== undefined) updateData.notes = updates.notes || "";
 
     await storeUpdateDocument("orders", resolvedId, updateData);
 

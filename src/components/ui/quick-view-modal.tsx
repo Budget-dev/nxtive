@@ -23,9 +23,7 @@ export function QuickViewModal() {
 
   const handleAdd = () => {
     if (!quickViewProduct) return;
-    for (let i = 0; i < quantity; i++) {
-      addToCart(quickViewProduct, selectedSize);
-    }
+    addToCart(quickViewProduct, selectedSize, undefined, quantity);
     setQuickViewProduct(null);
   };
 

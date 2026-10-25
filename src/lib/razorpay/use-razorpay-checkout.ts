@@ -6,8 +6,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { doc, onSnapshot, getDoc } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { db, functions } from "@/lib/firebase/client";
+import { db } from "@/lib/firebase/client";
 import { getRazorpayUserErrorMessage, type MappedPaymentError } from "./error-map";
 
 declare global {
@@ -266,31 +265,16 @@ export function useRazorpayCheckout() {
       setStatus("creating_order");
 
       try {
-        // Step 1: Create Order Server-Side (via Cloud Function or API fallback)
+        // Step 1: Create Order Server-Side via direct Next.js API route
+        const createController = new AbortController();
+        const createTimeoutId = setTimeout(() => createController.abort(), 8000);
+
         let createData: any;
         try {
-          // Attempt Firebase Cloud Function
-          const createOrderFn = httpsCallable<any, any>(functions, "createRazorpayOrder");
-          const fnRes = await createOrderFn({
-            items: input.items.map((i) => ({
-              productId: i.id,
-              quantity: i.quantity,
-              selectedSize: i.selectedSize,
-              selectedColor: i.selectedColor,
-            })),
-            shippingAddress: input.shippingAddress,
-            deliveryMethod: input.deliveryMethod,
-            couponCode: input.couponCode,
-            metadata: {
-              userId: input.userId,
-            },
-          });
-          createData = fnRes.data;
-        } catch (fnErr) {
-          console.info("[Payment] Falling back to Next.js API route for order creation:", fnErr);
           const apiRes = await fetch("/api/payments/create-order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: createController.signal,
             body: JSON.stringify({
               items: input.items,
               shippingAddress: input.shippingAddress,
@@ -300,6 +284,8 @@ export function useRazorpayCheckout() {
             }),
           });
           createData = await apiRes.json();
+        } finally {
+          clearTimeout(createTimeoutId);
         }
 
         if (!createData || !createData.success || !createData.orderId) {
@@ -343,21 +329,11 @@ export function useRazorpayCheckout() {
 
               // Step 3: Verification with network timeout handling
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 12000);
+              const timeoutId = setTimeout(() => controller.abort(), 10000);
 
               try {
                 let verifyData: any;
                 try {
-                  const verifyFn = httpsCallable<any, any>(functions, "verifyRazorpayPayment");
-                  const res = await verifyFn({
-                    orderId,
-                    razorpay_order_id: response.razorpay_order_id,
-                    razorpay_payment_id: response.razorpay_payment_id,
-                    razorpay_signature: response.razorpay_signature,
-                  });
-                  verifyData = res.data;
-                } catch (fnErr: any) {
-                  console.info("[Payment] Falling back to Next.js API for verification:", fnErr);
                   const apiRes = await fetch("/api/payments/verify", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -370,6 +346,8 @@ export function useRazorpayCheckout() {
                     }),
                   });
                   verifyData = await apiRes.json();
+                } catch (verifyErr: any) {
+                  console.warn("[Payment] Direct verification fetch failed:", verifyErr);
                 }
 
                 clearTimeout(timeoutId);

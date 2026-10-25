@@ -193,6 +193,18 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
       setMessage({ type: "error", text: "Please enter a product title." });
       return;
     }
+    if (!mainImage.trim()) {
+      setMessage({ type: "error", text: "Please provide a main product image URL or upload an image." });
+      return;
+    }
+    if (isNaN(price) || price <= 0) {
+      setMessage({ type: "error", text: "Please enter a valid product price greater than ₹0." });
+      return;
+    }
+    if (isNaN(totalStock) || totalStock < 0) {
+      setMessage({ type: "error", text: "Total stock cannot be a negative number." });
+      return;
+    }
     if (selectedSizes.length === 0) {
       setMessage({ type: "error", text: "Please select at least one apparel size." });
       return;
@@ -249,6 +261,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
 
       const res = await saveProduct(productPayload);
       if (res.success) {
+        // Also mirror write to client-side Firestore if client auth is active
         try {
           const docId = res.id;
           const prodRef = doc(db, "products", docId);
@@ -270,19 +283,21 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
             },
             { merge: true }
           );
-        } catch {
-          // Handled if restricted
+        } catch (clientErr) {
+          // Cloud Firestore was already updated via server action
+          console.info("[product-form] Client-side mirror sync notice:", clientErr);
         }
+
         setMessage({
           type: "success",
-          text: isEdit ? "Apparel updated successfully!" : "New apparel created successfully!",
+          text: isEdit ? "Apparel updated in Firestore database!" : "New apparel added to Firestore database!",
         });
         setTimeout(() => {
           router.push("/admin/products");
           router.refresh();
         }, 800);
       } else {
-        setMessage({ type: "error", text: res.error || "Failed to save product." });
+        setMessage({ type: "error", text: res.error || "Failed to save product to database." });
       }
     } catch (err: any) {
       setMessage({ type: "error", text: err?.message || "Failed to save apparel item." });

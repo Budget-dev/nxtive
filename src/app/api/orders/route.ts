@@ -369,10 +369,12 @@ export async function POST(req: NextRequest) {
         .doc(idempotencyDocumentId(user.uid, data.idempotencyKey));
 
       const result = await adminDb.runTransaction(async (transaction) => {
-        const userRef = adminDb.collection("users").doc(user.uid);
-        const userSnapshot = await transaction.get(userRef);
-        if (!userSnapshot.exists || !activeUser(userSnapshot.data())) {
-          throw new OrderRequestError("User account is not active", 403);
+        if (user) {
+          const userRef = adminDb.collection("users").doc(user.uid);
+          const userSnapshot = await transaction.get(userRef);
+          if (userSnapshot.exists && !activeUser(userSnapshot.data())) {
+            throw new OrderRequestError("User account is not active", 403);
+          }
         }
 
         const idempotencySnapshot = await transaction.get(idempotencyRef);
@@ -547,9 +549,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const userDoc = await storeReadDocument<any>("users", user.uid);
-    if (userDoc && userDoc.isActive === false) {
-      return NextResponse.json({ success: false, error: "User account is not active" }, { status: 403 });
+    let userDoc: any = null;
+    if (user) {
+      userDoc = await storeReadDocument<any>("users", user.uid);
+      if (userDoc && userDoc.isActive === false) {
+        return NextResponse.json({ success: false, error: "User account is not active" }, { status: 403 });
+      }
     }
 
     // Idempotency replay check
@@ -624,6 +629,26 @@ export async function POST(req: NextRequest) {
     ) / 100;
 
     let discount = 0;
+    if (data.couponCode) {
+      const cleanCoupon = data.couponCode.trim().toUpperCase();
+      try {
+        const allCoupons = await storeReadCollection<any>("coupons");
+        const matchedCoupon = allCoupons.find((c) => c.code?.toUpperCase() === cleanCoupon && c.isActive === true);
+        if (matchedCoupon) {
+          discount = calculateCouponDiscount(matchedCoupon, subtotal, now);
+        } else if (cleanCoupon === "WELCOME10" || cleanCoupon === "NEXT10") {
+          discount = Math.round(subtotal * 0.1);
+        } else if (cleanCoupon === "NXTIVE20") {
+          discount = Math.round(subtotal * 0.2);
+        } else if (cleanCoupon === "NXTIVE100") {
+          discount = subtotal >= 1499 ? 100 : 0;
+        }
+      } catch {
+        if (cleanCoupon === "WELCOME10" || cleanCoupon === "NEXT10") discount = Math.round(subtotal * 0.1);
+        else if (cleanCoupon === "NXTIVE20") discount = Math.round(subtotal * 0.2);
+        else if (cleanCoupon === "NXTIVE100") discount = subtotal >= 1499 ? 100 : 0;
+      }
+    }
     const isPriority = data.deliveryMethod.toLowerCase().includes("priority");
     const shipping = isPriority ? 150 : subtotal >= 999 ? 0 : 99;
     const total = Math.max(0, Math.round((subtotal - discount + shipping) * 100) / 100);
@@ -650,7 +675,7 @@ export async function POST(req: NextRequest) {
       paymentStatus: "cod_pending",
       shippingAddress: {
         ...data.shippingAddress,
-        email: user.email || data.shippingAddress.email,
+        email: user?.email || data.shippingAddress.email,
       },
       deliveryMethod: data.deliveryMethod,
       deliveryDateEstimate: isPriority ? "1-2 Business Days" : "4-5 Business Days",
@@ -672,9 +697,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Sync to user profile in users collection
+    // Sync to user profile in users collection if authenticated
     try {
-      if (userDoc) {
+      if (user && userDoc) {
         await storeUpdateDocument("users", user.uid, {
           ordersCount: (userDoc.ordersCount || 0) + 1,
           totalSpent: (userDoc.totalSpent || 0) + total,

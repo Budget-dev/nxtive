@@ -146,7 +146,47 @@ export async function POST(req: NextRequest | Request) {
 
     await storeUpdateDocument("orders", order.id, updatedData);
 
-    // 4. Update customer stats in users collection if registered
+    // 4. Decrement inventory for items purchased in online order
+    if (Array.isArray(order.items)) {
+      try {
+        const products = await storeReadCollection<any>("products");
+        const productsMap = new Map<string, any>();
+        products.forEach((p) => productsMap.set(p.id, p));
+
+        for (const item of order.items) {
+          const productId = item.productId || item.id;
+          const prod = productsMap.get(productId);
+          if (prod && typeof prod.totalStock === "number") {
+            const nextStock = Math.max(0, prod.totalStock - Number(item.quantity || 1));
+            await storeUpdateDocument("products", productId, {
+              totalStock: nextStock,
+              inStock: nextStock > 0,
+              updatedAt: now,
+            });
+          }
+        }
+      } catch (invErr) {
+        console.warn("[payments-verify] Inventory decrement warning:", invErr);
+      }
+    }
+
+    // 5. Increment coupon usage if promo code was applied
+    if (order.couponCode) {
+      try {
+        const coupons = await storeReadCollection<any>("coupons");
+        const coupon = coupons.find((c) => c.code?.toUpperCase() === order.couponCode?.toUpperCase());
+        if (coupon && coupon.id) {
+          await storeUpdateDocument("coupons", coupon.id, {
+            usageCount: Number(coupon.usageCount || 0) + 1,
+            updatedAt: now,
+          });
+        }
+      } catch (couponErr) {
+        console.warn("[payments-verify] Coupon usage sync warning:", couponErr);
+      }
+    }
+
+    // 6. Update customer stats in users collection if registered
     if (order.userId && order.userId !== "guest") {
       try {
         const userDoc = await storeReadDocument<any>("users", order.userId);

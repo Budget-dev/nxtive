@@ -79,7 +79,7 @@ interface StoreContextType {
   toastMessage: string | null;
   couponCode: string | null;
   discountRate: number;
-  addToCart: (product: ProductItem, size?: string, color?: string, qty?: number) => void;
+  addToCart: (product: ProductItem, size?: string, color?: string, qty?: number, openDrawer?: boolean) => void;
   removeFromCart: (id: string, size?: string, color?: string) => void;
   updateQuantity: (id: string, size: string, delta: number, color?: string) => void;
   clearCart: () => void;
@@ -269,7 +269,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     product: ProductItem,
     size = "M",
     color = product.colors?.[0]?.name || "Original",
-    qty = 1
+    qty = 1,
+    openDrawer = true
   ) => {
     setCart((prev) => {
       const existing = prev.find(
@@ -285,7 +286,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return [...prev, { ...product, quantity: qty, selectedSize: size, selectedColor: color }];
     });
     showToast(`Added "${product.title}" (${size}) to bag`);
-    setIsCartOpen(true);
+    if (openDrawer) {
+      setIsCartOpen(true);
+    }
   };
 
   const removeFromCart = (id: string, size?: string, color?: string) => {
@@ -386,24 +389,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     userId?: string;
   }): Promise<Order> => {
     const currentUser = auth.currentUser;
-    if (!currentUser || (userId && currentUser.uid !== userId)) {
-      throw new Error("Please sign in before placing an order.");
-    }
+    const effectiveUserId = currentUser?.uid || userId || "guest";
 
     const idempotencyKey =
       idempotencyRef.current || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     idempotencyRef.current = idempotencyKey;
 
     try {
-      const token = await currentUser.getIdToken();
+      let token: string | null = null;
+      if (currentUser) {
+        try {
+          token = await currentUser.getIdToken();
+        } catch {
+          // Token retrieval failed, proceed gracefully
+        }
+      }
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("/api/orders", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
-          userId: currentUser.uid,
+          userId: effectiveUserId,
           items: cart.map((item) => ({
             productId: item.id,
             title: item.title,
@@ -415,6 +428,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           })),
           shippingAddress,
           deliveryMethod,
+          paymentMethod,
           couponCode: couponCode || undefined,
           idempotencyKey,
         }),

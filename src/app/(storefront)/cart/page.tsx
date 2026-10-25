@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Plus, Minus, ArrowRight, ShieldCheck, Truck, RotateCcw, Tag } from "lucide-react";
+import { Trash2, Plus, Minus, ArrowRight, ShieldCheck, Truck, RotateCcw, Tag, Loader2 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 
 export default function CartPage() {
@@ -22,6 +22,11 @@ export default function CartPage() {
   } = useStore();
 
   const [inputCoupon, setInputCoupon] = useState("");
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  React.useEffect(() => {
+    router.prefetch("/checkout");
+  }, [router]);
 
   const freeShippingThreshold = 999;
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
@@ -422,7 +427,12 @@ export default function CartPage() {
 
                 {/* Checkout CTA */}
                 <button
-                  onClick={() => router.push("/checkout")}
+                  type="button"
+                  disabled={isNavigating}
+                  onClick={() => {
+                    setIsNavigating(true);
+                    router.push("/checkout");
+                  }}
                   style={{
                     width: "100%",
                     padding: "14px 24px",
@@ -436,13 +446,24 @@ export default function CartPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    cursor: "pointer",
+                    cursor: isNavigating ? "not-allowed" : "pointer",
                     boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
                     marginBottom: "18px",
+                    opacity: isNavigating ? 0.8 : 1,
+                    border: "none",
                   }}
                 >
-                  <span>Proceed to Checkout</span>
-                  <ArrowRight size={16} />
+                  {isNavigating ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Loading Checkout…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Proceed to Checkout</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
                 </button>
 
                 {/* Micro Trust Points */}

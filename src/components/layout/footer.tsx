@@ -240,7 +240,7 @@ export function Footer() {
                 { label: "Track Order", href: "/orders" },
                 { label: "Shipping", href: "/shipping" },
                 { label: "Returns & Exchanges", href: "/returns" },
-                { label: "Size Guide", href: "/faq" },
+                { label: "Size Guide", href: "/size-guide" },
                 { label: "FAQs", href: "/faq" },
                 { label: "Contact Us", href: "/contact" },
               ].map((item) => (
@@ -280,10 +280,10 @@ export function Footer() {
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
               {[
                 { label: "Our Story", href: "/about" },
-                { label: "Sustainability", href: "/about" },
-                { label: "Careers", href: "/about" },
-                { label: "Press", href: "/about" },
-                { label: "Affiliates", href: "/about" },
+                { label: "Sustainability", href: "/sustainability" },
+                { label: "Careers", href: "/careers" },
+                { label: "Press", href: "/press" },
+                { label: "Affiliates", href: "/affiliates" },
               ].map((item) => (
                 <li key={item.label}>
                   <Link

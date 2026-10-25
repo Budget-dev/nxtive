@@ -48,8 +48,33 @@ export async function POST(req: NextRequest | Request) {
     let discount = 0;
     if (couponCode) {
       const clean = String(couponCode).trim().toUpperCase();
-      if (clean === "NEXT10") discount = Math.round(subtotal * 0.1);
-      else if (clean === "NXTIVE20") discount = Math.round(subtotal * 0.2);
+      try {
+        const coupons = await storeReadCollection<any>("coupons");
+        const coupon = coupons.find((c) => c.code?.toUpperCase() === clean && c.isActive === true);
+        if (coupon) {
+          const nowStr = new Date().toISOString();
+          const isStarted = !coupon.validFrom || coupon.validFrom <= nowStr;
+          const isNotExpired = !coupon.validUntil || coupon.validUntil >= nowStr;
+          const meetsMin = !coupon.minOrderValue || subtotal >= Number(coupon.minOrderValue);
+          if (isStarted && isNotExpired && meetsMin) {
+            if (coupon.type === "percentage") {
+              discount = Math.round(subtotal * (Number(coupon.value || 0) / 100));
+            } else {
+              discount = Math.min(subtotal, Number(coupon.value || 0));
+            }
+          }
+        } else if (clean === "WELCOME10" || clean === "NEXT10") {
+          discount = Math.round(subtotal * 0.1);
+        } else if (clean === "NXTIVE20") {
+          discount = Math.round(subtotal * 0.2);
+        } else if (clean === "NXTIVE100") {
+          discount = subtotal >= 1499 ? 100 : 0;
+        }
+      } catch {
+        if (clean === "WELCOME10" || clean === "NEXT10") discount = Math.round(subtotal * 0.1);
+        else if (clean === "NXTIVE20") discount = Math.round(subtotal * 0.2);
+        else if (clean === "NXTIVE100") discount = subtotal >= 1499 ? 100 : 0;
+      }
     }
 
     const isPriority = String(deliveryMethod || "").toLowerCase().includes("priority");

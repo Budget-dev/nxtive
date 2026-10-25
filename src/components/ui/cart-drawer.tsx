@@ -324,6 +324,7 @@ export function CartDrawer() {
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <Link
                 href="/checkout"
+                prefetch={true}
                 onClick={() => setIsCartOpen(false)}
                 style={{
                   width: "100%",

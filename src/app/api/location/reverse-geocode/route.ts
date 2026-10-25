@@ -69,7 +69,10 @@ async function handleReverseGeocode(lat: number, lng: number) {
     if (apiKey) {
       try {
         const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}&solution_id=gmp_git_agentskills_v1`;
-        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        const res = await fetch(url, {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(3000),
+        });
         const data = await res.json();
 
         if (data.status === "OK" && Array.isArray(data.results) && data.results.length > 0) {
@@ -138,6 +141,7 @@ async function handleReverseGeocode(lat: number, lng: number) {
           Accept: "application/json",
           "User-Agent": "NXTIVE-Ecommerce/1.0",
         },
+        signal: AbortSignal.timeout(3000),
       });
 
       if (fallbackRes.ok) {

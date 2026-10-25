@@ -90,23 +90,52 @@ function saveCollectionData(collectionName: string, data: Record<string, any>) {
   }
 }
 
+import {
+  firestoreRestReadCollection,
+  firestoreRestReadDocument,
+  firestoreRestSetDocument,
+  firestoreRestDeleteDocument,
+} from "./firestore-rest";
+
 export async function storeReadCollection<T>(collectionName: string): Promise<T[]> {
-  // If service account is available, try adminDb first
+  // 1. If service account is available, try adminDb first
   if (hasAdminCredentials) {
     try {
       const snapshot = await adminDb.collection(collectionName).get();
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
+      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as T);
+      // Sync local cache
+      const map: Record<string, any> = {};
+      docs.forEach((d: any) => { if (d.id) map[d.id] = d; });
+      saveCollectionData(collectionName, map);
+      return docs;
     } catch (err) {
       console.warn(`[firestore-store] adminDb read error for ${collectionName}:`, err);
     }
   }
 
-  // Load from persistent storage
+  // 2. Direct Cloud Firestore connection via authenticated REST API
+  try {
+    const cloudDocs = await firestoreRestReadCollection<T>(collectionName);
+    if (cloudDocs !== null) {
+      // If cloud docs exist, update local cache and return live data
+      const map: Record<string, any> = {};
+      cloudDocs.forEach((d: any) => { if (d.id) map[d.id] = d; });
+      if (cloudDocs.length > 0 || !fs.existsSync(path.join(DATA_DIR, `${collectionName}.json`))) {
+        saveCollectionData(collectionName, map);
+      }
+      return cloudDocs;
+    }
+  } catch (err) {
+    console.warn(`[firestore-store] cloud REST read error for ${collectionName}:`, err);
+  }
+
+  // 3. Fallback to persistent storage
   const map = loadInitialCollectionData(collectionName);
   return Object.values(map) as T[];
 }
 
 export async function storeReadDocument<T>(collectionName: string, id: string): Promise<T | null> {
+  // 1. If service account is available, try adminDb
   if (hasAdminCredentials) {
     try {
       const doc = await adminDb.collection(collectionName).doc(id).get();
@@ -118,6 +147,17 @@ export async function storeReadDocument<T>(collectionName: string, id: string): 
     }
   }
 
+  // 2. Try direct Cloud Firestore REST API
+  try {
+    const cloudDoc = await firestoreRestReadDocument<T>(collectionName, id);
+    if (cloudDoc) {
+      return cloudDoc;
+    }
+  } catch (err) {
+    console.warn(`[firestore-store] cloud REST read doc error for ${collectionName}/${id}:`, err);
+  }
+
+  // 3. Fallback to local store
   const map = loadInitialCollectionData(collectionName);
   return (map[id] as T) || null;
 }
@@ -128,14 +168,29 @@ export async function storeSetDocument<T extends Record<string, any>>(
   data: T,
   merge = true
 ): Promise<void> {
+  let cloudSuccess = false;
+
+  // 1. Try Firebase Admin SDK if service account configured
   if (hasAdminCredentials) {
     try {
       await adminDb.collection(collectionName).doc(id).set(data, { merge });
+      cloudSuccess = true;
     } catch (err) {
       console.warn(`[firestore-store] adminDb set error for ${collectionName}/${id}:`, err);
     }
   }
 
+  // 2. Try direct Cloud Firestore REST API
+  if (!cloudSuccess) {
+    try {
+      const res = await firestoreRestSetDocument(collectionName, id, data, merge);
+      if (res) cloudSuccess = true;
+    } catch (err) {
+      console.warn(`[firestore-store] cloud REST set error for ${collectionName}/${id}:`, err);
+    }
+  }
+
+  // 3. Always update local store so local file is synchronized
   const map = loadInitialCollectionData(collectionName);
   const existing = map[id] || {};
   map[id] = merge ? { ...existing, ...data, id } : { ...data, id };
@@ -147,11 +202,23 @@ export async function storeUpdateDocument(
   id: string,
   data: Record<string, any>
 ): Promise<void> {
+  let cloudSuccess = false;
+
   if (hasAdminCredentials) {
     try {
       await adminDb.collection(collectionName).doc(id).update(data);
+      cloudSuccess = true;
     } catch (err) {
       console.warn(`[firestore-store] adminDb update error for ${collectionName}/${id}:`, err);
+    }
+  }
+
+  if (!cloudSuccess) {
+    try {
+      const res = await firestoreRestSetDocument(collectionName, id, data, true);
+      if (res) cloudSuccess = true;
+    } catch (err) {
+      console.warn(`[firestore-store] cloud REST update error for ${collectionName}/${id}:`, err);
     }
   }
 
@@ -171,9 +238,16 @@ export async function storeDeleteDocument(collectionName: string, id: string): P
     }
   }
 
+  try {
+    await firestoreRestDeleteDocument(collectionName, id);
+  } catch (err) {
+    console.warn(`[firestore-store] cloud REST delete error for ${collectionName}/${id}:`, err);
+  }
+
   const map = loadInitialCollectionData(collectionName);
   if (map[id]) {
     delete map[id];
     saveCollectionData(collectionName, map);
   }
 }
+

@@ -482,19 +482,23 @@ export function OrderDetailClient({ orderId }: Props) {
                 <span>Shipping Address</span>
               </div>
               <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
-                {order.shippingAddress.fullName}
+                {order.shippingAddress?.fullName || "Customer"}
               </div>
               <div style={{ fontSize: "12.5px", color: "#6A645C", marginTop: "4px", lineHeight: "1.5" }}>
-                {order.shippingAddress.street}
-                {order.shippingAddress.apartment ? `, ${order.shippingAddress.apartment}` : ""}
+                {order.shippingAddress?.street || "Street address"}
+                {order.shippingAddress?.apartment ? `, ${order.shippingAddress.apartment}` : ""}
                 <br />
-                {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.postalCode}
+                {order.shippingAddress?.city ? `${order.shippingAddress.city}, ` : ""}
+                {order.shippingAddress?.state ? `${order.shippingAddress.state} ` : ""}
+                {order.shippingAddress?.postalCode ? `- ${order.shippingAddress.postalCode}` : ""}
                 <br />
-                {order.shippingAddress.country}
+                {order.shippingAddress?.country || "India"}
               </div>
-              <div style={{ fontSize: "12px", color: "#8A847C", marginTop: "8px" }}>
-                Phone: {order.shippingAddress.phone}
-              </div>
+              {order.shippingAddress?.phone && (
+                <div style={{ fontSize: "12px", color: "#8A847C", marginTop: "8px" }}>
+                  Phone: {order.shippingAddress.phone}
+                </div>
+              )}
             </div>
 
             {/* Payment Summary */}

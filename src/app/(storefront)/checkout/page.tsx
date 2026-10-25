@@ -22,7 +22,82 @@ import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
 import { NxtvieLogo } from "@/components/layout/nxtvie-logo";
 import { useRazorpayCheckout } from "@/lib/razorpay/use-razorpay-checkout";
+import { auth } from "@/lib/firebase/client";
 import type { UserAddress } from "@/types/user";
+
+const PIN_CODE_PREFIX_MAP: Record<string, { state: string; citySample: string }> = {
+  "11": { state: "Delhi", citySample: "New Delhi" },
+  "12": { state: "Haryana", citySample: "Gurgaon" },
+  "13": { state: "Haryana", citySample: "Ambala" },
+  "14": { state: "Punjab", citySample: "Ludhiana" },
+  "15": { state: "Punjab", citySample: "Bathinda" },
+  "16": { state: "Chandigarh", citySample: "Chandigarh" },
+  "17": { state: "Himachal Pradesh", citySample: "Shimla" },
+  "18": { state: "Jammu and Kashmir", citySample: "Jammu" },
+  "19": { state: "Jammu and Kashmir", citySample: "Srinagar" },
+  "20": { state: "Uttar Pradesh", citySample: "Noida" },
+  "21": { state: "Uttar Pradesh", citySample: "Prayagraj" },
+  "22": { state: "Uttar Pradesh", citySample: "Lucknow" },
+  "23": { state: "Uttar Pradesh", citySample: "Varanasi" },
+  "24": { state: "Uttarakhand", citySample: "Dehradun" },
+  "25": { state: "Uttar Pradesh", citySample: "Meerut" },
+  "26": { state: "Uttarakhand", citySample: "Haldwani" },
+  "27": { state: "Uttar Pradesh", citySample: "Gorakhpur" },
+  "28": { state: "Uttar Pradesh", citySample: "Agra" },
+  "30": { state: "Rajasthan", citySample: "Jaipur" },
+  "31": { state: "Rajasthan", citySample: "Udaipur" },
+  "32": { state: "Rajasthan", citySample: "Kota" },
+  "33": { state: "Rajasthan", citySample: "Bikaner" },
+  "34": { state: "Rajasthan", citySample: "Jodhpur" },
+  "36": { state: "Gujarat", citySample: "Rajkot" },
+  "37": { state: "Gujarat", citySample: "Jamnagar" },
+  "38": { state: "Gujarat", citySample: "Ahmedabad" },
+  "39": { state: "Gujarat", citySample: "Surat" },
+  "40": { state: "Maharashtra", citySample: "Mumbai" },
+  "41": { state: "Maharashtra", citySample: "Pune" },
+  "42": { state: "Maharashtra", citySample: "Nashik" },
+  "43": { state: "Maharashtra", citySample: "Aurangabad" },
+  "44": { state: "Maharashtra", citySample: "Nagpur" },
+  "403": { state: "Goa", citySample: "Panaji" },
+  "45": { state: "Madhya Pradesh", citySample: "Indore" },
+  "46": { state: "Madhya Pradesh", citySample: "Bhopal" },
+  "47": { state: "Madhya Pradesh", citySample: "Gwalior" },
+  "48": { state: "Madhya Pradesh", citySample: "Jabalpur" },
+  "49": { state: "Chhattisgarh", citySample: "Raipur" },
+  "50": { state: "Telangana", citySample: "Hyderabad" },
+  "51": { state: "Andhra Pradesh", citySample: "Tirupati" },
+  "52": { state: "Andhra Pradesh", citySample: "Vijayawada" },
+  "53": { state: "Andhra Pradesh", citySample: "Visakhapatnam" },
+  "56": { state: "Karnataka", citySample: "Bengaluru" },
+  "57": { state: "Karnataka", citySample: "Mangalore" },
+  "58": { state: "Karnataka", citySample: "Hubli" },
+  "59": { state: "Karnataka", citySample: "Gulbarga" },
+  "60": { state: "Tamil Nadu", citySample: "Chennai" },
+  "61": { state: "Tamil Nadu", citySample: "Thanjavur" },
+  "62": { state: "Tamil Nadu", citySample: "Madurai" },
+  "63": { state: "Tamil Nadu", citySample: "Salem" },
+  "64": { state: "Tamil Nadu", citySample: "Coimbatore" },
+  "605": { state: "Puducherry", citySample: "Puducherry" },
+  "67": { state: "Kerala", citySample: "Kozhikode" },
+  "68": { state: "Kerala", citySample: "Kochi" },
+  "69": { state: "Kerala", citySample: "Thiruvananthapuram" },
+  "70": { state: "West Bengal", citySample: "Kolkata" },
+  "71": { state: "West Bengal", citySample: "Howrah" },
+  "72": { state: "West Bengal", citySample: "Midnapore" },
+  "73": { state: "West Bengal", citySample: "Siliguri" },
+  "74": { state: "West Bengal", citySample: "Barasat" },
+  "75": { state: "Odisha", citySample: "Bhubaneswar" },
+  "76": { state: "Odisha", citySample: "Rourkela" },
+  "77": { state: "Odisha", citySample: "Berhampur" },
+  "78": { state: "Assam", citySample: "Guwahati" },
+  "79": { state: "Meghalaya", citySample: "Shillong" },
+  "80": { state: "Bihar", citySample: "Patna" },
+  "81": { state: "Bihar", citySample: "Bhagalpur" },
+  "82": { state: "Bihar", citySample: "Gaya" },
+  "83": { state: "Jharkhand", citySample: "Ranchi" },
+  "84": { state: "Bihar", citySample: "Muzaffarpur" },
+  "85": { state: "Bihar", citySample: "Purnia" },
+};
 
 const INDIAN_STATES = [
   "Maharashtra",
@@ -63,8 +138,11 @@ const INDIAN_STATES = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartSubtotal, discountAmount, shippingFee, cartGrandTotal, couponCode, placeOrder, clearCart } = useStore();
+  const { cart, cartSubtotal, discountAmount, shippingFee, cartGrandTotal, couponCode, placeOrder, clearCart, setIsCartOpen } = useStore();
   const { user } = useAuth();
+
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [pinFeedback, setPinFeedback] = useState<string | null>(null);
 
   // Form states
   const [email, setEmail] = useState(user?.email || "");
@@ -88,6 +166,15 @@ export default function CheckoutPage() {
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
 
+  const hasAppliedDefaultAddress = React.useRef(false);
+  const userHasEditedAddress = React.useRef(false);
+
+  // Ensure cart drawer is closed on checkout page to avoid blocking overlays
+  useEffect(() => {
+    setIsHydrated(true);
+    setIsCartOpen(false);
+  }, [setIsCartOpen]);
+
   const {
     initiatePayment,
     loading: razorpayLoading,
@@ -100,24 +187,29 @@ export default function CheckoutPage() {
   const deliveryCost = deliveryMethod === "priority" ? 150 : shippingFee;
   const finalTotal = Math.max(0, cartSubtotal - discountAmount + deliveryCost);
 
-  // Load saved addresses for authenticated user
+  // Load saved addresses for authenticated user without overwriting current typing
   useEffect(() => {
     if (!user) return;
     if (user.email && !email) setEmail(user.email);
-    if (user.displayName && !firstName) {
+    if (user.displayName && !firstName && !userHasEditedAddress.current) {
       const parts = user.displayName.split(" ");
       setFirstName(parts[0] || "");
       if (parts.length > 1) setLastName(parts.slice(1).join(" "));
     }
+
+    if (hasAppliedDefaultAddress.current) return;
 
     fetch(`/api/users/addresses?uid=${encodeURIComponent(user.uid)}`)
       .then((res) => res.json())
       .then((json) => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           setSavedAddresses(json.data);
-          const defaultAddr = json.data.find((a: UserAddress) => a.isDefault) || json.data[0];
-          if (defaultAddr) {
-            applySavedAddress(defaultAddr);
+          if (!userHasEditedAddress.current && !hasAppliedDefaultAddress.current) {
+            const defaultAddr = json.data.find((a: UserAddress) => a.isDefault) || json.data[0];
+            if (defaultAddr) {
+              applySavedAddress(defaultAddr);
+              hasAppliedDefaultAddress.current = true;
+            }
           }
         }
       })
@@ -126,6 +218,7 @@ export default function CheckoutPage() {
 
   const applySavedAddress = (addr: UserAddress) => {
     setSelectedSavedAddressId(addr.id);
+    userHasEditedAddress.current = false;
     if (addr.fullName) {
       const parts = addr.fullName.split(" ");
       setFirstName(parts[0] || "");
@@ -141,8 +234,54 @@ export default function CheckoutPage() {
       );
       if (matched) setState(matched);
     }
-    if (addr.postalCode) setPostalCode(addr.postalCode.replace(/\D/g, "").slice(0, 6));
+    if (addr.postalCode) {
+      const code = addr.postalCode.replace(/\D/g, "").slice(0, 6);
+      setPostalCode(code);
+      setPinFeedback(`✓ ${addr.city}, ${addr.state}`);
+    }
     setLocationMessage(`Applied saved address: ${addr.label || "Saved"} (${addr.city})`);
+  };
+
+  // Instant 0ms PIN code autofill
+  const handlePostalCodeChange = (raw: string) => {
+    userHasEditedAddress.current = true;
+    setSelectedSavedAddressId(null);
+    const cleaned = raw.replace(/\D/g, "").slice(0, 6);
+    setPostalCode(cleaned);
+
+    if (cleaned.length === 6) {
+      const prefix3 = cleaned.slice(0, 3);
+      const prefix2 = cleaned.slice(0, 2);
+      const match = PIN_CODE_PREFIX_MAP[prefix3] || PIN_CODE_PREFIX_MAP[prefix2];
+      if (match) {
+        setState(match.state);
+        if (!city.trim() && match.citySample) {
+          setCity(match.citySample);
+        }
+        setPinFeedback(`✓ ${match.state} (PIN verified)`);
+      }
+
+      fetch(`https://api.postalpincode.in/pincode/${cleaned}`, {
+        signal: AbortSignal.timeout(2500),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data) && data[0]?.Status === "Success" && data[0]?.PostOffice?.length > 0) {
+            const po = data[0].PostOffice[0];
+            if (po.District) setCity(po.District);
+            if (po.State) {
+              const matched = INDIAN_STATES.find(
+                (s) => s.toLowerCase() === po.State.toLowerCase() || po.State.toLowerCase().includes(s.toLowerCase())
+              );
+              if (matched) setState(matched);
+            }
+            setPinFeedback(`✓ ${po.District || po.Name}, ${po.State}`);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setPinFeedback(null);
+    }
   };
 
   // Google Maps / Device Geolocation Auto-Fetch
@@ -153,14 +292,15 @@ export default function CheckoutPage() {
     }
 
     setLocationLoading(true);
-    setLocationMessage("Detecting device GPS coordinates...");
+    setLocationMessage("Detecting location coordinates…");
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
-          setLocationMessage("Resolving address via Google Maps Geocoding...");
+          setLocationMessage("Resolving city & address…");
           const res = await fetch("/api/location/reverse-geocode", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(4000),
             body: JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }),
           });
 
@@ -179,12 +319,17 @@ export default function CheckoutPage() {
             );
             if (matchedState) setState(matchedState);
           }
-          if (addr.postalCode) setPostalCode(String(addr.postalCode).replace(/\D/g, "").slice(0, 6));
+          if (addr.postalCode) {
+            const code = String(addr.postalCode).replace(/\D/g, "").slice(0, 6);
+            setPostalCode(code);
+            setPinFeedback(`✓ ${addr.city}, ${addr.state}`);
+          }
 
+          userHasEditedAddress.current = true;
           setSelectedSavedAddressId(null);
-          setLocationMessage(`Auto-detected: ${addr.city}, ${addr.state}. Please review before placing order.`);
+          setLocationMessage(`Auto-filled: ${addr.city}, ${addr.state}. Please review before placing order.`);
         } catch {
-          setLocationMessage("Could not resolve location. Please enter your address manually.");
+          setLocationMessage("Could not auto-detect address. Please type your street and PIN code manually.");
         } finally {
           setLocationLoading(false);
         }
@@ -193,7 +338,7 @@ export default function CheckoutPage() {
         setLocationLoading(false);
         setLocationMessage("Location permission was not granted. You can still enter the address manually.");
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
     );
   };
 
@@ -201,14 +346,9 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (cart.length === 0 || isSubmitting || razorpayLoading || hasSubmitted) return;
 
-    if (!user) {
-      setOrderError("Please sign in before placing your order. Your order history is protected by your account.");
-      return;
-    }
-
     // Basic validation
-    if (!email.trim() || !phone.trim() || !firstName.trim() || !lastName.trim() || !street.trim() || !city.trim() || !postalCode.trim()) {
-      setOrderError("Please fill in all required fields.");
+    if (!email.trim() || !phone.trim() || !firstName.trim() || !street.trim() || !city.trim() || !postalCode.trim()) {
+      setOrderError("Please fill in all required delivery details (Name, Email, Mobile Phone, Street, City, and PIN code).");
       return;
     }
 
@@ -220,15 +360,16 @@ export default function CheckoutPage() {
     setOrderError(null);
     setIsSubmitting(true);
 
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const shippingAddress = {
-      fullName: `${firstName} ${lastName}`.trim(),
-      email,
-      phone,
-      street,
-      apartment,
-      city,
+      fullName: fullName || firstName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      street: street.trim(),
+      apartment: apartment.trim(),
+      city: city.trim(),
       state,
-      postalCode,
+      postalCode: postalCode.trim(),
       country: "India",
     };
 
@@ -236,33 +377,68 @@ export default function CheckoutPage() {
       ? "Priority Express (1-2 Days)"
       : "Standard Domestic (3-5 Days)";
 
+    const effectiveUserId = user?.uid || auth.currentUser?.uid || "guest";
+
     if (paymentMethod === "cod") {
       try {
+        if (!user && !auth.currentUser) {
+          try {
+            const { signInAnonymously } = await import("firebase/auth");
+            await signInAnonymously(auth);
+          } catch {
+            // Non-blocking fallback
+          }
+        }
+
+        const activeUid = auth.currentUser?.uid || user?.uid || effectiveUserId;
         const order = await placeOrder({
           shippingAddress,
           paymentMethod: "Cash on Delivery (COD)",
           deliveryMethod: deliveryMethodLabel,
-          userId: user?.uid,
+          userId: activeUid,
         });
+
+        // Save address in background for logged in users
+        if (user || auth.currentUser) {
+          fetch("/api/users/addresses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uid: activeUid, address: shippingAddress }),
+          }).catch(() => {});
+        }
 
         setHasSubmitted(true);
         router.push(`/checkout/success?orderId=${order.id}`);
       } catch (err: any) {
-        setOrderError(err?.message || "Something went wrong placing your order. Please try again.");
+        const msg = err?.message || "";
+        if (msg.toLowerCase().includes("unauthorized") || msg.includes("401")) {
+          setOrderError("Please sign in or create an account to confirm your Cash on Delivery order.");
+        } else {
+          setOrderError(msg || "Something went wrong placing your order. Please try again.");
+        }
         setIsSubmitting(false);
       }
     } else {
-      // Online payment via Razorpay with resilient fallback
+      // Online payment via Razorpay with fast server route
       try {
         const res = await initiatePayment({
           items: cart,
           shippingAddress,
           deliveryMethod: deliveryMethodLabel,
           couponCode: couponCode || undefined,
-          userId: user?.uid || "guest",
+          userId: effectiveUserId,
         });
 
         if (res.success && res.orderId) {
+          // Save address in background for logged in users
+          if (user) {
+            fetch("/api/users/addresses", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ uid: user.uid, address: shippingAddress }),
+            }).catch(() => {});
+          }
+
           clearCart();
           setHasSubmitted(true);
           router.push(`/checkout/success?orderId=${res.orderId}`);
@@ -279,7 +455,29 @@ export default function CheckoutPage() {
 
   const isLoading = isSubmitting || razorpayLoading;
 
-  if (cart.length === 0 && !isSubmitting) {
+  if (!isHydrated) {
+    return (
+      <div style={{ backgroundColor: "#F5F3ED", minHeight: "100vh", padding: "50px 20px" }}>
+        <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "24px" }}>
+            <div style={{ width: "160px", height: "24px", backgroundColor: "#E6E2D6", borderRadius: "6px" }} />
+            <div style={{ width: "100px", height: "18px", backgroundColor: "#E6E2D6", borderRadius: "6px" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "28px" }} className="checkout-grid">
+            <div style={{ backgroundColor: "#FFFFFF", padding: "32px", borderRadius: "14px", height: "460px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#666", fontSize: "14px", fontWeight: 600 }}>
+                <Loader2 size={20} className="animate-spin" color="#111110" />
+                <span>Preparing secure checkout…</span>
+              </div>
+            </div>
+            <div style={{ backgroundColor: "#FFFFFF", padding: "32px", borderRadius: "14px", height: "320px" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (cart.length === 0 && !isSubmitting && !hasSubmitted) {
     return (
       <div style={{ backgroundColor: "#F5F3ED", minHeight: "100vh", padding: "80px 20px", textAlign: "center" }}>
         <div style={{ maxWidth: "480px", margin: "0 auto", backgroundColor: "#FFFFFF", padding: "40px", borderRadius: "14px" }}>
@@ -359,9 +557,16 @@ export default function CheckoutPage() {
                   <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: 0 }}>
                     1. Contact Information
                   </h2>
-                  {!user && (
+                  {!user ? (
                     <span style={{ fontSize: "12px", color: "#666" }}>
-                      Already a member? <Link href="/login" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>Sign in</Link>
+                      Guest Checkout enabled • Already a member?{" "}
+                      <Link href="/login" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
+                        Sign in
+                      </Link>
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "12px", color: "#2B9348", fontWeight: 600 }}>
+                      ✓ Signed in as {user.email || user.displayName || "Member"}
                     </span>
                   )}
                 </div>
@@ -510,7 +715,11 @@ export default function CheckoutPage() {
                         type="text"
                         required
                         value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
+                        onChange={(e) => {
+                          userHasEditedAddress.current = true;
+                          setSelectedSavedAddressId(null);
+                          setFirstName(e.target.value);
+                        }}
                         placeholder="First name"
                         style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
                       />
@@ -523,7 +732,11 @@ export default function CheckoutPage() {
                         type="text"
                         required
                         value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
+                        onChange={(e) => {
+                          userHasEditedAddress.current = true;
+                          setSelectedSavedAddressId(null);
+                          setLastName(e.target.value);
+                        }}
                         placeholder="Last name"
                         style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
                       />
@@ -538,7 +751,11 @@ export default function CheckoutPage() {
                       type="text"
                       required
                       value={street}
-                      onChange={(e) => setStreet(e.target.value)}
+                      onChange={(e) => {
+                        userHasEditedAddress.current = true;
+                        setSelectedSavedAddressId(null);
+                        setStreet(e.target.value);
+                      }}
                       placeholder="House / Flat #, Building Name, Street"
                       style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
                     />
@@ -552,7 +769,11 @@ export default function CheckoutPage() {
                       <input
                         type="text"
                         value={apartment}
-                        onChange={(e) => setApartment(e.target.value)}
+                        onChange={(e) => {
+                          userHasEditedAddress.current = true;
+                          setSelectedSavedAddressId(null);
+                          setApartment(e.target.value);
+                        }}
                         placeholder="Flat 402, Wing B"
                         style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
                       />
@@ -565,7 +786,11 @@ export default function CheckoutPage() {
                         type="text"
                         required
                         value={city}
-                        onChange={(e) => setCity(e.target.value)}
+                        onChange={(e) => {
+                          userHasEditedAddress.current = true;
+                          setSelectedSavedAddressId(null);
+                          setCity(e.target.value);
+                        }}
                         placeholder="Mumbai"
                         style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
                       />
@@ -579,7 +804,11 @@ export default function CheckoutPage() {
                       </label>
                       <select
                         value={state}
-                        onChange={(e) => setState(e.target.value)}
+                        onChange={(e) => {
+                          userHasEditedAddress.current = true;
+                          setSelectedSavedAddressId(null);
+                          setState(e.target.value);
+                        }}
                         style={{ width: "100%", padding: "11px 10px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13px", outline: "none", backgroundColor: "#FFFFFF" }}
                       >
                         {INDIAN_STATES.map((st) => (
@@ -598,11 +827,16 @@ export default function CheckoutPage() {
                         type="text"
                         required
                         value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
+                        onChange={(e) => handlePostalCodeChange(e.target.value)}
                         placeholder="400050"
                         maxLength={6}
                         style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
                       />
+                      {pinFeedback && (
+                        <div style={{ fontSize: "11px", color: "#2B9348", fontWeight: 700, marginTop: "4px" }}>
+                          {pinFeedback}
+                        </div>
+                      )}
                     </div>
 
                     <div>

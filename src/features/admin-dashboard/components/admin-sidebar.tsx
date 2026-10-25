@@ -14,6 +14,7 @@ import {
   Truck,
   ShieldCheck,
   Settings,
+  Database,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
@@ -143,6 +144,16 @@ const SIDEBAR_ITEMS: NavSection[] = [
       { label: "Notification Settings", href: "/admin/settings?tab=notifications" },
     ],
   },
+  {
+    id: "database",
+    label: "Database & Collections",
+    icon: Database,
+    href: "/admin/database",
+    children: [
+      { label: "Collections Overview", href: "/admin/database" },
+      { label: "Initialize Collections", href: "/admin/database" },
+    ],
+  },
 ];
 
 export function AdminSidebar({
@@ -162,6 +173,7 @@ export function AdminSidebar({
     shipping: pathname.startsWith("/admin/shipping"),
     admins: pathname.startsWith("/admin/admin-users") || pathname.startsWith("/admin/roles"),
     settings: pathname.startsWith("/admin/settings"),
+    database: pathname.startsWith("/admin/database"),
   });
 
   const toggleSection = (id: string, e: React.MouseEvent) => {

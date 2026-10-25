@@ -133,7 +133,7 @@ function OrderSuccessContent() {
 
           <p style={{ fontSize: "14.5px", color: "#666057", maxWidth: "520px", margin: "0 auto" }}>
             {currentOrder
-              ? <>We've received your request and our fulfillment team is preparing your package. A confirmation has been dispatched to <strong>{currentOrder.shippingAddress.email}</strong>.</>
+              ? <>We&apos;ve received your request and our fulfillment team is preparing your package. A confirmation has been dispatched to <strong>{currentOrder.shippingAddress?.email || "your email"}</strong>.</>
               : "Your order was received. Sign in with the account used at checkout to view the protected order details."}
           </p>
         </div>
@@ -330,16 +330,21 @@ function OrderSuccessContent() {
                     <span>Shipping To</span>
                   </div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#111110" }}>
-                    {currentOrder.shippingAddress.fullName}
+                    {currentOrder.shippingAddress?.fullName || "Valued Customer"}
                   </div>
                   <div style={{ fontSize: "12.5px", color: "#6F6961", marginTop: "2px", lineHeight: "1.4" }}>
-                    {currentOrder.shippingAddress.street}
-                    {currentOrder.shippingAddress.apartment ? `, ${currentOrder.shippingAddress.apartment}` : ""}
+                    {currentOrder.shippingAddress?.street || "Address on file"}
+                    {currentOrder.shippingAddress?.apartment ? `, ${currentOrder.shippingAddress.apartment}` : ""}
                     <br />
-                    {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state} -{" "}
-                    {currentOrder.shippingAddress.postalCode}
-                    <br />
-                    Phone: {currentOrder.shippingAddress.phone}
+                    {currentOrder.shippingAddress?.city ? `${currentOrder.shippingAddress.city}, ` : ""}
+                    {currentOrder.shippingAddress?.state ? `${currentOrder.shippingAddress.state} ` : ""}
+                    {currentOrder.shippingAddress?.postalCode ? `- ${currentOrder.shippingAddress.postalCode}` : ""}
+                    {currentOrder.shippingAddress?.phone && (
+                      <>
+                        <br />
+                        Phone: {currentOrder.shippingAddress.phone}
+                      </>
+                    )}
                   </div>
                 </div>
 
