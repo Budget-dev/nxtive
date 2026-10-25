@@ -45,11 +45,9 @@ export default function TermsOfServicePage() {
 
         {/* Legal Card */}
         <div
+          className="legal-card"
           style={{
-            backgroundColor: "#FFFFFF",
-            borderRadius: "16px",
-            padding: "40px",
-            border: "1px solid rgba(0,0,0,0.06)",
+            padding: "clamp(20px, 4vw, 40px)",
             boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
             fontSize: "14px",
             color: "#554F47",
@@ -61,7 +59,7 @@ export default function TermsOfServicePage() {
               1. Acceptance of Terms
             </h2>
             <p>
-              By accessing, browsing, or purchasing products on NXTIVE ("nxtvie.com"), you agree to be legally bound by these Terms of Service, our Privacy Policy, and our Shipping and Returns guidelines. If you do not agree to all provisions, you should refrain from using our platforms.
+              By accessing, browsing, or purchasing products on NXTIVE ("nxtive.com"), you agree to be legally bound by these Terms of Service, our Privacy Policy, and our Shipping and Returns guidelines. If you do not agree to all provisions, you should refrain from using our platforms.
             </p>
           </section>
 

@@ -450,11 +450,10 @@ export function PressClient() {
       {/* Media Inquiries Form */}
       <section className="container" style={{ maxWidth: "720px", paddingTop: "10px" }}>
         <div
+          className="info-card"
           style={{
-            backgroundColor: "#FFFFFF",
             borderRadius: "20px",
-            padding: "40px",
-            border: "1px solid rgba(0,0,0,0.06)",
+            padding: "clamp(20px, 4vw, 40px)",
             boxShadow: "0 6px 24px rgba(0,0,0,0.02)",
           }}
         >
@@ -498,7 +497,7 @@ export function PressClient() {
             </div>
           ) : (
             <form onSubmit={handlePrSubmit}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+              <div className="form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
                     Your Name *

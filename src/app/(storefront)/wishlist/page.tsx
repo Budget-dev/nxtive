@@ -83,8 +83,9 @@ export default function WishlistPage() {
 
         {savedProducts.length === 0 ? (
           <div
+            className="info-card"
             style={{
-              padding: "70px 20px",
+              padding: "clamp(40px, 8vw, 70px) clamp(16px, 4vw, 24px)",
               textAlign: "center",
               backgroundColor: "#FFFFFF",
               borderRadius: "14px",
@@ -159,6 +160,11 @@ export default function WishlistPage() {
           .wishlist-grid {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 16px 12px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .wishlist-grid {
+            gap: 12px 8px !important;
           }
         }
       `}</style>

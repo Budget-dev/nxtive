@@ -184,7 +184,16 @@ export function SizeGuideClient() {
           }}
         >
           {/* Category Tabs */}
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <div
+            className="scroll-touch no-scrollbar"
+            style={{
+              display: "flex",
+              gap: "8px",
+              overflowX: "auto",
+              whiteSpace: "nowrap",
+              paddingBottom: "4px",
+            }}
+          >
             {[
               { id: "tshirts", label: "T-Shirts" },
               { id: "hoodies", label: "Hoodies" },
@@ -266,13 +275,13 @@ export function SizeGuideClient() {
 
         {/* Table Card */}
         <div
+          className="info-card"
           style={{
-            backgroundColor: "#FFFFFF",
             borderRadius: "18px",
-            border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 6px 24px rgba(0,0,0,0.02)",
             overflow: "hidden",
             marginBottom: "36px",
+            padding: 0,
           }}
         >
           {/* Table Header Bar */}
@@ -302,7 +311,7 @@ export function SizeGuideClient() {
           </div>
 
           {/* Sizing Table */}
-          <div style={{ overflowX: "auto" }}>
+          <div className="scroll-touch" style={{ overflowX: "auto" }}>
             <table
               style={{
                 width: "100%",

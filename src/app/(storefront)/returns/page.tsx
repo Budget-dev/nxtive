@@ -46,11 +46,9 @@ export default function ReturnsPolicyPage() {
 
         {/* 3 Steps Process */}
         <div
+          className="legal-card"
           style={{
-            backgroundColor: "#FFFFFF",
-            borderRadius: "16px",
             padding: "36px",
-            border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 6px 20px rgba(0,0,0,0.02)",
             marginBottom: "36px",
           }}
@@ -102,8 +100,8 @@ export default function ReturnsPolicyPage() {
                   Orders Page
                 </Link>{" "}
                 or email{" "}
-                <a href="mailto:support@nxtvie.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
-                  support@nxtvie.com
+                <a href="mailto:support@nxtive.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
+                  support@nxtive.com
                 </a>{" "}
                 with your order ID and the preferred exchange size.
               </p>
@@ -165,11 +163,9 @@ export default function ReturnsPolicyPage() {
 
         {/* Conditions Card */}
         <div
+          className="legal-card"
           style={{
-            backgroundColor: "#FAF9F5",
-            borderRadius: "14px",
             padding: "28px",
-            border: "1px solid rgba(0,0,0,0.06)",
             marginBottom: "36px",
           }}
         >

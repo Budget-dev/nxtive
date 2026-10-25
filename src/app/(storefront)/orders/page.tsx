@@ -149,7 +149,17 @@ export default function OrdersPage() {
         </div>
 
         {/* Filter Pills */}
-        <div style={{ display: "flex", gap: "10px", marginBottom: "28px" }}>
+        <div
+          className="scroll-touch no-scrollbar"
+          style={{
+            display: "flex",
+            gap: "10px",
+            marginBottom: "28px",
+            overflowX: "auto",
+            whiteSpace: "nowrap",
+            paddingBottom: "4px",
+          }}
+        >
           {[
             { id: "all", label: `All Orders (${orders.length})` },
             {
@@ -175,6 +185,7 @@ export default function OrdersPage() {
                 color: filter === tab.id ? "#FFFFFF" : "#111110",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
+                flexShrink: 0,
               }}
             >
               {tab.label}
@@ -185,12 +196,10 @@ export default function OrdersPage() {
         {/* Orders List */}
         {filteredOrders.length === 0 ? (
           <div
+            className="order-card"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "16px",
               padding: "60px 24px",
               textAlign: "center",
-              border: "1px solid rgba(0,0,0,0.06)",
               boxShadow: "0 4px 16px rgba(0,0,0,0.02)",
             }}
           >
@@ -230,19 +239,18 @@ export default function OrdersPage() {
               return (
                 <div
                   key={order.id}
+                  className="order-card"
                   style={{
-                    backgroundColor: "#FFFFFF",
-                    borderRadius: "16px",
-                    border: "1px solid rgba(0,0,0,0.06)",
                     boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
                     overflow: "hidden",
+                    padding: 0,
                     transition: "box-shadow 0.2s ease",
                   }}
                 >
                   {/* Order Top Bar */}
                   <div
                     style={{
-                      padding: "18px 24px",
+                      padding: "clamp(14px, 3vw, 18px) clamp(16px, 3.5vw, 24px)",
                       backgroundColor: "#FAF9F5",
                       borderBottom: "1px solid rgba(0,0,0,0.05)",
                       display: "flex",

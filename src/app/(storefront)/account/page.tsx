@@ -567,7 +567,7 @@ function AccountContent() {
             borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "18px", minWidth: 0, flex: "1 1 300px" }}>
             <div
               style={{
                 width: "58px",
@@ -582,11 +582,12 @@ function AccountContent() {
                 fontWeight: 800,
                 letterSpacing: "0.02em",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                flexShrink: 0,
               }}
             >
               {profileName ? profileName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase() || "N"}
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div
                 style={{
                   fontSize: "11px",
@@ -597,6 +598,7 @@ function AccountContent() {
                   marginBottom: "4px",
                   display: "flex",
                   alignItems: "center",
+                  flexWrap: "wrap",
                   gap: "6px",
                 }}
               >
@@ -606,16 +608,17 @@ function AccountContent() {
               </div>
               <h1
                 style={{
-                  fontSize: "28px",
+                  fontSize: "clamp(22px, 3.5vw, 28px)",
                   fontWeight: 900,
                   letterSpacing: "-0.02em",
                   textTransform: "uppercase",
                   color: "#121110",
+                  wordBreak: "break-word",
                 }}
               >
                 {profileName || user.email?.split("@")[0] || "Customer"}
               </h1>
-              <div style={{ fontSize: "13px", color: "#746E66", marginTop: "2px" }}>
+              <div style={{ fontSize: "13px", color: "#746E66", marginTop: "2px", wordBreak: "break-all" }}>
                 {user.email}
               </div>
             </div>
@@ -647,14 +650,16 @@ function AccountContent() {
 
         {/* Navigation Tabs */}
         <div
+          className="scroll-touch no-scrollbar"
           style={{
             display: "flex",
             alignItems: "center",
             gap: "8px",
             overflowX: "auto",
-            paddingBottom: "4px",
+            paddingBottom: "8px",
             marginBottom: "32px",
             borderBottom: "1px solid rgba(0,0,0,0.06)",
+            whiteSpace: "nowrap",
           }}
         >
           {[
@@ -709,11 +714,9 @@ function AccountContent() {
               }}
             >
               <div
+                className="account-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "14px",
                   padding: "22px",
-                  border: "1px solid rgba(0, 0, 0, 0.05)",
                   boxShadow: "0 4px 14px rgba(0, 0, 0, 0.02)",
                   display: "flex",
                   flexDirection: "column",
@@ -752,11 +755,9 @@ function AccountContent() {
               </div>
 
               <div
+                className="account-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "14px",
                   padding: "22px",
-                  border: "1px solid rgba(0, 0, 0, 0.05)",
                   boxShadow: "0 4px 14px rgba(0, 0, 0, 0.02)",
                   display: "flex",
                   flexDirection: "column",
@@ -790,11 +791,9 @@ function AccountContent() {
               </div>
 
               <div
+                className="account-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "14px",
                   padding: "22px",
-                  border: "1px solid rgba(0, 0, 0, 0.05)",
                   boxShadow: "0 4px 14px rgba(0, 0, 0, 0.02)",
                   display: "flex",
                   flexDirection: "column",
@@ -844,11 +843,9 @@ function AccountContent() {
             >
               {/* Latest Order Card */}
               <div
+                className="account-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "16px",
                   padding: "26px",
-                  border: "1px solid rgba(0,0,0,0.06)",
                   boxShadow: "0 4px 16px rgba(0,0,0,0.02)",
                 }}
               >
@@ -1002,11 +999,9 @@ function AccountContent() {
 
               {/* Default Address Preview */}
               <div
+                className="account-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "16px",
                   padding: "26px",
-                  border: "1px solid rgba(0,0,0,0.06)",
                   boxShadow: "0 4px 16px rgba(0,0,0,0.02)",
                   display: "flex",
                   flexDirection: "column",

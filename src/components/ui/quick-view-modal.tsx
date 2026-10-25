@@ -62,6 +62,7 @@ export function QuickViewModal() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
+            className="quick-view-grid"
             style={{
               position: "relative",
               width: "100%",
@@ -102,6 +103,7 @@ export function QuickViewModal() {
 
         {/* Product Image */}
         <div
+          className="quick-view-image-wrap"
           style={{
             position: "relative",
             minHeight: "380px",
@@ -127,6 +129,7 @@ export function QuickViewModal() {
 
         {/* Product Details */}
         <div
+          className="quick-view-body"
           style={{
             padding: "36px 32px",
             display: "flex",

@@ -72,10 +72,11 @@ export function ContactClient() {
         >
           {/* Left: Interactive Contact Form */}
           <div
+            className="info-card"
             style={{
               backgroundColor: "#FFFFFF",
               borderRadius: "16px",
-              padding: "36px",
+              padding: "clamp(20px, 4vw, 36px)",
               border: "1px solid rgba(0,0,0,0.06)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.03)",
             }}
@@ -276,10 +277,11 @@ export function ContactClient() {
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Contact Info Card */}
             <div
+              className="info-card"
               style={{
                 backgroundColor: "#FFFFFF",
                 borderRadius: "16px",
-                padding: "30px",
+                padding: "clamp(18px, 3.5vw, 30px)",
                 border: "1px solid rgba(0,0,0,0.06)",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.03)",
               }}
@@ -310,10 +312,10 @@ export function ContactClient() {
                       Customer Support
                     </div>
                     <a
-                      href="mailto:support@nxtvie.com"
+                      href="mailto:support@nxtive.com"
                       style={{ fontSize: "14px", fontWeight: 700, color: "#111110", textDecoration: "underline" }}
                     >
-                      support@nxtvie.com
+                      support@nxtive.com
                     </a>
                     <div style={{ fontSize: "12px", color: "#746E66", marginTop: "2px" }}>
                       Expected response within 12 hours

@@ -283,9 +283,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
         @media (hover: none), (pointer: coarse) {
           .product-card-wrap .quick-view-hover-btn {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateX(-50%) translateY(0);
+            display: none;
           }
         }
       `}</style>

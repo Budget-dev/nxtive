@@ -54,11 +54,9 @@ export default function ShippingPolicyPage() {
           }}
         >
           <div
+            className="legal-card"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "14px",
               padding: "24px",
-              border: "1px solid rgba(0,0,0,0.05)",
               boxShadow: "0 4px 14px rgba(0,0,0,0.02)",
             }}
           >
@@ -70,11 +68,9 @@ export default function ShippingPolicyPage() {
           </div>
 
           <div
+            className="legal-card"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "14px",
               padding: "24px",
-              border: "1px solid rgba(0,0,0,0.05)",
               boxShadow: "0 4px 14px rgba(0,0,0,0.02)",
             }}
           >
@@ -86,11 +82,9 @@ export default function ShippingPolicyPage() {
           </div>
 
           <div
+            className="legal-card"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "14px",
               padding: "24px",
-              border: "1px solid rgba(0,0,0,0.05)",
               boxShadow: "0 4px 14px rgba(0,0,0,0.02)",
             }}
           >
@@ -104,13 +98,12 @@ export default function ShippingPolicyPage() {
 
         {/* Detailed Shipping Table */}
         <div
+          className="legal-card"
           style={{
-            backgroundColor: "#FFFFFF",
-            borderRadius: "16px",
-            border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
             overflow: "hidden",
             marginBottom: "36px",
+            padding: 0,
           }}
         >
           <div style={{ padding: "20px 28px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
@@ -119,7 +112,7 @@ export default function ShippingPolicyPage() {
             </h3>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="scroll-touch" style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
               <thead>
                 <tr style={{ backgroundColor: "#FAF9F5", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
@@ -186,8 +179,8 @@ export default function ShippingPolicyPage() {
             </h3>
             <p>
               All shipments are secured with tamper-evident security tape. If you observe that your outer parcel has been significantly compromised, punctured, or opened prior to delivery, we request you to reject receipt or document photographs before opening and contact us within 24 hours at{" "}
-              <a href="mailto:support@nxtvie.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
-                support@nxtvie.com
+              <a href="mailto:support@nxtive.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
+                support@nxtive.com
               </a>.
             </p>
           </div>

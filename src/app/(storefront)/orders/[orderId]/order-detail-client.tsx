@@ -219,10 +219,8 @@ export function OrderDetailClient({ orderId }: Props) {
 
         {/* Order Header Card */}
         <div
+          className="order-card"
           style={{
-            backgroundColor: "#FFFFFF",
-            borderRadius: "16px",
-            border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
             padding: "28px",
             marginBottom: "24px",
@@ -357,11 +355,9 @@ export function OrderDetailClient({ orderId }: Props) {
         >
           {/* Left Column: Items List */}
           <div
+            className="order-card"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "16px",
               padding: "28px",
-              border: "1px solid rgba(0,0,0,0.06)",
               boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
             }}
           >
@@ -457,11 +453,9 @@ export function OrderDetailClient({ orderId }: Props) {
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             {/* Address */}
             <div
+              className="order-card"
               style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "16px",
                 padding: "24px",
-                border: "1px solid rgba(0,0,0,0.06)",
                 boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
               }}
             >
@@ -503,11 +497,9 @@ export function OrderDetailClient({ orderId }: Props) {
 
             {/* Payment Summary */}
             <div
+              className="order-card"
               style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "16px",
                 padding: "24px",
-                border: "1px solid rgba(0,0,0,0.06)",
                 boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
               }}
             >

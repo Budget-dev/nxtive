@@ -173,7 +173,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                   width: "74px",
                   flexShrink: 0,
                 }}
-                className="pdp-thumbnails"
+                className="pdp-thumbnails scroll-touch no-scrollbar"
               >
                 {gallery.map((img, idx) => (
                   <button
@@ -830,12 +830,15 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
               onClick={() => setShowReviewModal(false)}
             >
               <div
+                className="info-card"
                 style={{
                   backgroundColor: "#FFFFFF",
                   borderRadius: "16px",
-                  padding: "32px",
+                  padding: "clamp(20px, 4vw, 32px)",
                   maxWidth: "480px",
                   width: "100%",
+                  maxHeight: "90vh",
+                  overflowY: "auto",
                   boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -1047,14 +1050,16 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
             }}
           />
           <div
-            className="pdp-size-guide-card"
+            className="pdp-size-guide-card info-card"
             style={{
               position: "relative",
               width: "100%",
               maxWidth: "540px",
               backgroundColor: "#FFFFFF",
               borderRadius: "14px",
-              padding: "32px",
+              padding: "clamp(20px, 4vw, 32px)",
+              maxHeight: "90vh",
+              overflowY: "auto",
               zIndex: 10,
               boxShadow: "0 20px 50px rgba(0,0,0,0.2)",
             }}

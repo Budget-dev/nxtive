@@ -126,12 +126,10 @@ export default function CartPage() {
             <div>
               {/* Free Shipping Progress Bar */}
               <div
+                className="cart-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "12px",
                   padding: "18px 22px",
                   marginBottom: "24px",
-                  border: "1px solid rgba(0,0,0,0.06)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "13px" }}>
@@ -170,11 +168,9 @@ export default function CartPage() {
 
               {/* Items Card */}
               <div
+                className="cart-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "14px",
                   padding: "24px",
-                  border: "1px solid rgba(0,0,0,0.06)",
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -193,8 +189,8 @@ export default function CartPage() {
                       <Link
                         href={`/products/${item.slug || item.id}`}
                         style={{
-                          width: "90px",
-                          height: "115px",
+                          width: "clamp(74px, 20vw, 90px)",
+                          height: "clamp(96px, 24vw, 115px)",
                           borderRadius: "8px",
                           overflow: "hidden",
                           backgroundColor: "#EBE7DF",
@@ -230,7 +226,12 @@ export default function CartPage() {
                               aria-label="Remove item"
                               style={{
                                 color: "#8E8880",
-                                padding: "4px",
+                                padding: "6px",
+                                minWidth: "32px",
+                                minHeight: "32px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
                                 cursor: "pointer",
                                 transition: "color 0.2s ease",
                               }}
@@ -257,13 +258,24 @@ export default function CartPage() {
                               border: "1px solid rgba(0, 0, 0, 0.15)",
                               borderRadius: "9999px",
                               backgroundColor: "#FAF9F6",
-                              padding: "3px 10px",
-                              gap: "12px",
+                              padding: "2px 8px",
+                              gap: "8px",
                             }}
                           >
                             <button
                               onClick={() => updateQuantity(item.id, item.selectedSize, -1, item.selectedColor)}
-                              style={{ fontSize: "15px", color: "#111110", cursor: "pointer" }}
+                              style={{
+                                fontSize: "16px",
+                                color: "#111110",
+                                cursor: "pointer",
+                                minWidth: "28px",
+                                minHeight: "28px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "none",
+                                border: "none",
+                              }}
                               aria-label="Decrease"
                             >
                               -
@@ -273,7 +285,18 @@ export default function CartPage() {
                             </span>
                             <button
                               onClick={() => updateQuantity(item.id, item.selectedSize, 1, item.selectedColor)}
-                              style={{ fontSize: "15px", color: "#111110", cursor: "pointer" }}
+                              style={{
+                                fontSize: "16px",
+                                color: "#111110",
+                                cursor: "pointer",
+                                minWidth: "28px",
+                                minHeight: "28px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "none",
+                                border: "none",
+                              }}
                               aria-label="Increase"
                             >
                               +
@@ -295,11 +318,9 @@ export default function CartPage() {
             {/* Right: Sticky Order Summary & Coupon */}
             <div style={{ position: "sticky", top: "90px" }}>
               <div
+                className="cart-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "14px",
                   padding: "28px",
-                  border: "1px solid rgba(0,0,0,0.06)",
                   boxShadow: "0 6px 24px rgba(0,0,0,0.04)",
                 }}
               >

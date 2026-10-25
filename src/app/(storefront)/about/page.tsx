@@ -243,11 +243,9 @@ export default function AboutPage() {
             ].map((pillar) => (
               <div
                 key={pillar.title}
+                className="info-card"
                 style={{
-                  backgroundColor: "#FFFFFF",
                   padding: "32px 26px",
-                  borderRadius: "14px",
-                  border: "1px solid rgba(0, 0, 0, 0.05)",
                   boxShadow: "0 6px 20px rgba(0, 0, 0, 0.02)",
                 }}
               >

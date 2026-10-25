@@ -435,12 +435,9 @@ export function CareersClient() {
           {filteredJobs.map((job) => (
             <div
               key={job.id}
+              className="info-card"
               style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "16px",
                 padding: "26px 30px",
-                border: "1px solid rgba(0,0,0,0.06)",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.02)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -511,11 +508,10 @@ export function CareersClient() {
 
         {/* Speculative Application Card */}
         <div
+          className="info-card"
           style={{
             marginTop: "48px",
-            backgroundColor: "#FFFFFF",
-            borderRadius: "16px",
-            padding: "36px",
+            padding: "clamp(22px, 4vw, 36px)",
             textAlign: "center",
             border: "1px dashed rgba(147, 96, 55, 0.4)",
             maxWidth: "680px",
@@ -574,7 +570,7 @@ export function CareersClient() {
               width: "100%",
               maxHeight: "90vh",
               overflowY: "auto",
-              padding: "36px",
+              padding: "clamp(20px, 4.5vw, 36px)",
               position: "relative",
               boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
             }}
@@ -657,7 +653,7 @@ export function CareersClient() {
                     Your Information
                   </h4>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                  <div className="form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                     <div>
                       <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
                         Full Name *
@@ -686,7 +682,7 @@ export function CareersClient() {
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                  <div className="form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                     <div>
                       <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
                         Phone

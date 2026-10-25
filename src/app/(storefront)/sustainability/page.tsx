@@ -175,10 +175,11 @@ export default function SustainabilityPage() {
           {PILLARS.map((pillar) => (
             <div
               key={pillar.title}
+              className="info-card"
               style={{
                 backgroundColor: "#FFFFFF",
                 borderRadius: "16px",
-                padding: "32px 28px",
+                padding: "clamp(20px, 4vw, 32px) clamp(18px, 3.5vw, 28px)",
                 border: "1px solid rgba(0,0,0,0.06)",
                 boxShadow: "0 6px 20px rgba(0,0,0,0.02)",
                 display: "flex",
@@ -231,10 +232,11 @@ export default function SustainabilityPage() {
       {/* Heavyweight Durability Philosophy */}
       <section className="container" style={{ paddingTop: "30px", paddingBottom: "50px" }}>
         <div
+          className="responsive-split-grid info-card"
           style={{
             backgroundColor: "#FFFFFF",
             borderRadius: "20px",
-            padding: "44px 40px",
+            padding: "clamp(20px, 4vw, 44px) clamp(18px, 4vw, 40px)",
             border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 8px 30px rgba(0,0,0,0.03)",
             display: "grid",
@@ -242,7 +244,6 @@ export default function SustainabilityPage() {
             gap: "40px",
             alignItems: "center",
           }}
-          className="responsive-split-grid"
         >
           <div>
             <span
@@ -358,14 +359,15 @@ export default function SustainabilityPage() {
           {ROADMAP.map((item) => (
             <div
               key={item.year}
+              className="info-card"
               style={{
                 backgroundColor: "#FFFFFF",
                 borderRadius: "14px",
-                padding: "20px 24px",
+                padding: "clamp(14px, 3vw, 20px) clamp(16px, 3.5vw, 24px)",
                 border: "1px solid rgba(0,0,0,0.06)",
                 display: "flex",
                 alignItems: "center",
-                gap: "20px",
+                gap: "clamp(12px, 3vw, 20px)",
               }}
             >
               <div

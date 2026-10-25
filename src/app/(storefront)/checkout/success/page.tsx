@@ -120,7 +120,7 @@ function OrderSuccessContent() {
 
           <h1
             style={{
-              fontSize: "34px",
+              fontSize: "clamp(24px, 5vw, 34px)",
               fontWeight: 900,
               letterSpacing: "-0.03em",
               textTransform: "uppercase",
@@ -141,6 +141,7 @@ function OrderSuccessContent() {
         {/* Order Details Card */}
         {currentOrder ? (
           <div
+            className="order-card"
             style={{
               backgroundColor: "#FFFFFF",
               borderRadius: "16px",
@@ -155,7 +156,7 @@ function OrderSuccessContent() {
               style={{
                 backgroundColor: "#161514",
                 color: "#FFFFFF",
-                padding: "20px 28px",
+                padding: "clamp(16px, 3.5vw, 20px) clamp(16px, 4vw, 28px)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -207,7 +208,7 @@ function OrderSuccessContent() {
             {/* Estimated Delivery Banner */}
             <div
               style={{
-                padding: "16px 28px",
+                padding: "clamp(12px, 3vw, 16px) clamp(16px, 4vw, 28px)",
                 backgroundColor: "#FAF8F5",
                 borderBottom: "1px solid rgba(0,0,0,0.05)",
                 display: "flex",
@@ -230,7 +231,7 @@ function OrderSuccessContent() {
             </div>
 
             {/* Items List */}
-            <div style={{ padding: "28px" }}>
+            <div style={{ padding: "clamp(16px, 4vw, 28px)" }}>
               <h3
                 style={{
                   fontSize: "13px",

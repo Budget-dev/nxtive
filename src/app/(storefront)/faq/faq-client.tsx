@@ -140,7 +140,7 @@ export function FaqClient() {
           </span>
           <h1
             style={{
-              fontSize: "36px",
+              fontSize: "clamp(24px, 5vw, 36px)",
               fontWeight: 900,
               letterSpacing: "-0.03em",
               textTransform: "uppercase",
@@ -150,7 +150,7 @@ export function FaqClient() {
           >
             Frequently Asked Questions
           </h1>
-          <p style={{ fontSize: "14.5px", color: "#6A645C", maxWidth: "520px", margin: "0 auto 28px auto" }}>
+          <p style={{ fontSize: "clamp(13px, 2.8vw, 14.5px)", color: "#6A645C", maxWidth: "520px", margin: "0 auto 28px auto" }}>
             Everything you need to know about our fits, ordering, domestic shipping, and sustainable craftsmanship.
           </p>
 
@@ -251,6 +251,7 @@ export function FaqClient() {
               return (
                 <div
                   key={faq.id}
+                  className="info-card"
                   style={{
                     backgroundColor: "#FFFFFF",
                     borderRadius: "12px",
@@ -264,18 +265,18 @@ export function FaqClient() {
                     onClick={() => toggleAccordion(faq.id)}
                     style={{
                       width: "100%",
-                      padding: "20px 24px",
+                      padding: "clamp(16px, 3.5vw, 20px) clamp(16px, 3.5vw, 24px)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      gap: "16px",
+                      gap: "14px",
                       backgroundColor: "transparent",
                       border: "none",
                       textAlign: "left",
                       cursor: "pointer",
                     }}
                   >
-                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#111110" }}>
+                    <span style={{ fontSize: "clamp(14px, 3vw, 15px)", fontWeight: 700, color: "#111110" }}>
                       {faq.question}
                     </span>
                     <ChevronDown
@@ -292,7 +293,7 @@ export function FaqClient() {
                   {isOpen && (
                     <div
                       style={{
-                        padding: "0 24px 22px 24px",
+                        padding: "0 clamp(16px, 3.5vw, 24px) clamp(16px, 3.5vw, 22px) clamp(16px, 3.5vw, 24px)",
                         fontSize: "13.5px",
                         color: "#5C564E",
                         lineHeight: 1.65,
@@ -315,11 +316,11 @@ export function FaqClient() {
             backgroundColor: "#161514",
             color: "#FFFFFF",
             borderRadius: "16px",
-            padding: "36px",
+            padding: "clamp(24px, 5vw, 36px)",
             textAlign: "center",
           }}
         >
-          <h3 style={{ fontSize: "20px", fontWeight: 800, textTransform: "uppercase", marginBottom: "8px" }}>
+          <h3 style={{ fontSize: "clamp(17px, 3.8vw, 20px)", fontWeight: 800, textTransform: "uppercase", marginBottom: "8px" }}>
             Still have questions?
           </h3>
           <p style={{ fontSize: "13.5px", color: "#A8A29A", maxWidth: "440px", margin: "0 auto 20px auto" }}>

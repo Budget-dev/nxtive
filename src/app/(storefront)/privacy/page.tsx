@@ -45,11 +45,9 @@ export default function PrivacyPolicyPage() {
 
         {/* Legal Text Card */}
         <div
+          className="legal-card"
           style={{
-            backgroundColor: "#FFFFFF",
-            borderRadius: "16px",
-            padding: "40px",
-            border: "1px solid rgba(0,0,0,0.06)",
+            padding: "clamp(20px, 4vw, 40px)",
             boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
             fontSize: "14px",
             color: "#554F47",
@@ -61,7 +59,7 @@ export default function PrivacyPolicyPage() {
               1. Overview
             </h2>
             <p>
-              At NXTIVE ("we", "our", or "us"), we value your trust and are committed to safeguarding your personal data. This Privacy Policy details the types of information we collect through our website (nxtvie.com), our client concierge, and checkout gateways, and explains how that data is stored, processed, and respected.
+              At NXTIVE ("we", "our", or "us"), we value your trust and are committed to safeguarding your personal data. This Privacy Policy details the types of information we collect through our website (nxtive.com), our client concierge, and checkout gateways, and explains how that data is stored, processed, and respected.
             </p>
           </section>
 

@@ -186,7 +186,7 @@ export default function RegisterPage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          padding: "clamp(32px, 5vw, 64px)",
+          padding: "clamp(24px, 5vw, 64px) clamp(16px, 4vw, 40px)",
           maxWidth: "520px",
           width: "100%",
           margin: "0 auto",

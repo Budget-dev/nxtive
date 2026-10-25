@@ -190,7 +190,7 @@ function ProductsContent() {
               paddingBottom: "4px",
               maxWidth: "100%",
             }}
-            className="category-pill-row"
+            className="category-pill-row scroll-touch no-scrollbar"
           >
             {categories.map((cat) => {
               const isActive = selectedCategory === cat;
@@ -282,10 +282,11 @@ function ProductsContent() {
         {/* Collapsible Filter Panel */}
         {showMobileFilters && (
           <div
+            className="info-card"
             style={{
               backgroundColor: "#FFFFFF",
               borderRadius: "12px",
-              padding: "24px",
+              padding: "clamp(16px, 3.5vw, 24px)",
               border: "1px solid rgba(0, 0, 0, 0.08)",
               marginBottom: "28px",
               boxShadow: "0 6px 20px rgba(0, 0, 0, 0.04)",
@@ -409,8 +410,9 @@ function ProductsContent() {
         {/* Product Grid */}
         {filteredProducts.length === 0 ? (
           <div
+            className="info-card"
             style={{
-              padding: "60px 20px",
+              padding: "clamp(40px, 6vw, 60px) 20px",
               textAlign: "center",
               backgroundColor: "#FFFFFF",
               borderRadius: "12px",

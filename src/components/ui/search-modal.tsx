@@ -49,7 +49,7 @@ export function SearchModal() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            padding: "70px 20px 20px",
+            padding: "clamp(20px, 6vh, 70px) clamp(12px, 3vw, 20px) 20px",
           }}
         >
           {/* Backdrop */}
@@ -80,6 +80,9 @@ export function SearchModal() {
               backgroundColor: "#FAF9F6",
               borderRadius: "14px",
               overflow: "hidden",
+              maxHeight: "86vh",
+              display: "flex",
+              flexDirection: "column",
               boxShadow: "0 24px 60px rgba(0, 0, 0, 0.25)",
               border: "1px solid rgba(0, 0, 0, 0.08)",
               zIndex: 10,
@@ -176,7 +179,15 @@ export function SearchModal() {
         )}
 
         {/* Results List */}
-        <div style={{ maxHeight: "380px", overflowY: "auto", padding: "14px 22px" }}>
+        <div
+          className="scroll-touch"
+          style={{
+            flex: 1,
+            maxHeight: "calc(86vh - 120px)",
+            overflowY: "auto",
+            padding: "14px clamp(14px, 3.5vw, 22px)",
+          }}
+        >
           <div style={{ fontSize: "11px", fontWeight: 700, color: "#8E8880", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>
             {query.trim() ? `Search Results (${results.length})` : "Featured Drops"}
           </div>

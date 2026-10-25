@@ -123,7 +123,7 @@ export function CategoryViewClient({
           position: "relative",
           backgroundColor: "#11100F",
           color: "#FFFFFF",
-          padding: "72px 0 80px 0",
+          padding: "clamp(44px, 8vw, 72px) 0 clamp(48px, 8vw, 80px) 0",
           overflow: "hidden",
           borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
         }}
@@ -300,7 +300,7 @@ export function CategoryViewClient({
               scrollbarWidth: "none",
               paddingBottom: "2px",
             }}
-            className="no-scrollbar"
+            className="scroll-touch no-scrollbar"
           >
             <Link
               href="/products"
@@ -351,6 +351,7 @@ export function CategoryViewClient({
       <main className="container" style={{ paddingTop: "32px" }}>
         {/* Filter & Sorting Controls Header */}
         <div
+          className="info-card"
           style={{
             display: "flex",
             alignItems: "center",
@@ -359,9 +360,6 @@ export function CategoryViewClient({
             gap: "16px",
             marginBottom: "20px",
             padding: "16px 20px",
-            backgroundColor: "#FFFFFF",
-            borderRadius: "12px",
-            border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
           }}
         >

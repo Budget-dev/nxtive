@@ -304,6 +304,7 @@ export function CartDrawer() {
           <div
             style={{
               padding: "20px 24px",
+              paddingBottom: "max(24px, env(safe-area-inset-bottom))",
               backgroundColor: "#FFFFFF",
               borderTop: "1px solid var(--border-light)",
               display: "flex",

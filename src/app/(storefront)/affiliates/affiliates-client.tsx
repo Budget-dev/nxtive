@@ -424,11 +424,10 @@ export function AffiliatesClient() {
       {/* Application Form */}
       <section id="apply" className="container" style={{ maxWidth: "700px" }}>
         <div
+          className="info-card"
           style={{
-            backgroundColor: "#FFFFFF",
             borderRadius: "20px",
-            padding: "40px",
-            border: "1px solid rgba(0,0,0,0.06)",
+            padding: "clamp(20px, 4vw, 40px)",
             boxShadow: "0 6px 24px rgba(0,0,0,0.02)",
           }}
         >
@@ -472,7 +471,7 @@ export function AffiliatesClient() {
             </div>
           ) : (
             <form onSubmit={handleApplication}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+              <div className="form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
                     Full Name *
@@ -501,7 +500,7 @@ export function AffiliatesClient() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+              <div className="form-two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
                     Primary Social Platform
