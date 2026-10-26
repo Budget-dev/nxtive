@@ -2,4 +2,6 @@ node_modules/
 lib/
 *.log
 .env
+.env.local
 .env.*.local
+.env*.local
