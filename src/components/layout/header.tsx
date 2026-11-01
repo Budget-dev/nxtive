@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Search, Heart, ShoppingBag, User, Menu, X, ArrowRight, Moon, Sun } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+
 import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
 import { NxtvieLogo } from "./nxtvie-logo";
@@ -11,13 +12,13 @@ import { NxtvieLogo } from "./nxtvie-logo";
 const THEME_STORAGE_KEY = "nxtvie-theme";
 
 export function Header() {
+  const pathname = usePathname();
   const { totalCartCount, wishlist, setIsCartOpen, setIsSearchOpen } = useStore();
   const { user } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const shouldReduceMotion = useReducedMotion();
-
+  
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 15);
@@ -26,20 +27,32 @@ export function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+    // Always close mobile menu and release scroll lock whenever the route changes
   useEffect(() => {
-    if (!mobileMenuOpen) return;
+    setMobileMenuOpen(false);
+    document.body.style.overflow = "";
+    document.body.style.pointerEvents = "";
+  }, [pathname]);
 
-    const previousOverflow = document.body.style.overflow;
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileMenuOpen(false);
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+        document.body.style.overflow = "";
+      }
     };
 
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleEscape);
     };
   }, [mobileMenuOpen]);
 
@@ -346,32 +359,26 @@ export function Header() {
       </header>
 
       {/* Mobile Drawer Menu */}
-      <AnimatePresence initial={false}>
-        {mobileMenuOpen && (
-        <motion.div
-          key="mobile-menu"
+      {mobileMenuOpen && (
+        <div
           id="mobile-navigation-drawer"
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation"
-          initial={shouldReduceMotion ? false : { opacity: 0 }}
-           animate={shouldReduceMotion ? undefined : { opacity: 1 }}
-          exit={shouldReduceMotion ? undefined : { opacity: 0 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.2, ease: "easeOut" }}
           style={{
             position: "fixed",
             inset: 0,
             zIndex: 100,
             display: "flex",
+            animation: "mobileDrawerFadeIn 0.2s ease-out",
           }}
         >
           {/* Backdrop */}
-          <motion.div
-            onClick={() => setMobileMenuOpen(false)}
-            initial={shouldReduceMotion ? false : { opacity: 0 }}
-             animate={shouldReduceMotion ? undefined : { opacity: 1 }}
-            exit={shouldReduceMotion ? undefined : { opacity: 0 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.2, ease: "easeOut" }}
+          <div
+            onClick={() => {
+              setMobileMenuOpen(false);
+              document.body.style.overflow = "";
+            }}
             style={{
               position: "absolute",
               inset: 0,
@@ -381,12 +388,8 @@ export function Header() {
           />
 
           {/* Drawer Content */}
-          <motion.div
+          <div
             className="mobile-menu-drawer"
-            initial={shouldReduceMotion ? false : { x: "-100%" }}
-             animate={shouldReduceMotion ? undefined : { x: 0 }}
-            exit={shouldReduceMotion ? undefined : { x: "-100%" }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.28, ease: [0.16, 1, 0.3, 1] }}
             style={{
               position: "relative",
               width: "82%",
@@ -400,6 +403,7 @@ export function Header() {
               flexDirection: "column",
               padding: "max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))",
               boxShadow: "var(--shadow-lg)",
+              animation: "mobileDrawerSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           >
             <div
@@ -415,7 +419,10 @@ export function Header() {
               <NxtvieLogo size={22} color={isDarkMode ? "#FBF9F5" : "#121110"} />
               <button
                 type="button"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  document.body.style.overflow = "";
+                }}
                 aria-label="Close menu"
                 style={{
                   color: "var(--text-dark)",
@@ -437,6 +444,7 @@ export function Header() {
               className="mobile-menu-search"
               onClick={() => {
                 setMobileMenuOpen(false);
+                document.body.style.overflow = "";
                 setIsSearchOpen(true);
               }}
               style={{
@@ -445,14 +453,14 @@ export function Header() {
                 gap: "8px",
                 backgroundColor: "#EBE7DF",
                 borderRadius: "9999px",
-                 padding: "10px 16px",
-                 marginBottom: "24px",
-                 cursor: "pointer",
-                 minHeight: "44px",
-                 width: "100%",
-                 textAlign: "left",
-               }}
-             >
+                padding: "10px 16px",
+                marginBottom: "24px",
+                cursor: "pointer",
+                minHeight: "44px",
+                width: "100%",
+                textAlign: "left",
+              }}
+            >
               <Search size={16} color="#857F76" />
               <span style={{ fontSize: "13px", color: "#857F76" }}>
                 Search for products...
@@ -465,7 +473,10 @@ export function Header() {
                 <Link
                   key={link.label}
                   href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    document.body.style.overflow = "";
+                  }}
                   style={{
                     fontSize: "16px",
                     fontWeight: 600,
@@ -495,7 +506,10 @@ export function Header() {
             >
               <Link
                 href={user ? "/account" : "/login"}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  document.body.style.overflow = "";
+                }}
                 style={{
                   fontSize: "14px",
                   color: "var(--text-dark)",
@@ -518,11 +532,11 @@ export function Header() {
                   color: "var(--text-dark)",
                   display: "flex",
                   alignItems: "center",
-                   justifyContent: "space-between",
-                   width: "100%",
-                   gap: "10px",
-                   minHeight: "44px",
-                 }}
+                  justifyContent: "space-between",
+                  width: "100%",
+                  gap: "10px",
+                  minHeight: "44px",
+                }}
               >
                 <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
@@ -553,12 +567,19 @@ export function Header() {
                 </span>
               </button>
             </div>
-          </motion.div>
-        </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
+        @keyframes mobileDrawerFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes mobileDrawerSlideIn {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
         @media (max-width: 900px) {
           .desktop-nav {
             display: none !important;

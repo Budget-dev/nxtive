@@ -384,20 +384,58 @@ export function categoriesFromProducts(products: Product[]): Category[] {
 export function productsForCategory(products: Product[], slug: string): Product[] {
   if (!Array.isArray(products) || products.length === 0) return [];
   const normalized = String(slug || "").toLowerCase();
-  if (normalized === "all" || normalized === "shop") return products;
-  return products.filter((product) => {
+
+  // All / Shop / Collections
+  if (normalized === "all" || normalized === "shop" || normalized === "collections") {
+    return products;
+  }
+
+  // Men / Menswear: NXTIVE is a contemporary menswear brand, so Men includes all apparel
+  if (normalized === "men" || normalized === "menswear") {
+    const menswear = products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
+    return menswear.length > 0 ? menswear : products;
+  }
+
+  // Clothing: All non-accessory garments
+  if (normalized === "clothing") {
+    const clothing = products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
+    return clothing.length > 0 ? clothing : products;
+  }
+
+  // Sale drops
+  if (normalized === "sale") {
+    const saleItems = products.filter(
+      (p) =>
+        p?.badge === "Sale" ||
+        (p?.originalPrice != null && p.originalPrice > p.price) ||
+        (Array.isArray(p?.collections) && p.collections.includes("sale"))
+    );
+    return saleItems.length > 0 ? saleItems : products.slice(0, 8);
+  }
+
+  // New arrivals
+  if (normalized === "new-arrivals") {
+    const newItems = products.filter(
+      (p) =>
+        p?.badge === "New" ||
+        (Array.isArray(p?.collections) && (p.collections.includes("new-arrivals") || p.collections.includes("new")))
+    );
+    return newItems.length > 0 ? newItems : products.slice(0, 8);
+  }
+
+  // Standard category / collection matching
+  const matched = products.filter((product) => {
     if (!product) return false;
     const category = String(product.category || "").toLowerCase();
     const collections = Array.isArray(product.collections) ? product.collections : [];
     return (
       category === normalized ||
       category.replace(/\s+/g, "-") === normalized ||
-      collections.includes(normalized) ||
-      (normalized === "sale" && (product.badge === "Sale" || (product.originalPrice != null && product.originalPrice > product.price))) ||
-      (normalized === "new-arrivals" && (product.badge === "New" || collections.includes("new-arrivals"))) ||
-      (normalized === "clothing" && category !== "accessories")
+      collections.includes(normalized)
     );
   });
+
+  return matched.length > 0 ? matched : products;
 }
 
 export function relatedProducts(products: Product[], productId: string, limit = 4): Product[] {

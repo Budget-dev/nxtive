@@ -99,6 +99,8 @@ body {
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
