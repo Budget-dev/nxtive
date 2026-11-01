@@ -105,8 +105,8 @@ export default function TermsOfServicePage() {
             </h2>
             <p>
               For legal inquiries or customer clarifications, contact us via email at{" "}
-              <a href="mailto:support@nxtvie.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
-                support@nxtvie.com
+              <a href="mailto:support@nxtive.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
+                support@nxtive.com
               </a>.
             </p>
           </section>

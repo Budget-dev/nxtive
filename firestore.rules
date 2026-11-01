@@ -62,13 +62,29 @@ service cloud.firestore {
     }
 
     // ─── Orders ──────────────────────────────────────────────────
-    // Allow a user to create/read their own orders only if request.auth.uid == resource.data.userId (or request.resource.data.userId on create);
-    // Allow the admin to read and update all orders (to change status).
     match /orders/{orderId} {
-      allow create: if signedIn() && (request.resource.data.userId == request.auth.uid || isPrimaryAdmin());
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isPrimaryAdmin());
-      allow update: if isPrimaryAdmin();
-      allow delete: if isPrimaryAdmin();
+      // 1. Anyone (including unauthenticated guest customers) can create a pending PhonePe order
+      allow create: if (request.resource.data.keys().hasOnly([
+          'customerName', 'customerPhone', 'amount', 'status',
+          'paymentMethod', 'upiTransactionId', 'createdAt'
+        ])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0)
+        || (signedIn() && (request.resource.data.userId == request.auth.uid || isPrimaryAdmin()));
+
+      // 2. Anyone with the order ID can submit the PhonePe transaction ID / UTR once while still pending
+      allow update: if resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'upiTransactionId', 'status', 'submittedAt'
+        ])
+        && request.resource.data.status == 'submitted';
+
+      // 3. Admins can read, verify, reject, or delete orders. Signed-in users can read their own orders.
+      allow read: if (request.auth != null && (request.auth.token.admin == true || isPrimaryAdmin()))
+                  || (signedIn() && resource.data.keys().hasAny(['userId']) && resource.data.userId == request.auth.uid);
+      allow update: if (request.auth != null && (request.auth.token.admin == true || isPrimaryAdmin()));
+      allow delete: if (request.auth != null && (request.auth.token.admin == true || isPrimaryAdmin()));
     }
 
     // ─── Shipping & logistics ───────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -17,11 +17,96 @@ import {
   Heart,
   Eye,
 } from "lucide-react";
-import { useStore } from "@/components/store-context";
-import type { Product } from "@/types/product";
-import { categoriesFromProducts, productsForCategory } from "@/lib/catalog";
-import { sharpImageSrc } from "@/lib/sharp-image";
-import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
+import { useStore, ProductItem } from "@/components/store-context";
+import { MOCK_PRODUCTS, Product } from "@/constants/mock-products";
+
+// 5 Categories from reference
+const CATEGORIES = [
+  { name: "T-Shirts", image: "/images/nxtvie/cat-tshirts.jpg", href: "/categories/t-shirts" },
+  { name: "Shirts", image: "/images/nxtvie/cat-shirts.jpg", href: "/categories/shirts" },
+  { name: "Hoodies", image: "/images/nxtvie/cat-hoodies.jpg", href: "/categories/hoodies" },
+  { name: "Bottoms", image: "/images/nxtvie/cat-bottoms.jpg", href: "/categories/bottoms" },
+  { name: "Accessories", image: "/images/nxtvie/cat-accessories.jpg", href: "/categories/accessories" },
+];
+
+// Category sections with 2 featured cards per category
+interface CategorySectionConfig {
+  slug: string;
+  name: string;
+  eyebrow: string;
+  tagline: string;
+  href: string;
+  products: Product[];
+}
+
+const CATEGORY_SECTIONS: CategorySectionConfig[] = [
+  {
+    slug: "t-shirts",
+    name: "T-Shirts",
+    eyebrow: "Core Drop 01",
+    tagline: "Heavyweight 260-300 GSM combed organic cotton tees with architectural drop shoulders.",
+    href: "/categories/t-shirts",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "oversized-essential-tee") || MOCK_PRODUCTS[0],
+      MOCK_PRODUCTS.find((p) => p.slug === "minimal-logo-tee") || MOCK_PRODUCTS[1],
+    ],
+  },
+  {
+    slug: "hoodies",
+    name: "Hoodies",
+    eyebrow: "Heavyweight Volume",
+    tagline: "Substantial 450 GSM French terry loopback pullovers with double-layered hoods.",
+    href: "/categories/hoodies",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "core-hoodie") || MOCK_PRODUCTS[3],
+      MOCK_PRODUCTS.find((p) => p.slug === "asian-minimal-modern-hoodie") || MOCK_PRODUCTS[7],
+    ],
+  },
+  {
+    slug: "shirts",
+    name: "Shirts",
+    eyebrow: "Summer Layering",
+    tagline: "Breathable linen-cotton camp shirts and workwear overshirts for effortless everyday styling.",
+    href: "/categories/shirts",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "relaxed-fit-shirt") || MOCK_PRODUCTS[2],
+      MOCK_PRODUCTS.find((p) => p.slug === "camp-collar-linen-shirt") || MOCK_PRODUCTS[2],
+    ],
+  },
+  {
+    slug: "bottoms",
+    name: "Bottoms",
+    eyebrow: "Urban Movement",
+    tagline: "Articulated ripstop tactical cargo pants and relaxed wide-leg brushed fleece track pants.",
+    href: "/categories/bottoms",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "cargo-pants") || MOCK_PRODUCTS[4],
+      MOCK_PRODUCTS.find((p) => p.slug === "urban-runner-relaxed-sweats") || MOCK_PRODUCTS[4],
+    ],
+  },
+  {
+    slug: "jackets",
+    name: "Jackets",
+    eyebrow: "Specialized Fabrics",
+    tagline: "Technical weather-resistant memory nylon windbreakers engineered with Aquaguard zips.",
+    href: "/categories/jackets",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "jackets-for-every-journey") || MOCK_PRODUCTS[6],
+      MOCK_PRODUCTS.find((p) => p.slug === "specialized-technical-jacket") || MOCK_PRODUCTS[6],
+    ],
+  },
+  {
+    slug: "accessories",
+    name: "Accessories",
+    eyebrow: "Signature Details",
+    tagline: "Structured 6-panel low-profile dad caps and heavyweight 16oz organic canvas daily carry totes.",
+    href: "/categories/accessories",
+    products: [
+      MOCK_PRODUCTS.find((p) => p.slug === "nxtvie-cap") || MOCK_PRODUCTS[5],
+      MOCK_PRODUCTS.find((p) => p.slug === "heavyweight-canvas-tote") || MOCK_PRODUCTS[5],
+    ],
+  },
+];
 
 // Social gallery photos
 const GALLERY_PHOTOS = [
@@ -34,7 +119,7 @@ const GALLERY_PHOTOS = [
   { id: 7, image: "/images/nxtvie/product-cap-hd.jpg", alt: "NXTIVE black lightning cap detail" },
 ];
 
-// Cinematic Full-Width Hero Banner Slides (16:9 Desktop & 9:16 Mobile Ad)
+// Cinematic Full-Width 16:9 Hero Banner Slides featuring Official NXTIVE Branding
 const CINEMATIC_HERO_SLIDES = [
   {
     id: 1,
@@ -47,9 +132,8 @@ const CINEMATIC_HERO_SLIDES = [
     primaryHref: "/categories/new-arrivals",
     secondaryCta: "Explore Urban",
     secondaryHref: "/categories/urban-essentials",
-    image: "/images/cinematic/banner-urban-movement-nxtive.jpg?v=20261023",
-    mobileImage: "/images/cinematic/mobile-hero-minimal-9-16.jpg",
-    alt: "NXTIVE Urban Movement Indian Roots Modern Style Collection",
+    image: "/images/cinematic/banner-nxtive-urban.jpg",
+    alt: "NXTIVE Urban Movement Indian Roots Modern Style Collection with Official Branding",
     scriptTag: "For\nNew\nGenerations",
     accentColor: "var(--accent-next, #C78D4E)",
     badge: "New Season AW26",
@@ -66,8 +150,7 @@ const CINEMATIC_HERO_SLIDES = [
     primaryHref: "/categories/jackets",
     secondaryCta: "Explore Fabrics",
     secondaryHref: "/about",
-    image: "/images/cinematic/banner-outerwear-fabrics.jpg",
-    mobileImage: "/images/nxtvie/promo-jackets-hd.jpg",
+    image: "/images/cinematic/banner-nxtive-outerwear.jpg",
     alt: "NXTIVE Specialized Fabrics Technical Outerwear Campaign",
     scriptTag: "Form &\nFunction",
     accentColor: "#E29D52",
@@ -85,8 +168,7 @@ const CINEMATIC_HERO_SLIDES = [
     primaryHref: "/categories/hoodies",
     secondaryCta: "View Lookbook",
     secondaryHref: "/products",
-    image: "/images/cinematic/banner-asian-minimal-night.jpg",
-    mobileImage: "/images/nxtvie/promo-asian-minimal-hd.jpg",
+    image: "/images/cinematic/banner-nxtive-hoodie.jpg",
     alt: "NXTIVE Asian Minimal Modern Twilight Skyline Campaign",
     scriptTag: "Nightfall\nSeries",
     accentColor: "#F4A261",
@@ -99,14 +181,13 @@ const CINEMATIC_HERO_SLIDES = [
     headlineLine1: "TIMELESS PIECES.",
     headlineAccent: "BETTER",
     headlineLine2: "EVERYDAY.",
-    subtitle: "Precision-tailored organic ribbed high-neck tees, boxy heavyweight tees, and architectural streetwear staples.",
+    subtitle: "Precision-tailored organic ribbed mocknecks, boxy heavyweight tees, and architectural streetwear staples.",
     primaryCta: "Shop Premium Basics",
     primaryHref: "/categories/premium-basics",
     secondaryCta: "All Menswear",
     secondaryHref: "/products",
-    image: "/images/cinematic/banner-luxury-basics.jpg",
-    mobileImage: "/images/nxtvie/hero-model.jpg",
-    alt: "NXTIVE Refined Everyday Luxury Architecture Campaign",
+    image: "/images/cinematic/banner-nxtive-movement.jpg",
+    alt: "NXTIVE Refined Everyday Streetwear Architecture Campaign",
     scriptTag: "Refined\nSimplicity",
     accentColor: "#E0A899",
     badge: "Zero Compromise",
@@ -146,7 +227,7 @@ function TwoCardProduct({ product }: { product: Product }) {
       <div className="two-card-media-box">
         <Link href={`/products/${product.slug || product.id}`} className="two-card-img-link">
           <img
-            src={sharpImageSrc(product.image)}
+            src={product.image}
             alt={product.title}
             loading="lazy"
             decoding="async"
@@ -247,42 +328,6 @@ function TwoCardProduct({ product }: { product: Product }) {
 export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const touchStartXRef = useRef<number | null>(null);
-  const { products, categories, ready } = useStorefrontCatalog();
-
-  const browseCategories = useMemo(
-    () => (categories.length > 0 ? categories : categoriesFromProducts(products)),
-    [categories, products]
-  );
-
-  const departmentCategories = useMemo(() => {
-    const primaryOrder = ["t-shirts", "shirts", "hoodies", "bottoms", "jackets", "accessories"];
-    const matched = primaryOrder
-      .map((slug) => browseCategories.find((c) => c.slug === slug))
-      .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
-    return matched.length > 0 ? matched : browseCategories.slice(0, 6);
-  }, [browseCategories]);
-
-  const categorySections = useMemo(
-    () => {
-      const coreSlugs = ["t-shirts", "hoodies", "shirts", "bottoms", "jackets", "accessories"];
-      const sectionsList = coreSlugs
-        .map((slug) => browseCategories.find((c) => c.slug === slug))
-        .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
-      const source = sectionsList.length > 0 ? sectionsList : browseCategories;
-
-      return source
-        .map((category) => ({
-          slug: category.slug,
-          name: category.name,
-          eyebrow: category.title || category.name,
-          tagline: category.tagline,
-          href: `/categories/${category.slug}`,
-          products: productsForCategory(products, category.slug).slice(0, 2),
-        }))
-        .filter((section) => section.products.length > 0);
-    },
-    [browseCategories, products]
-  );
 
   const nextSlide = useCallback(() => {
     setActiveSlide((prev) => (prev + 1) % CINEMATIC_HERO_SLIDES.length);
@@ -343,17 +388,6 @@ export default function HomePage() {
           Slide {activeSlide + 1} of {CINEMATIC_HERO_SLIDES.length}: {currentSlide.tag}
         </span>
 
-        {/* Mobile 9:16 Story Ad Progress Bars */}
-        <div className="mobile-story-bars" aria-hidden="true">
-          {CINEMATIC_HERO_SLIDES.map((_, i) => (
-            <div
-              key={i}
-              className={`mobile-story-bar-segment ${i === activeSlide ? "active" : ""}`}
-              onClick={() => setActiveSlide(i)}
-            />
-          ))}
-        </div>
-
         {/* Slides Stack */}
         {CINEMATIC_HERO_SLIDES.map((slide, idx) => {
           const isActive = idx === activeSlide;
@@ -374,26 +408,23 @@ export default function HomePage() {
               }}
               className="hero-slide-pane"
             >
-              {/* Cinematic Background Image (16:9 Desktop & 9:16 Mobile Ad) */}
-              <picture style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-                <source media="(max-width: 640px)" srcSet={slide.mobileImage || slide.image} />
-                <img
-                  src={slide.image}
-                  alt={slide.alt}
-                  loading={idx === 0 ? "eager" : "lazy"}
-                  fetchPriority={idx === 0 ? "high" : "low"}
-                  decoding="async"
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: slide.objectPosition,
-                    filter: "brightness(0.92)",
-                  }}
-                />
-              </picture>
+              {/* Cinematic Background Image */}
+              <img
+                src={slide.image}
+                alt={slide.alt}
+                loading={idx === 0 ? "eager" : "lazy"}
+                fetchPriority={idx === 0 ? "high" : "low"}
+                decoding="async"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: slide.objectPosition,
+                  filter: "brightness(0.92)",
+                }}
+              />
 
               {/* Gradient Scrim Overlays */}
               <div
@@ -493,6 +524,43 @@ export default function HomePage() {
             style={{ maxWidth: "600px", opacity: 1 }}
             className="hero-content-col"
           >
+            {/* Official NXTIVE Brand Watermark / Badge */}
+            <div
+              className="hero-brand-badge"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <img
+                src="/images/logo/nxtive-logo-wide-light.png"
+                alt="NXTIVE"
+                style={{
+                  height: "clamp(24px, 3.2vw, 34px)",
+                  width: "auto",
+                  objectFit: "contain",
+                  filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.8))",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "10.5px",
+                  fontWeight: 800,
+                  letterSpacing: "0.22em",
+                  color: "rgba(255, 255, 255, 0.75)",
+                  textTransform: "uppercase",
+                  borderLeft: "1px solid rgba(255, 255, 255, 0.3)",
+                  paddingLeft: "10px",
+                  lineHeight: 1,
+                }}
+                className="hero-brand-sublabel"
+              >
+                SPECIALIZED APPAREL
+              </span>
+            </div>
+
             {/* Tag / Eyebrow Pill */}
             <div
               style={{
@@ -624,6 +692,48 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Slide Indicators / Interactive Dots */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "22px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            zIndex: 20,
+            padding: "6px 14px",
+            backgroundColor: "rgba(18, 17, 16, 0.65)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "9999px",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+          }}
+          className="hero-slide-indicators"
+        >
+          {CINEMATIC_HERO_SLIDES.map((s, idx) => {
+            const isActive = idx === activeSlide;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActiveSlide(idx)}
+                aria-label={`Go to slide ${idx + 1}`}
+                style={{
+                  width: isActive ? "24px" : "8px",
+                  height: "8px",
+                  borderRadius: "9999px",
+                  backgroundColor: isActive ? s.accentColor : "rgba(255, 255, 255, 0.45)",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+              />
+            );
+          })}
+        </div>
+
         {/* Carousel Arrow Controls */}
         <button
           onClick={prevSlide}
@@ -726,7 +836,7 @@ export default function HomePage() {
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#1E1C1A", display: "block" }}>
                   Secure Checkout
                 </span>
-                <span style={{ fontSize: "10.5px", color: "#6A655D" }}>UPI, Cards, EMI via Razorpay</span>
+                <span style={{ fontSize: "10.5px", color: "#6A655D" }}>Direct PhonePe UPI & COD</span>
               </div>
             </div>
 
@@ -743,8 +853,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. CATEGORY TILES — quick browse departments */}
-      {departmentCategories.length > 0 && (
+      {/* 2. CATEGORY TILES BAR (Quick Navigation Row of 5) */}
       <section style={{ padding: "28px 0 20px 0" }} className="categories-preview-section">
         <div className="container">
           <div className="section-title-wrap">
@@ -761,27 +870,25 @@ export default function HomePage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gridTemplateColumns: "repeat(5, 1fr)",
               gap: "14px",
             }}
             className="categories-grid"
           >
-            {departmentCategories.map((cat) => (
+            {CATEGORIES.map((cat) => (
               <Link
-                key={cat.id}
-                href={`/categories/${cat.slug}`}
+                key={cat.name}
+                href={cat.href}
                 className="category-card"
               >
                 <div className="category-card-media">
-                  {cat.image ? (
-                    <img
-                      src={sharpImageSrc(cat.image)}
-                      alt={cat.name}
-                      loading="eager"
-                      decoding="async"
-                      className="cat-img"
-                    />
-                  ) : null}
+                  <img
+                    src={cat.image}
+                    alt={cat.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="cat-img"
+                  />
                 </div>
                 <div className="category-card-footer">
                   <span className="cat-name">{cat.name}</span>
@@ -792,42 +899,72 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      )}
 
-      {/* 3. LIVE CATEGORY SECTIONS */}
-      {categorySections.map((section) => (
-        <section key={section.slug} className="category-showcase-section">
-          <div className="container">
-            <div className="category-showcase-header">
-              <div>
-                <div className="category-badge-pill">
-                  <span className="badge-dot" />
-                  <span>{section.eyebrow}</span>
-                </div>
-                <h2 className="category-showcase-title">{section.name}</h2>
-                {section.tagline ? (
-                  <p className="category-showcase-tagline">{section.tagline}</p>
-                ) : null}
+      {/* 3. CATEGORY SECTIONS WITH 2-CARD LAYOUT & "SEE ALL" NAVIGATION */}
+
+      {/* Section A: T-SHIRTS (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[0].eyebrow}</span>
               </div>
-
-              <Link
-                href={section.href}
-                className="see-all-cta-btn"
-                aria-label={`See all ${section.name}`}
-              >
-                <span>See All {section.name}</span>
-                <ArrowRight size={15} />
-              </Link>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[0].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[0].tagline}</p>
             </div>
 
-            <div className="two-card-grid">
-              {section.products.map((prod) => (
-                <TwoCardProduct key={prod.id} product={prod} />
-              ))}
-            </div>
+            <Link
+              href={CATEGORY_SECTIONS[0].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[0].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[0].name}</span>
+              <ArrowRight size={15} />
+            </Link>
           </div>
-        </section>
-      ))}
+
+          {/* 2-Card Layout Grid */}
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[0].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section B: HOODIES (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[1].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[1].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[1].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[1].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[1].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[1].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          {/* 2-Card Layout Grid */}
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[1].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* 4. EDITORIAL COLLECTION BANNERS (Urban Essentials & Premium Basics) */}
       <section style={{ padding: "16px 0 44px 0" }} className="collections-section">
@@ -840,10 +977,10 @@ export default function HomePage() {
             }}
             className="collections-split-grid"
           >
-            {/* Left: Urban Essentials Dark Banner */}
+            {/* Left: Urban Essentials Dark Banner with Official NXTIVE Branding */}
             <div className="urban-banner">
               <img
-                src="/images/nxtvie/banner-urban-essentials-hd.jpg"
+                src="/images/cinematic/banner-nxtive-essentials.jpg"
                 alt="NXTIVE Urban Essentials Collection"
                 loading="lazy"
                 decoding="async"
@@ -862,24 +999,32 @@ export default function HomePage() {
                   position: "absolute",
                   inset: 0,
                   background:
-                    "linear-gradient(to right, rgba(12, 11, 10, 0.88) 0%, rgba(12, 11, 10, 0.65) 50%, rgba(12, 11, 10, 0.2) 100%)",
+                    "linear-gradient(to right, rgba(12, 11, 10, 0.92) 0%, rgba(12, 11, 10, 0.72) 50%, rgba(12, 11, 10, 0.25) 100%)",
                   zIndex: 1,
                 }}
               />
               <div style={{ position: "relative", zIndex: 2, maxWidth: "380px" }}>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.14em",
-                    color: "rgba(255, 255, 255, 0.8)",
-                    textTransform: "uppercase",
-                    display: "block",
-                    marginBottom: "8px",
-                  }}
-                >
-                  NEW DROP
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                  <img
+                    src="/images/logo/nxtive-logo-wide-light.png"
+                    alt="NXTIVE"
+                    style={{ height: "18px", width: "auto", objectFit: "contain" }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "10.5px",
+                      fontWeight: 800,
+                      letterSpacing: "0.14em",
+                      color: "rgba(255, 255, 255, 0.8)",
+                      textTransform: "uppercase",
+                      borderLeft: "1px solid rgba(255, 255, 255, 0.3)",
+                      paddingLeft: "8px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    NEW DROP
+                  </span>
+                </div>
                 <h2
                   style={{
                     fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
@@ -961,6 +1106,27 @@ export default function HomePage() {
                   justifyContent: "center",
                 }}
               >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  <img
+                    src="/images/logo/nxtive-logo-wide-dark.png"
+                    alt="NXTIVE"
+                    style={{ height: "16px", width: "auto", objectFit: "contain" }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 800,
+                      letterSpacing: "0.14em",
+                      color: "#8C867E",
+                      textTransform: "uppercase",
+                      borderLeft: "1px solid rgba(0,0,0,0.15)",
+                      paddingLeft: "6px",
+                      lineHeight: 1,
+                    }}
+                  >
+                    SIGNATURE
+                  </span>
+                </div>
                 <h3
                   style={{
                     fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
@@ -1012,6 +1178,129 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Section C: SHIRTS (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[2].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[2].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[2].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[2].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[2].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[2].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[2].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section D: BOTTOMS (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[3].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[3].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[3].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[3].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[3].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[3].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[3].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section E: JACKETS (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[4].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[4].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[4].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[4].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[4].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[4].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[4].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section F: ACCESSORIES (2 Cards + See All) */}
+      <section className="category-showcase-section">
+        <div className="container">
+          <div className="category-showcase-header">
+            <div>
+              <div className="category-badge-pill">
+                <span className="badge-dot" />
+                <span>{CATEGORY_SECTIONS[5].eyebrow}</span>
+              </div>
+              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[5].name}</h2>
+              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[5].tagline}</p>
+            </div>
+
+            <Link
+              href={CATEGORY_SECTIONS[5].href}
+              className="see-all-cta-btn"
+              aria-label={`See all ${CATEGORY_SECTIONS[5].name}`}
+            >
+              <span>See All {CATEGORY_SECTIONS[5].name}</span>
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="two-card-grid">
+            {CATEGORY_SECTIONS[5].products.map((prod) => (
+              <TwoCardProduct key={prod.id} product={prod} />
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* 5. TRUST / FEATURES STRIP (4 Pillars) */}
       <section style={{ padding: "16px 0 54px 0" }} className="features-section">
@@ -1101,6 +1390,13 @@ export default function HomePage() {
                 justifyContent: "center",
               }}
             >
+              <div style={{ marginBottom: "16px" }}>
+                <img
+                  src="/images/logo/nxtive-logo-wide-dark.png"
+                  alt="NXTIVE"
+                  style={{ height: "24px", width: "auto", objectFit: "contain" }}
+                />
+              </div>
               <h2
                 style={{
                   fontFamily: "var(--font-body, 'Plus Jakarta Sans', sans-serif)",
@@ -1160,8 +1456,8 @@ export default function HomePage() {
               }}
             >
               <img
-                src="/images/nxtvie/story-back-print-nxtive.jpg?v=20261023"
-                alt="NXTIVE Mindset Philosophy Editorial"
+                src="/images/cinematic/story-nxtive-backprint.jpg"
+                alt="NXTIVE Mindset Philosophy Editorial featuring official brand typography"
                 loading="lazy"
                 decoding="async"
                 style={{
@@ -1381,8 +1677,6 @@ export default function HomePage() {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          object-position: center 18%;
-          display: block;
           transition: transform 0.35s ease;
         }
         .category-card-footer {
@@ -1721,17 +2015,18 @@ export default function HomePage() {
           }
           .hero-trust-bar-grid {
             grid-template-columns: repeat(2, 1fr) !important;
-            gap: 16px !important;
+            gap: 14px !important;
           }
         }
 
         @media (max-width: 860px) {
           .collections-split-grid {
             grid-template-columns: 1fr !important;
+            gap: 16px !important;
           }
           .features-strip-grid {
             grid-template-columns: repeat(2, 1fr) !important;
-            gap: 20px !important;
+            gap: 16px !important;
           }
           .brand-story-grid {
             grid-template-columns: 1fr !important;
@@ -1739,304 +2034,298 @@ export default function HomePage() {
           .carousel-arrow-btn {
             display: none !important;
           }
-          .hero-left-scrim {
-            background: linear-gradient(to top, rgba(10, 9, 8, 0.95) 0%, rgba(10, 9, 8, 0.7) 60%, rgba(10, 9, 8, 0.3) 100%) !important;
-          }
-          .hero-transparent-pill {
-            display: none !important;
-          }
-        }
-
-        /* Mobile 9:16 Minimal Editorial Hero & Compact Rectangular Categories */
-        @media (max-width: 640px) {
-          .cinematic-hero-section {
-            min-height: 80svh !important;
-            height: 82svh !important;
-            max-height: 720px !important;
-            align-items: flex-end !important;
-          }
-          .mobile-story-bars {
-            display: flex !important;
-            position: absolute !important;
-            bottom: 22px !important;
-            right: 20px !important;
-            left: auto !important;
-            top: auto !important;
-            gap: 5px !important;
-            z-index: 25 !important;
-            background: rgba(0, 0, 0, 0.4) !important;
-            padding: 4px 8px !important;
-            border-radius: 9999px !important;
-            backdrop-filter: blur(8px) !important;
-          }
-          .mobile-story-bar-segment {
-            width: 5px !important;
-            height: 5px !important;
-            flex: none !important;
-            background: rgba(255, 255, 255, 0.4) !important;
-            border-radius: 50% !important;
-            cursor: pointer !important;
-            transition: all 0.25s ease !important;
-          }
-          .mobile-story-bar-segment.active {
-            width: 16px !important;
-            border-radius: 9999px !important;
-            background: #FFFFFF !important;
-            box-shadow: none !important;
-          }
-          .cinematic-hero-section > .container {
-            padding-top: 16px !important;
-            padding-bottom: 26px !important;
-          }
           .hero-script-tag {
             display: none !important;
           }
           .hero-left-scrim {
-            background: linear-gradient(to top, rgba(12, 11, 9, 0.94) 0%, rgba(12, 11, 9, 0.52) 32%, rgba(12, 11, 9, 0.1) 62%, transparent 100%) !important;
+            background: linear-gradient(to top, rgba(10, 9, 8, 0.96) 0%, rgba(10, 9, 8, 0.76) 55%, rgba(10, 9, 8, 0.35) 100%) !important;
+          }
+        }
+
+        @media (max-width: 680px) {
+          .cinematic-hero-section {
+            min-height: clamp(520px, 86svh, 660px) !important;
+            align-items: flex-end !important;
+          }
+          .cinematic-hero-section > .container {
+            padding-top: 24px !important;
+            padding-bottom: 56px !important;
+          }
+          .hero-brand-badge {
+            margin-bottom: 12px !important;
+          }
+          .hero-brand-badge img {
+            height: 22px !important;
+          }
+          .hero-brand-sublabel {
+            font-size: 9px !important;
           }
           .hero-transparent-pill {
             display: inline-flex !important;
-            margin-bottom: 8px !important;
             padding: 4px 12px !important;
-            font-size: 9.5px !important;
-            font-weight: 700 !important;
-            letter-spacing: 0.14em !important;
-            background: rgba(255, 255, 255, 0.12) !important;
-            backdrop-filter: blur(8px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
-            border-radius: 9999px !important;
+            font-size: 10px !important;
+            margin-bottom: 12px !important;
           }
           .hero-headline {
-            font-size: clamp(26px, 7.8vw, 34px) !important;
-            line-height: 1.04 !important;
-            letter-spacing: -0.025em !important;
-            margin-bottom: 6px !important;
-            font-weight: 900 !important;
+            font-size: clamp(30px, 8.8vw, 44px) !important;
+            line-height: 1.0 !important;
+            letter-spacing: -0.03em !important;
+            margin-bottom: 12px !important;
           }
           .hero-subtext {
-            font-size: 12.5px !important;
-            line-height: 1.4 !important;
-            margin-bottom: 16px !important;
-            color: rgba(255, 255, 255, 0.85) !important;
-            max-width: 310px !important;
-            display: -webkit-box !important;
-            -webkit-line-clamp: 2 !important;
-            -webkit-box-orient: vertical !important;
-            overflow: hidden !important;
+            font-size: 13px !important;
+            line-height: 1.48 !important;
+            margin-bottom: 20px !important;
+            max-width: 100% !important;
           }
           .hero-cta-row {
             display: flex !important;
-            align-items: center !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
             gap: 10px !important;
-            margin-bottom: 0 !important;
-          }
-          .hero-cta-row > a.banner-cta-white {
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 8px !important;
-            padding: 11px 22px !important;
-            font-size: 12px !important;
-            font-weight: 800 !important;
-            letter-spacing: 0.04em !important;
-            text-transform: uppercase !important;
-            border-radius: 9999px !important;
-            background-color: #FFFFFF !important;
-            color: #111110 !important;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
-            text-decoration: none !important;
-          }
-          .hero-cta-row > a.hero-secondary-btn {
-            display: none !important;
-          }
-
-          /* Trust bar mobile */
-          .hero-trust-bar-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 8px !important;
-          }
-          .hero-trust-bar-grid > div {
-            padding: 6px 4px;
-          }
-          .hero-trust-bar-grid span:first-child {
-            font-size: 11px !important;
-          }
-          .hero-trust-bar-grid span:last-child {
-            display: none;
-          }
-
-          /* Compact Rectangular Categories Horizontal Scroll (Small & Not Circle) */
-          .categories-preview-section {
-            padding: 20px 0 12px 0 !important;
-          }
-          .categories-preview-section .section-title-wrap {
             margin-bottom: 12px !important;
           }
-          .categories-preview-section .section-eyebrow {
+          .hero-cta-row > a {
+            width: 100% !important;
+            min-height: 44px !important;
+            justify-content: center !important;
+            text-align: center !important;
+            font-size: 13px !important;
+            padding: 12px 20px !important;
+          }
+          .hero-slide-indicators {
+            bottom: 14px !important;
+            padding: 5px 12px !important;
+          }
+
+          /* Luxury Trust Strip Mobile: Clean 2x2 micro-cards */
+          .hero-trust-bar-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+          }
+          .hero-trust-bar-grid > div {
+            background-color: rgba(255, 255, 255, 0.65) !important;
+            border: 1px solid rgba(0, 0, 0, 0.05) !important;
+            border-radius: 10px !important;
+            padding: 10px 12px !important;
+            gap: 10px !important;
+          }
+          .hero-trust-bar-grid span:first-child {
+            font-size: 11.5px !important;
+            font-weight: 800 !important;
+            line-height: 1.25 !important;
+          }
+          .hero-trust-bar-grid span:last-child {
+            display: block !important;
             font-size: 9.5px !important;
-            letter-spacing: 0.14em !important;
+            color: #706B63 !important;
+            line-height: 1.25 !important;
+            margin-top: 2px !important;
           }
-          .categories-preview-section .section-heading-sm {
-            font-size: 17px !important;
-          }
+
+          /* Category horizontal scroll bar */
           .categories-grid {
             display: flex !important;
-            gap: 10px !important;
-            margin: 0 -16px !important;
-            padding: 2px 16px 12px !important;
+            gap: 12px !important;
+            margin: 0 !important;
+            padding: 4px 4px 12px 4px !important;
             overflow-x: auto !important;
             scroll-snap-type: x mandatory !important;
-            -webkit-overflow-scrolling: touch !important;
             scrollbar-width: none !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior-x: contain !important;
           }
           .categories-grid::-webkit-scrollbar {
-            display: none !important;
+            display: none;
           }
           .category-card {
-            flex: 0 0 102px !important;
-            width: 102px !important;
-            height: 128px !important;
-            position: relative !important;
-            border-radius: 12px !important;
-            overflow: hidden !important;
-            background: #141312 !important;
-            border: 1px solid rgba(0, 0, 0, 0.08) !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07) !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: flex-end !important;
+            flex: 0 0 135px !important;
+            width: 135px !important;
             scroll-snap-align: start !important;
-            text-decoration: none !important;
+            border-radius: 10px !important;
           }
           .category-card-media {
-            position: absolute !important;
-            inset: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            min-height: 100% !important;
-            border-radius: 0 !important;
-            border: none !important;
-            overflow: hidden !important;
-            background: #141312 !important;
-          }
-          .category-card-media img,
-          .category-card-media .cat-img {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover !important;
-            object-position: center 20% !important;
-            filter: brightness(0.85) !important;
-            transition: transform 0.3s ease !important;
-          }
-          .category-card:active .category-card-media img {
-            transform: scale(1.06) !important;
-          }
-          .category-card-footer {
-            position: relative !important;
-            z-index: 2 !important;
-            padding: 16px 8px 10px !important;
-            background: linear-gradient(to top, rgba(14, 13, 11, 0.92) 0%, rgba(14, 13, 11, 0.5) 60%, transparent 100%) !important;
-            border: none !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: flex-end !important;
-            width: 100% !important;
+            height: 125px !important;
           }
           .cat-name {
-            font-size: 11px !important;
-            font-weight: 800 !important;
-            color: #FFFFFF !important;
-            text-align: center !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            max-width: 90px !important;
-            display: block !important;
-            letter-spacing: 0.04em !important;
-            text-transform: uppercase !important;
-            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
-          }
-          .cat-arrow {
-            display: none !important;
+            font-size: 12px !important;
           }
 
           /* 2-Card Layout on Mobile */
-          .two-card-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 12px !important;
+          .category-showcase-section {
+            padding: 26px 0 32px 0 !important;
           }
-          .two-card-media-box {
-            aspect-ratio: 3 / 3.8;
-          }
-          .two-card-content {
-            padding: 12px 10px 14px;
-          }
-          .two-card-title {
-            font-size: 13px;
-          }
-          .two-card-price {
-            font-size: 13.5px;
-          }
-          .two-card-original-price {
-            font-size: 11px;
-          }
-          .two-card-color-dot {
-            width: 20px;
-            height: 20px;
-          }
-          .two-card-add-cart-btn {
-            padding: 6px 10px;
-            font-size: 11px;
-          }
-          .add-cart-text {
-            display: none;
-          }
-
           .category-showcase-header {
-            align-items: flex-start !important;
-            gap: 10px;
-            margin-bottom: 14px;
+            margin-bottom: 14px !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            align-items: center !important;
           }
           .category-showcase-title {
             font-size: 20px !important;
           }
           .category-showcase-tagline {
-            display: none;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
+            font-size: 12px !important;
+            line-height: 1.35 !important;
+            margin-top: 3px !important;
           }
           .see-all-cta-btn {
-            padding: 6px 14px;
-            font-size: 11.5px;
+            padding: 7px 15px !important;
+            font-size: 11.5px !important;
+            border-radius: 9999px !important;
           }
 
-          /* Urban banner */
+          .two-card-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+          }
+          .two-card-item {
+            border-radius: 12px !important;
+          }
+          .two-card-media-box {
+            aspect-ratio: 3 / 3.9 !important;
+          }
+          .two-card-content {
+            padding: 10px 10px 12px !important;
+          }
+          .two-card-meta-row {
+            margin-bottom: 8px !important;
+          }
+          .two-card-title {
+            font-size: 12.5px !important;
+            line-height: 1.3 !important;
+            min-height: 32px !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
+            white-space: normal !important;
+            margin-bottom: 4px !important;
+          }
+          .two-card-price {
+            font-size: 13px !important;
+          }
+          .two-card-original-price {
+            font-size: 10.5px !important;
+          }
+          .two-card-action-bar {
+            padding-top: 8px !important;
+          }
+          .two-card-colors {
+            gap: 4px !important;
+          }
+          .two-card-color-dot {
+            width: 18px !important;
+            height: 18px !important;
+          }
+          .two-card-add-cart-btn {
+            padding: 6px 10px !important;
+            font-size: 11px !important;
+            min-height: 32px !important;
+            border-radius: 6px !important;
+          }
+          .add-cart-text {
+            display: inline !important;
+            font-size: 11px !important;
+          }
+
+          /* Collections Split Banners on Mobile */
+          .collections-section {
+            padding: 12px 0 32px 0 !important;
+          }
           .urban-banner {
             min-height: 280px !important;
-            padding: 24px 20px !important;
+            padding: 24px 18px !important;
+            border-radius: 12px !important;
           }
           .urban-banner h2 {
-            font-size: 28px !important;
+            font-size: 26px !important;
+            margin-bottom: 8px !important;
+          }
+          .urban-banner p {
+            font-size: 12.5px !important;
+            margin-bottom: 18px !important;
+          }
+          .premium-basics-banner {
+            border-radius: 12px !important;
+          }
+          .premium-basics-banner > div:first-child {
+            height: 180px !important;
+          }
+          .premium-basics-banner > div:last-child {
+            padding: 20px 18px !important;
           }
 
           /* Features strip */
+          .features-section {
+            padding: 12px 0 36px 0 !important;
+          }
           .features-strip-grid {
-            grid-template-columns: 1fr !important;
-            gap: 12px !important;
-            padding: 16px !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+            padding: 14px 12px !important;
+          }
+          .features-strip-grid > div {
+            gap: 10px !important;
+          }
+          .features-strip-grid h4 {
+            font-size: 11.5px !important;
+          }
+          .features-strip-grid p {
+            font-size: 10px !important;
+          }
+
+          /* Brand story */
+          .brand-story-section {
+            padding: 0 0 44px 0 !important;
+          }
+          .brand-story-grid {
+            border-radius: 12px !important;
+          }
+          .brand-story-grid > div:first-child {
+            padding: 28px 18px !important;
+          }
+          .brand-story-grid h2 {
+            font-size: 26px !important;
+            margin-bottom: 12px !important;
+          }
+          .brand-story-grid p {
+            font-size: 13px !important;
+            margin-bottom: 20px !important;
+          }
+          .brand-story-grid > div:last-child {
+            min-height: 260px !important;
           }
 
           /* Gallery */
+          .gallery-section {
+            padding: 0 0 48px 0 !important;
+          }
+          .gallery-section-header {
+            margin-bottom: 14px !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 6px !important;
+          }
           .gallery-grid {
             display: flex !important;
-            overflow-x: auto;
-            gap: 10px !important;
-            scrollbar-width: none;
+            gap: 8px !important;
+            overflow-x: auto !important;
+            scroll-snap-type: x mandatory !important;
+            scrollbar-width: none !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior-x: contain !important;
           }
           .gallery-grid::-webkit-scrollbar {
             display: none;
           }
           .gallery-item {
-            flex: 0 0 140px !important;
+            flex: 0 0 130px !important;
+            scroll-snap-align: start !important;
           }
         }
       `}</style>

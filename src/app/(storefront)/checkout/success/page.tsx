@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState, useEffect } from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -15,72 +15,13 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
-import { auth } from "@/lib/firebase/client";
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
   const { orders } = useStore();
-  const [fetchedOrder, setFetchedOrder] = useState<any>(null);
 
-  useEffect(() => {
-    if (!orderId) return;
-    const existing = orders.find((o) => o.id === orderId);
-    if (existing) return;
-
-    let active = true;
-    async function load() {
-      try {
-        const token = await auth.currentUser?.getIdToken();
-        const res = await fetch(`/api/orders/${orderId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          cache: "no-store",
-        });
-        const json = await res.json();
-        if (active && json.success && json.data) {
-          const raw = json.data;
-          setFetchedOrder({
-            id: raw.id,
-            date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
-            items: (raw.items || []).map((item: any) => ({
-              id: item.productId || item.id,
-              title: item.title,
-              price: item.price,
-              quantity: item.quantity,
-              selectedSize: item.selectedSize,
-              selectedColor: item.selectedColor,
-              image: item.image,
-            })),
-            subtotal: raw.subtotal || 0,
-            discount: raw.discount || 0,
-            shipping: raw.shipping || 0,
-            total: raw.total || 0,
-            status:
-              raw.status === "delivered"
-                ? "Delivered"
-                : raw.status === "shipped" || raw.status === "out_for_delivery"
-                ? "Shipped"
-                : raw.status === "processing" || raw.status === "packed"
-                ? "Processing"
-                : "Order Confirmed",
-            paymentMethod: raw.paymentMethod || "Online Payment",
-            paymentStatus: raw.paymentStatus === "paid" ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending",
-            shippingAddress: raw.shippingAddress || {},
-            deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
-            trackingNumber: raw.trackingNumber || `NXT-AWB-${raw.id?.slice(-6) || "882190"}`,
-          });
-        }
-      } catch (err) {
-        console.warn("[checkout-success] Error loading order:", err);
-      }
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, [orderId, orders]);
-
-  const currentOrder = (orderId ? orders.find((o) => o.id === orderId) : undefined) || fetchedOrder;
+  const currentOrder = orderId ? orders.find((o) => o.id === orderId) : undefined;
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "60px 0 90px 0" }}>
@@ -120,7 +61,7 @@ function OrderSuccessContent() {
 
           <h1
             style={{
-              fontSize: "clamp(24px, 5vw, 34px)",
+              fontSize: "34px",
               fontWeight: 900,
               letterSpacing: "-0.03em",
               textTransform: "uppercase",
@@ -133,7 +74,7 @@ function OrderSuccessContent() {
 
           <p style={{ fontSize: "14.5px", color: "#666057", maxWidth: "520px", margin: "0 auto" }}>
             {currentOrder
-              ? <>We&apos;ve received your request and our fulfillment team is preparing your package. A confirmation has been dispatched to <strong>{currentOrder.shippingAddress?.email || "your email"}</strong>.</>
+              ? <>We've received your request and our fulfillment team is preparing your package. A confirmation has been dispatched to <strong>{currentOrder.shippingAddress.email}</strong>.</>
               : "Your order was received. Sign in with the account used at checkout to view the protected order details."}
           </p>
         </div>
@@ -141,7 +82,6 @@ function OrderSuccessContent() {
         {/* Order Details Card */}
         {currentOrder ? (
           <div
-            className="order-card"
             style={{
               backgroundColor: "#FFFFFF",
               borderRadius: "16px",
@@ -156,7 +96,7 @@ function OrderSuccessContent() {
               style={{
                 backgroundColor: "#161514",
                 color: "#FFFFFF",
-                padding: "clamp(16px, 3.5vw, 20px) clamp(16px, 4vw, 28px)",
+                padding: "20px 28px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -208,7 +148,7 @@ function OrderSuccessContent() {
             {/* Estimated Delivery Banner */}
             <div
               style={{
-                padding: "clamp(12px, 3vw, 16px) clamp(16px, 4vw, 28px)",
+                padding: "16px 28px",
                 backgroundColor: "#FAF8F5",
                 borderBottom: "1px solid rgba(0,0,0,0.05)",
                 display: "flex",
@@ -231,7 +171,7 @@ function OrderSuccessContent() {
             </div>
 
             {/* Items List */}
-            <div style={{ padding: "clamp(16px, 4vw, 28px)" }}>
+            <div style={{ padding: "28px" }}>
               <h3
                 style={{
                   fontSize: "13px",
@@ -246,7 +186,7 @@ function OrderSuccessContent() {
               </h3>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "28px" }}>
-                {currentOrder.items.map((item: any, idx: number) => (
+                {currentOrder.items.map((item, idx) => (
                   <div
                     key={`${item.id}-${idx}`}
                     style={{
@@ -271,7 +211,7 @@ function OrderSuccessContent() {
                         }}
                       >
                         <Image
-                          src={item.image}
+                          src={item.image || "/images/nxtvie/cat-tshirts.jpg"}
                           alt={item.title}
                           fill
                           style={{ objectFit: "cover" }}
@@ -331,21 +271,16 @@ function OrderSuccessContent() {
                     <span>Shipping To</span>
                   </div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#111110" }}>
-                    {currentOrder.shippingAddress?.fullName || "Valued Customer"}
+                    {currentOrder.shippingAddress.fullName}
                   </div>
                   <div style={{ fontSize: "12.5px", color: "#6F6961", marginTop: "2px", lineHeight: "1.4" }}>
-                    {currentOrder.shippingAddress?.street || "Address on file"}
-                    {currentOrder.shippingAddress?.apartment ? `, ${currentOrder.shippingAddress.apartment}` : ""}
+                    {currentOrder.shippingAddress.street}
+                    {currentOrder.shippingAddress.apartment ? `, ${currentOrder.shippingAddress.apartment}` : ""}
                     <br />
-                    {currentOrder.shippingAddress?.city ? `${currentOrder.shippingAddress.city}, ` : ""}
-                    {currentOrder.shippingAddress?.state ? `${currentOrder.shippingAddress.state} ` : ""}
-                    {currentOrder.shippingAddress?.postalCode ? `- ${currentOrder.shippingAddress.postalCode}` : ""}
-                    {currentOrder.shippingAddress?.phone && (
-                      <>
-                        <br />
-                        Phone: {currentOrder.shippingAddress.phone}
-                      </>
-                    )}
+                    {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state} -{" "}
+                    {currentOrder.shippingAddress.postalCode}
+                    <br />
+                    Phone: {currentOrder.shippingAddress.phone}
                   </div>
                 </div>
 
@@ -412,6 +347,77 @@ function OrderSuccessContent() {
                 >
                   <span>Grand Total</span>
                   <span>₹{currentOrder.total.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : orderId ? (
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              border: "1px solid rgba(0,0,0,0.06)",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.03)",
+              overflow: "hidden",
+              marginBottom: "32px",
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#5F259F",
+                color: "#FFFFFF",
+                padding: "20px 28px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "16px",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.8)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  PhonePe Order Reference
+                </div>
+                <div style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.01em", marginTop: "2px" }}>
+                  #{orderId}
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#FFFFFF",
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  padding: "4px 12px",
+                  borderRadius: "9999px",
+                }}
+              >
+                Submitted / Pending Verification
+              </div>
+            </div>
+
+            <div style={{ padding: "28px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "14px",
+                  backgroundColor: "#FAF5FF",
+                  padding: "16px 20px",
+                  borderRadius: "10px",
+                  border: "1px solid #E9D5FF",
+                  marginBottom: "20px",
+                }}
+              >
+                <CheckCircle2 size={22} color="#5F259F" style={{ flexShrink: 0, marginTop: "2px" }} />
+                <div>
+                  <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
+                    Your PhonePe Transaction Details Have Been Received
+                  </h4>
+                  <p style={{ fontSize: "13px", color: "#6B7280", lineHeight: "1.5" }}>
+                    We have registered your payment reference {searchParams.get("utr") ? `(UTR: ${searchParams.get("utr")})` : ""}.
+                    Our concierge will cross-check the transaction with our PhonePe Business gateway and dispatch your package immediately upon verification.
+                  </p>
                 </div>
               </div>
             </div>

@@ -941,7 +941,7 @@ function AccountContent() {
                               flexShrink: 0,
                             }}
                           >
-                            <Image src={item.image} alt={item.title} fill style={{ objectFit: "cover" }} sizes="48px" />
+                            <Image src={item.image || "/images/nxtvie/cat-tshirts.jpg"} alt={item.title} fill style={{ objectFit: "cover" }} sizes="48px" />
                           </div>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>{item.title}</div>
@@ -1351,7 +1351,7 @@ function AccountContent() {
                                     flexShrink: 0,
                                   }}
                                 >
-                                  <Image src={item.image || "/images/placeholder.jpg"} alt={item.title || "Apparel item"} fill style={{ objectFit: "cover" }} sizes="50px" />
+                                  <Image src={item.image || "/images/nxtvie/cat-tshirts.jpg"} alt={item.title || "Apparel item"} fill style={{ objectFit: "cover" }} sizes="50px" />
                                 </div>
                                 <div>
                                   <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>

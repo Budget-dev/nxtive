@@ -362,7 +362,7 @@ export default function OrdersPage() {
                               }}
                             >
                               <Image
-                                src={item.image}
+                                src={item.image || "/images/nxtvie/cat-tshirts.jpg"}
                                 alt={item.title}
                                 fill
                                 style={{ objectFit: "cover" }}

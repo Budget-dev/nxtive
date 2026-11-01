@@ -45,9 +45,11 @@ export default function PrivacyPolicyPage() {
 
         {/* Legal Text Card */}
         <div
-          className="legal-card"
           style={{
-            padding: "clamp(20px, 4vw, 40px)",
+            backgroundColor: "#FFFFFF",
+            borderRadius: "16px",
+            padding: "40px",
+            border: "1px solid rgba(0,0,0,0.06)",
             boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
             fontSize: "14px",
             color: "#554F47",
@@ -76,7 +78,7 @@ export default function PrivacyPolicyPage() {
                 <strong>Account Credentials:</strong> Secure authentication tokens handled via Google Cloud Firebase Auth. We never store raw passwords.
               </li>
               <li>
-                <strong>Transaction & Payment Details:</strong> Card brand, last 4 digits, and UPI IDs tokenized securely via RBI-licensed, PCI-DSS Level 1 payment partners (Razorpay). Full card numbers are never stored on our servers.
+                <strong>Transaction & Payment Details:</strong> UPI IDs and payment references processed securely via RBI-licensed payment partners (PhonePe UPI). Full banking credentials are never stored on our servers.
               </li>
               <li>
                 <strong>Browsing & Technical Data:</strong> IP address, device type, browser metadata, and interaction events utilized to optimize page load speeds and visual experience.
@@ -102,7 +104,7 @@ export default function PrivacyPolicyPage() {
               4. Third-Party Disclosures
             </h2>
             <p>
-              We do not sell, rent, or monetize your personal data. We only share necessary data with trusted logistics and infrastructure partners (e.g. Delhivery, BlueDart, Razorpay, Google Firebase) strictly to process your orders and maintain website security.
+              We do not sell, rent, or monetize your personal data. We only share necessary data with trusted logistics and infrastructure partners (e.g. Delhivery, BlueDart, PhonePe, Google Firebase) strictly to process your orders and maintain website security.
             </p>
           </section>
 
@@ -112,8 +114,8 @@ export default function PrivacyPolicyPage() {
             </h2>
             <p>
               You maintain the right to inspect, correct, export, or request the permanent deletion of your personal data from our systems. To request deletion, please contact our Data Protection Officer at{" "}
-              <a href="mailto:privacy@nxtvie.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
-                privacy@nxtvie.com
+              <a href="mailto:privacy@nxtive.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
+                privacy@nxtive.com
               </a>.
             </p>
           </section>
@@ -124,8 +126,8 @@ export default function PrivacyPolicyPage() {
             </h2>
             <p>
               If you have any questions regarding this policy or our data practices, reach us at{" "}
-              <a href="mailto:support@nxtvie.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
-                support@nxtvie.com
+              <a href="mailto:support@nxtive.com" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>
+                support@nxtive.com
               </a>{" "}
               or by postal mail to: NXTIVE Atelier, Unit 14/B Sun Mill Compound, Lower Parel, Mumbai 400013.
             </p>
