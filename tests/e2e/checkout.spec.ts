@@ -14,8 +14,8 @@ describe("E-Commerce Helpers & Validation", () => {
   });
 
   it("generates tracking numbers with courier prefix", () => {
-    const tracking = generateTrackingNumber("DELHIVERY");
-    expect(tracking).toContain("DELHIVERY-");
+    const tracking = generateTrackingNumber("SHIPROCKET");
+    expect(tracking).toContain("SHIPROCKET-NXT-");
   });
 
   it("validates clothing product creation schema", () => {

@@ -45,7 +45,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
   const [statusNote, setStatusNote] = useState("");
   const [trackingNumber, setTrackingNumber] = useState(initialOrder.trackingNumber || "");
   const [trackingUrl, setTrackingUrl] = useState(initialOrder.trackingUrl || "");
-  const [courier, setCourier] = useState("BlueDart");
+  const [courier, setCourier] = useState("Shiprocket");
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [shippingShiprocket, setShippingShiprocket] = useState(false);
@@ -132,9 +132,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
       const computedUrl =
         trackingUrl ||
         (trackingNumber
-          ? courier === "BlueDart"
-            ? `https://www.bluedart.com/tracking?track=${trackingNumber}`
-            : `https://www.delhivery.com/track/package/${trackingNumber}`
+          ? `https://shiprocket.co/tracking/${trackingNumber}`
           : undefined);
 
       const res = await updateOrderStatus(order.id, selectedStatus, statusNote, {
@@ -519,10 +517,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                   className="admin-select"
                   style={{ width: "100%", padding: "10px 14px" }}
                 >
-                  <option value="BlueDart">BlueDart Express</option>
-                  <option value="Delhivery">Delhivery Surface/Air</option>
-                  <option value="DTDC">DTDC Courier</option>
-                  <option value="IndiaPost">India Post Speed Post</option>
+                  <option value="Shiprocket">Shiprocket (Automated Express Logistics)</option>
                 </select>
               </div>
 
@@ -532,7 +527,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                   type="text"
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="e.g. BLUEDART-9842109"
+                  placeholder="e.g. SR-AWB-9842109"
                   className="admin-input"
                   style={{ fontFamily: "var(--adm-font-mono)", fontSize: "0.85rem" }}
                 />

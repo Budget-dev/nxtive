@@ -159,7 +159,7 @@ export default function AdminShippingPage() {
             Shipping & Logistics Partners
           </h1>
           <p style={{ fontSize: "14px", color: "var(--adm-text-muted)", marginTop: "4px" }}>
-            Manage third-party logistics integrations (Shiprocket, Delhivery, BlueDart, VRL Logistics)
+            Shiprocket Automated Express Logistics Integration & Live AWB Tracking
           </p>
         </div>
 

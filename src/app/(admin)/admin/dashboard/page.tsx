@@ -961,7 +961,7 @@ export default function AdminDashboardPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div>
               <h3 style={{ fontSize: "18px", fontWeight: 800 }}>Courier Partners & Logistics</h3>
-              <p style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>Shiprocket, Delhivery, BlueDart, and VRL Logistics integrations</p>
+              <p style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>Shiprocket Automated Express Logistics Integration</p>
             </div>
             <Link href="/admin/shipping" className="admin-btn-primary admin-btn-sm">
               Configure Shipping →

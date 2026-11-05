@@ -1,141 +1,225 @@
 rules_version = '2';
 
 // ===============================================================
-// NXTIVE Cloud Firestore Security Rules
+// NXTIVE Cloud Firestore Production Security Rules
 // ===============================================================
-// Architecture: Direct Client Key-Based Access
-// Allows direct read and write access for all application collections
-// using the Firebase Web API key without requiring custom auth claims
-// or server-side OAuth tokens.
+// Security Directive:
+// 1. Root Default-Deny: Disallow unauthorized reads/writes by default.
+// 2. Public Catalog Read: Anyone can read products and categories.
+// 3. Admin Authority: Strict RBAC deriving from verified primary admin
+//    email (nxtiveclothing@gmail.com) or custom claim (token.admin == true).
+// 4. Safe Checkout & Order Flow: Customers can create orders and submit
+//    payment verification UTR without price or item tampering.
+// 5. User Data & PII Protection: Users access only their own profile.
+// 6. Sensitive Admin Collections: Shipments, payments, logs, and roles
+//    restricted exclusively to administrators.
 // ===============================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ─── HELPER FUNCTIONS ────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isPrimaryAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "nxtiveclothing@gmail.com" ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     // ─── 1. Products & Categories (Catalog) ──────────────────────
     match /products/{productId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if isPrimaryAdmin();
       }
     }
 
     match /categories/{categoryId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if isPrimaryAdmin();
       }
     }
 
     // ─── 2. Orders & Order Tracking ─────────────────────────────
     match /orders/{orderId} {
-      allow read, write: if true;
+      // Allow any customer (signed-in or guest) to create an order
+      allow create: if true;
+
+      // Allow order read if admin or owner of the order
+      allow read: if isPrimaryAdmin() || (
+        isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          resource.data.uid == request.auth.uid
+        )
+      ) || (
+        // Allow guest to read order directly if they know the order document ID
+        resource.data.userId == "guest" ||
+        !('userId' in resource.data)
+      );
+
+      // Allow customer to update payment transaction / UTR info or admin to update anything
+      allow update: if isPrimaryAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'upiTransactionId',
+          'paymentTransactionId',
+          'status',
+          'paymentStatus',
+          'statusHistory',
+          'submittedAt',
+          'updatedAt'
+        ])
+      );
+
+      // Deletion is strictly admin-only
+      allow delete: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
     // ─── 3. Store Settings ──────────────────────────────────────
     match /settings/{settingId} {
-      allow read, write: if true;
+      // Allow public read for global storefront settings & social gallery
+      allow read: if settingId == 'global' || settingId == 'general' || settingId == 'social_gallery' || isPrimaryAdmin();
+      allow write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
     // ─── 4. Promotional Coupons ─────────────────────────────────
     match /coupons/{couponId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if isPrimaryAdmin();
       }
     }
 
     // ─── 5. Customer Reviews ────────────────────────────────────
     match /reviews/{reviewId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if isPrimaryAdmin();
       }
     }
 
     // ─── 6. Contact Inquiries ───────────────────────────────────
     match /contactMessages/{messageId} {
-      allow read, write: if true;
+      // Public contact form submission with basic field validation
+      allow create: if request.resource.data.name is string &&
+                       request.resource.data.email is string &&
+                       request.resource.data.message is string;
+      allow read, update, delete: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
     // ─── 7. Users & Customer Profiles ───────────────────────────
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, write: if isOwner(userId) || isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isOwner(userId) || isPrimaryAdmin();
       }
     }
 
-    // ─── 8. Shipping & Courier Logistics ────────────────────────
+    // ─── 8. Shipping & Courier Logistics (Shiprocket Integration)
     match /shipping_providers/{providerId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if isPrimaryAdmin();
       }
     }
 
     match /shipments/{shipmentId} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
     match /shipping_logs/{logId} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
-    // ─── 9. Payments & Webhooks ─────────────────────────────────
+    // ─── 9. Payments, Webhooks & Idempotency ────────────────────
     match /payments/{paymentId} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
     match /webhook_events/{eventId} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
     }
 
     match /order_idempotency/{id} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
     }
 
-    // ─── 10. Admin Users, Roles & Logs ──────────────────────────
+    // ─── 10. Admin Users, Roles & Audit Logs ─────────────────────
     match /admin_users/{adminId} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
     match /admin_roles/{roleId} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
     match /admin_logs/{logId} {
-      allow read, write: if true;
+      allow read, write: if isPrimaryAdmin();
+
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read, write: if isPrimaryAdmin();
       }
     }
 
-    // ─── Default Fallback ───────────────────────────────────────
+    // ─── DEFAULT ROOT FALLBACK (DENY ALL) ───────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

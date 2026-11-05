@@ -335,7 +335,7 @@ export function OrderDetailClient({ orderId }: Props) {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#111110" }}>
                 <Truck size={16} color="#936037" />
-                <span>Courier: <strong>Delhivery Surface Express</strong> (AWB: {order.trackingNumber})</span>
+                <span>Courier: <strong>Shiprocket Express</strong> (AWB: {order.trackingNumber})</span>
               </div>
               <span style={{ color: "#746E66" }}>
                 Estimated Delivery: <strong>{order.deliveryDateEstimate}</strong>
