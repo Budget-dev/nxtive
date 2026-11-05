@@ -4,6 +4,7 @@ import { normalizeProduct } from "@/lib/catalog";
 import type { Product } from "@/types/product";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -16,7 +17,7 @@ export async function GET() {
       { success: true, products },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
         },
       }
     );

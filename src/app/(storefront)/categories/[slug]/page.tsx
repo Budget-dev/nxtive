@@ -4,7 +4,8 @@ import { fetchStorefrontCategories, fetchStorefrontProducts, productsForCategory
 import type { Category } from "@/types/product";
 import { CategoryViewClient } from "./category-view-client";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const dynamicParams = true;
 
 interface CategoryPageProps {
@@ -48,8 +49,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       title: normalizedSlug.replace(/-/g, " ").toUpperCase(),
       tagline: "Explore contemporary streetwear engineered for presence and clean aesthetics.",
       image:
-        catalog.find((product) => product.category.toLowerCase().replace(/\s+/g, "-") === normalizedSlug)?.image ||
-        "/images/nxtvie/hero-model.jpg",
+        catalog.find(
+          (product) =>
+            product.category?.toLowerCase().replace(/\s+/g, "-") === normalizedSlug ||
+            product.categoryId?.toLowerCase() === normalizedSlug
+        )?.image || "/images/nxtvie/hero-model.jpg",
       isActive: true,
     };
   }

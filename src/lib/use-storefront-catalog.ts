@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { Category, Product } from "@/types/product";
 import { DEFAULT_CATEGORIES, fetchStorefrontCategories, fetchStorefrontProducts } from "@/lib/catalog";
 
@@ -47,22 +47,42 @@ export function useStorefrontCatalog() {
     return memoryProducts !== null;
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([fetchStorefrontProducts(), fetchStorefrontCategories()]).then(([nextProducts, nextCategories]) => {
-      if (cancelled) return;
-      memoryProducts = nextProducts || [];
-      if (nextCategories && nextCategories.length > 0) {
-        memoryCategories = nextCategories;
+  const loadData = useCallback(() => {
+    return Promise.all([fetchStorefrontProducts(), fetchStorefrontCategories()]).then(
+      ([nextProducts, nextCategories]) => {
+        memoryProducts = nextProducts || [];
+        if (nextCategories && nextCategories.length > 0) {
+          memoryCategories = nextCategories;
+        }
+        setProducts(memoryProducts);
+        setCategories(memoryCategories || DEFAULT_CATEGORIES);
+        setReady(true);
       }
-      setProducts(memoryProducts);
-      setCategories(memoryCategories || DEFAULT_CATEGORIES);
-      setReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
+    );
   }, []);
 
-  return { products, categories, ready };
+  useEffect(() => {
+    let cancelled = false;
+    loadData();
+
+    const handleInvalidate = () => {
+      if (cancelled) return;
+      memoryProducts = null;
+      memoryCategories = null;
+      loadData();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("nxtive:catalog-invalidated", handleInvalidate);
+    }
+
+    return () => {
+      cancelled = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nxtive:catalog-invalidated", handleInvalidate);
+      }
+    };
+  }, [loadData]);
+
+  return { products, categories, ready, refresh: loadData };
 }

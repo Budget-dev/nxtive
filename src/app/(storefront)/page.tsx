@@ -350,17 +350,13 @@ export default function HomePage() {
     const matched = primaryOrder
       .map((slug) => browseCategories.find((c) => c.slug === slug))
       .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
-    return matched.length > 0 ? matched : browseCategories.slice(0, 5);
+    const others = browseCategories.filter((c) => !primaryOrder.includes(c.slug));
+    const merged = [...matched, ...others];
+    return merged.length > 0 ? merged : browseCategories.slice(0, 6);
   }, [browseCategories]);
 
   const categorySections = useMemo(() => {
-    const coreSlugs = ["t-shirts", "hoodies", "shirts", "bottoms", "jackets", "accessories"];
-    const sectionsList = coreSlugs
-      .map((slug) => browseCategories.find((c) => c.slug === slug))
-      .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
-    const source = sectionsList.length > 0 ? sectionsList : browseCategories;
-
-    return source
+    return browseCategories
       .map((category) => {
         const catProducts = productsForCategory(products, category.slug);
         return {

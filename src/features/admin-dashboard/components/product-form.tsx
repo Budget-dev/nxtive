@@ -18,6 +18,7 @@ import { slugify } from "@/utils/slugify";
 import type { Product, ProductCategory, ProductBadge } from "@/types/product";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { invalidateCatalogCache } from "@/lib/catalog";
 import { saveProduct, getAdminCategories, saveCategory } from "../server/actions";
 
 interface ProductFormProps {
@@ -115,6 +116,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
       setCategory(trimmed as ProductCategory);
       setNewCategoryName("");
       setShowNewCategoryInput(false);
+      invalidateCatalogCache(); // category
     } catch (err: any) {
       alert("Failed to create category: " + (err?.message || "Unknown error"));
     } finally {
@@ -267,12 +269,14 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         imageUrl: mainImage.trim(),
         images: galleryImages.length > 0 ? galleryImages : [mainImage.trim()],
         variants,
+        isActive: true, // explicit
         createdAt: initialProduct?.createdAt || now,
         updatedAt: now,
       };
 
       const res = await saveProduct(productPayload);
       if (res.success) {
+        invalidateCatalogCache(); // product
         // Also mirror write to client-side Firestore if client auth is active
         try {
           const docId = res.id;

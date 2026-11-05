@@ -25,7 +25,8 @@ export type ProductCategory =
   | "Hoodies"
   | "Bottoms"
   | "Accessories"
-  | "Jackets";
+  | "Jackets"
+  | (string & {});
 
 export type ProductBadge = "Bestseller" | "New" | "Trending" | "Sale";
 
@@ -39,6 +40,7 @@ export interface Product {
   imageUrl?: string;
   images: string[];
   category: ProductCategory;
+  categoryId?: string;
   collections: string[];
   badge?: ProductBadge | null;
   colors: ProductColor[];

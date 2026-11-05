@@ -518,6 +518,7 @@ export async function saveProduct(
     title,
     slug,
     category,
+    categoryId: (product as any).categoryId || (existing as any)?.categoryId || (category ? String(category).toLowerCase().replace(/\s+/g, "-") : undefined),
     image,
     imageUrl: (product as any).imageUrl || image,
     price: Number(product.price ?? existing?.price),

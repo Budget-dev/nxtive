@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { Category, Product, ProductBadge, ProductCategory } from "@/types/product";
 
@@ -12,8 +12,10 @@ const CATEGORIES: ProductCategory[] = [
 ];
 
 function asCategoryName(value: unknown): ProductCategory {
-  const name = String(value || "");
-  return CATEGORIES.includes(name as ProductCategory) ? (name as ProductCategory) : "T-Shirts";
+  const name = String(value || "").trim();
+  if (!name) return "T-Shirts";
+  const matched = CATEGORIES.find((c) => c.toLowerCase() === name.toLowerCase());
+  return matched || (name as ProductCategory);
 }
 
 function asBadge(value: unknown): ProductBadge | null {
@@ -29,8 +31,15 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
   if (data.isActive === false) return null;
   const title = String(data.title || "").trim();
   if (!title) return null;
-  const image = String(data.image || "");
+  const image = String(data.image || data.imageUrl || "");
   const images = asStringList(data.images);
+  const categoryRaw = String(data.category || "").trim();
+  const category = asCategoryName(categoryRaw);
+  const categoryIdRaw =
+    typeof data.categoryId === "string" && data.categoryId.trim()
+      ? data.categoryId.trim().toLowerCase()
+      : category.toLowerCase().replace(/\s+/g, "-");
+
   return {
     id,
     slug: String(data.slug || id),
@@ -39,7 +48,8 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     originalPrice: data.originalPrice == null || data.originalPrice === "" ? null : Number(data.originalPrice),
     image,
     images: images.length ? images : image ? [image] : [],
-    category: asCategoryName(data.category),
+    category,
+    categoryId: categoryIdRaw,
     collections: asStringList(data.collections),
     badge: asBadge(data.badge),
     colors: Array.isArray(data.colors)
@@ -88,9 +98,9 @@ async function readActiveDocuments<T>(
 ): Promise<T[]> {
   try {
     const col = collection(db, collectionName);
-    const filtered = await getDocs(query(col, where("isActive", "==", true)));
-    const filteredDocs = filtered.docs as CatalogDoc[];
-    return filteredDocs
+    const snapshot = await getDocs(col);
+    const docs = snapshot.docs as CatalogDoc[];
+    return docs
       .map((docSnap) => normalize(docSnap.id, docSnap.data()))
       .filter((row): row is T => row !== null);
   } catch {
@@ -159,85 +169,29 @@ export const DEFAULT_CATEGORIES: Category[] = [
     sortOrder: 6,
     isActive: true,
   },
-  {
-    id: "men",
-    slug: "men",
-    name: "Men",
-    title: "Men's Collection",
-    tagline: "Modern menswear inspired by Asian style and everyday comfort.",
-    image: "/images/nxtvie/hero-model.jpg",
-    sortOrder: 7,
-    isActive: true,
-  },
-  {
-    id: "new-arrivals",
-    slug: "new-arrivals",
-    name: "New Arrivals",
-    title: "New Releases",
-    tagline: "Fresh silhouettes, limited drops, and seasonal colorways.",
-    image: "/images/nxtvie/banner-urban-essentials-hd.jpg",
-    sortOrder: 8,
-    isActive: true,
-  },
-  {
-    id: "clothing",
-    slug: "clothing",
-    name: "Clothing",
-    title: "Apparel Collection",
-    tagline: "Heavyweight tees, structured shirts, technical outerwear and pants.",
-    image: "/images/nxtvie/promo-jackets-hd.jpg",
-    sortOrder: 9,
-    isActive: true,
-  },
-  {
-    id: "collections",
-    slug: "collections",
-    name: "Collections",
-    title: "Curated Collections",
-    tagline: "Explore Urban Essentials, Premium Basics, and Mindset Capsules.",
-    image: "/images/nxtvie/banner-premium-basics-stack-hd.jpg",
-    sortOrder: 10,
-    isActive: true,
-  },
-  {
-    id: "sale",
-    slug: "sale",
-    name: "Sale",
-    title: "Archive Sale",
-    tagline: "Past season favorites and limited-run items at special prices.",
-    image: "/images/nxtvie/promo-asian-minimal-hd.jpg",
-    sortOrder: 11,
-    isActive: true,
-  },
-  {
-    id: "urban-essentials",
-    slug: "urban-essentials",
-    name: "Urban Essentials",
-    title: "Urban Essentials Collection",
-    tagline: "Everyday boxy silhouettes and modern earth tones.",
-    image: "/images/nxtvie/banner-urban-essentials-hd.jpg",
-    sortOrder: 12,
-    isActive: true,
-  },
-  {
-    id: "premium-basics",
-    slug: "premium-basics",
-    name: "Premium Basics",
-    title: "Premium Basics",
-    tagline: "Heavyweight organic cotton staples made to last.",
-    image: "/images/cinematic/banner-luxury-basics.jpg",
-    sortOrder: 13,
-    isActive: true,
-  },
 ];
 
 // ZERO mock products - true empty state until items are created in Firestore/admin
 export const FALLBACK_PRODUCTS: Product[] = [];
 
-// High-speed catalog cache to boost page transitions & eliminate redundant Firestore queries
+// High-speed catalog cache to boost page transitions & eliminate redundant queries
 let storefrontProductsCache: { timestamp: number; data: Product[] } | null = null;
 let storefrontCategoriesCache: { timestamp: number; data: Category[] } | null = null;
-const CATALOG_CACHE_TTL_MS = 45_000;
+const CATALOG_CACHE_TTL_MS = 4_000;
+
+export function invalidateCatalogCache() {
+  storefrontProductsCache = null;
+  storefrontCategoriesCache = null;
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.removeItem("nxtive_cache_products");
+      sessionStorage.removeItem("nxtive_cache_products_time");
+      sessionStorage.removeItem("nxtive_cache_categories");
+      sessionStorage.removeItem("nxtive_cache_categories_time");
+      window.dispatchEvent(new CustomEvent("nxtive:catalog-invalidated"));
+    } catch {}
+  }
+}
 
 export async function fetchStorefrontProducts(): Promise<Product[]> {
   const now = Date.now();
@@ -245,7 +199,7 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
     return storefrontProductsCache.data;
   }
 
-  // 1. Try reading client sessionStorage in browser for instant 0ms responses
+  // 1. Try reading client sessionStorage in browser for instant responses
   if (typeof window !== "undefined") {
     try {
       const stored = sessionStorage.getItem("nxtive_cache_products");
@@ -257,12 +211,10 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
           return parsed;
         }
       }
-    } catch {
-      // Ignore storage errors
-    }
+    } catch {}
   }
 
-  // 2. Try fetching from fast cached server API route
+  // 2. Try fetching from server API route
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/products", { cache: "no-store" });
@@ -277,9 +229,7 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
           return json.products;
         }
       }
-    } catch {
-      // Fall through to direct Firestore fetch
-    }
+    } catch {}
   }
 
   // 3. Fallback to direct active documents read
@@ -319,7 +269,7 @@ export async function fetchStorefrontCategories(): Promise<Category[]> {
     } catch {}
   }
 
-  // 2. Try fetching from fast cached server API route
+  // 2. Try fetching from fast server API route
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/categories", { cache: "no-store" });
@@ -339,10 +289,10 @@ export async function fetchStorefrontCategories(): Promise<Category[]> {
 
   // 3. Fallback to direct active documents read
   try {
-    const categories = await readActiveDocuments("categories", normalizeCategory);
+    const remote = await readActiveDocuments("categories", normalizeCategory);
     const sorted =
-      categories.length > 0
-        ? categories.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+      remote.length > 0
+        ? remote.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
         : DEFAULT_CATEGORIES;
     storefrontCategoriesCache = { timestamp: now, data: sorted };
     if (typeof window !== "undefined") {
@@ -383,7 +333,7 @@ export function categoriesFromProducts(products: Product[]): Category[] {
 
 export function productsForCategory(products: Product[], slug: string): Product[] {
   if (!Array.isArray(products) || products.length === 0) return [];
-  const normalized = String(slug || "").toLowerCase();
+  const normalized = String(slug || "").toLowerCase().trim();
 
   // All / Shop / Collections
   if (normalized === "all" || normalized === "shop" || normalized === "collections") {
@@ -392,50 +342,57 @@ export function productsForCategory(products: Product[], slug: string): Product[
 
   // Men / Menswear: NXTIVE is a contemporary menswear brand, so Men includes all apparel
   if (normalized === "men" || normalized === "menswear") {
-    const menswear = products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
-    return menswear.length > 0 ? menswear : products;
+    return products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
   }
 
   // Clothing: All non-accessory garments
   if (normalized === "clothing") {
-    const clothing = products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
-    return clothing.length > 0 ? clothing : products;
+    return products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
   }
 
   // Sale drops
   if (normalized === "sale") {
-    const saleItems = products.filter(
+    return products.filter(
       (p) =>
         p?.badge === "Sale" ||
         (p?.originalPrice != null && p.originalPrice > p.price) ||
-        (Array.isArray(p?.collections) && p.collections.includes("sale"))
+        (Array.isArray(p?.collections) && p.collections.some((c) => String(c).toLowerCase().trim() === "sale"))
     );
-    return saleItems.length > 0 ? saleItems : products.slice(0, 8);
   }
 
   // New arrivals
-  if (normalized === "new-arrivals") {
-    const newItems = products.filter(
+  if (normalized === "new-arrivals" || normalized === "new") {
+    return products.filter(
       (p) =>
         p?.badge === "New" ||
-        (Array.isArray(p?.collections) && (p.collections.includes("new-arrivals") || p.collections.includes("new")))
+        (Array.isArray(p?.collections) &&
+          p.collections.some((c) => {
+            const cl = String(c).toLowerCase().trim();
+            return cl === "new-arrivals" || cl === "new";
+          }))
     );
-    return newItems.length > 0 ? newItems : products.slice(0, 8);
   }
 
-  // Standard category / collection matching
-  const matched = products.filter((product) => {
+  // Standard category / collection matching (checks category, categorySlug, categoryId, categoryIdSlug, and collections)
+  return products.filter((product) => {
     if (!product) return false;
-    const category = String(product.category || "").toLowerCase();
-    const collections = Array.isArray(product.collections) ? product.collections : [];
+    const cat = String(product.category || "").toLowerCase().trim();
+    const catSlug = cat.replace(/\s+/g, "-");
+    const catId = String(product.categoryId || "").toLowerCase().trim();
+    const catIdSlug = catId.replace(/\s+/g, "-");
+    const collections = Array.isArray(product.collections)
+      ? product.collections.map((c) => String(c || "").toLowerCase().trim())
+      : [];
+
     return (
-      category === normalized ||
-      category.replace(/\s+/g, "-") === normalized ||
-      collections.includes(normalized)
+      cat === normalized ||
+      catSlug === normalized ||
+      catId === normalized ||
+      catIdSlug === normalized ||
+      collections.includes(normalized) ||
+      collections.some((c) => c.replace(/\s+/g, "-") === normalized)
     );
   });
-
-  return matched.length > 0 ? matched : products;
 }
 
 export function relatedProducts(products: Product[], productId: string, limit = 4): Product[] {

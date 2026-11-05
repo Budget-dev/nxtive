@@ -11,12 +11,14 @@ function ProductsContent() {
   const searchParams = useSearchParams();
   const searchQ = searchParams.get("q") || "";
   const categoryParam = searchParams.get("category");
-  const { products, ready } = useStorefrontCatalog();
+  const { products, categories: storeCategories, ready } = useStorefrontCatalog();
 
   const categories = useMemo(() => {
-    const names = Array.from(new Set(products.map((product) => product.category)));
+    const fromCats = (storeCategories || []).map((c) => c.name);
+    const fromProds = products.map((product) => product.category);
+    const names = Array.from(new Set([...fromCats, ...fromProds].filter(Boolean)));
     return ["All", ...names];
-  }, [products]);
+  }, [storeCategories, products]);
 
   const resolvedInitialCat = categoryParam
     ? categories.find(c => c.toLowerCase() === categoryParam.toLowerCase().replace(/-/g, " ")) ||
@@ -67,8 +69,14 @@ function ProductsContent() {
       }
 
       // Category
-      if (selectedCategory !== "All" && prod.category !== selectedCategory) {
-        return false;
+      if (selectedCategory !== "All") {
+        const selNorm = selectedCategory.toLowerCase().trim();
+        const catNorm = String(prod.category || "").toLowerCase().trim();
+        const catIdNorm = String(prod.categoryId || "").toLowerCase().trim();
+        const selSlug = selNorm.replace(/\s+/g, "-");
+        if (catNorm !== selNorm && catIdNorm !== selNorm && catIdNorm !== selSlug && catNorm.replace(/\s+/g, "-") !== selSlug) {
+          return false;
+        }
       }
 
       // Size
