@@ -5,6 +5,7 @@ import path from "path";
 import os from "os";
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "nxtive-80349";
+const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAWwaVSLhQcj6QS_Nm3OWZmQ2WSdQyTyMQ";
 const OAUTH_CLIENT_ID = "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com";
 const OAUTH_CLIENT_SECRET = "j9iVZfS8kkCEFUPaAeJV0sAi";
 
@@ -47,6 +48,10 @@ export async function getFirestoreAccessToken(): Promise<string | null> {
         // Fall through
       }
     }
+  }
+
+  if (!refreshToken) {
+    refreshToken = process.env.FIREBASE_TOKEN;
   }
 
   if (!refreshToken) {
@@ -138,6 +143,48 @@ export function fromFirestoreDocument<T = Record<string, any>>(doc: any): T {
 }
 
 const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+
+/**
+ * Read all documents from a Firestore collection using the PUBLIC Firebase API key.
+ * This works on Vercel and any server without service account credentials.
+ * Requires Firestore Security Rules: allow read: if true (which products/categories have).
+ */
+export async function firestoreApiKeyReadCollection<T = any>(collectionName: string): Promise<T[] | null> {
+  if (!API_KEY) return null;
+  try {
+    const url = `${BASE_URL}/${collectionName}?pageSize=300&key=${API_KEY}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      if (res.status === 404) return [];
+      console.warn(`[firestore-rest] apiKey read collection ${collectionName} status:`, res.status);
+      return null;
+    }
+    const json = await res.json();
+    const documents = json.documents || [];
+    return documents.map(fromFirestoreDocument) as T[];
+  } catch (err) {
+    console.warn(`[firestore-rest] apiKey read collection ${collectionName} failed:`, err);
+    return null;
+  }
+}
+
+/**
+ * Read a single document using the PUBLIC Firebase API key.
+ */
+export async function firestoreApiKeyReadDocument<T = any>(collectionName: string, id: string): Promise<T | null> {
+  if (!API_KEY) return null;
+  try {
+    const url = `${BASE_URL}/${collectionName}/${encodeURIComponent(id)}?key=${API_KEY}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    const doc = await res.json();
+    return fromFirestoreDocument<T>(doc);
+  } catch (err) {
+    console.warn(`[firestore-rest] apiKey read doc ${collectionName}/${id} failed:`, err);
+    return null;
+  }
+}
 
 /**
  * Read all documents from a Firestore collection via REST API.

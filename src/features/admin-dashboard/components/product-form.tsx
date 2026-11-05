@@ -268,55 +268,76 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         imageUrl: mainImage.trim(),
         images: galleryImages.length > 0 ? galleryImages : [mainImage.trim()],
         variants,
-        isActive: true, // explicit
+        isActive: true,
         createdAt: initialProduct?.createdAt || now,
         updatedAt: now,
       };
 
-      const res = await saveProduct(productPayload);
-      if (res.success) {
-        invalidateCatalogCache(); // product
-        // Also mirror write to client-side Firestore if client auth is active
-        try {
-          const docId = res.id;
-          const prodRef = doc(db, "products", docId);
-          await setDoc(
-            prodRef,
-            {
-              ...productPayload,
-              id: docId,
-              title: title.trim(),
-              description: description.trim(),
-              imageUrl: mainImage.trim(),
-              image: mainImage.trim(),
-              category,
-        categoryId: paramCategoryId || slugify(category),
-              price: Number(price),
-              stock: Number(totalStock),
-              totalStock: Number(totalStock),
-              createdAt: initialProduct?.createdAt || now,
-              updatedAt: now,
-            },
-            { merge: true }
-          );
-        } catch (clientErr) {
-          // Cloud Firestore was already updated via server action
-          console.info("[product-form] Client-side mirror sync notice:", clientErr);
-        }
-
-        setMessage({
-          type: "success",
-          text: isEdit ? "Apparel updated in Firestore database!" : "New apparel added to Firestore database!",
+      // PRIMARY write path: direct API route → storeSetDocument → Firestore REST (API key, works on Vercel)
+      let savedId: string | null = null;
+      try {
+        const apiRes = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(productPayload),
         });
-        setTimeout(() => {
-          router.push("/admin/products");
-          router.refresh();
-        }, 800);
-      } else {
-        setMessage({ type: "error", text: res.error || "Failed to save product to database." });
+        const apiData = await apiRes.json();
+        if (apiData.success) {
+          savedId = apiData.id;
+        } else {
+          console.warn("[product-form] API route returned error:", apiData.error);
+        }
+      } catch (apiErr) {
+        console.warn("[product-form] API route call failed:", apiErr);
       }
+
+      // SECONDARY write path: server action (works locally with firebase-tools token)
+      let serverRes: { success: boolean; id: string; error?: string } | null = null;
+      try {
+        serverRes = await saveProduct(productPayload);
+        if (serverRes.success && !savedId) {
+          savedId = serverRes.id;
+        }
+      } catch (saErr) {
+        console.warn("[product-form] Server action failed:", saErr);
+      }
+
+      // TERTIARY write path: Firebase client SDK (requires admin to be signed in)
+      const docId = savedId || serverRes?.id || `prod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      try {
+        const prodRef = doc(db, "products", docId);
+        await setDoc(
+          prodRef,
+          {
+            ...productPayload,
+            id: docId,
+            isActive: true,
+            createdAt: initialProduct?.createdAt || now,
+            updatedAt: now,
+          },
+          { merge: true }
+        );
+        if (!savedId) savedId = docId;
+      } catch (clientErr: any) {
+        console.warn("[product-form] Client SDK Firestore write note:", clientErr?.code, clientErr?.message);
+      }
+
+      if (!savedId) {
+        setMessage({ type: "error", text: "Failed to save product. Please check your connection and try again." });
+        return;
+      }
+
+      invalidateCatalogCache();
+      setMessage({
+        type: "success",
+        text: isEdit ? "Product updated successfully!" : "Product added! It will now appear in the store.",
+      });
+      setTimeout(() => {
+        router.push("/admin/products");
+        router.refresh();
+      }, 800);
     } catch (err: any) {
-      setMessage({ type: "error", text: err?.message || "Failed to save apparel item." });
+      setMessage({ type: "error", text: err?.message || "Failed to save product." });
     } finally {
       setSubmitting(false);
     }

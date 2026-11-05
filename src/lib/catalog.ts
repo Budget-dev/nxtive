@@ -1,5 +1,5 @@
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
+import { db, firebaseConfig } from "@/lib/firebase/client";
 import type { Category, Product, ProductBadge, ProductCategory } from "@/types/product";
 
 const CATEGORIES: ProductCategory[] = [
@@ -91,10 +91,71 @@ export function normalizeCategory(id: string, data: Record<string, unknown>): Ca
 
 type CatalogDoc = { id: string; data: () => Record<string, unknown> };
 
+function unpackFirestoreRestValue(val: any): unknown {
+  if (!val || typeof val !== "object") return val;
+  if ("stringValue" in val) return val.stringValue;
+  if ("integerValue" in val) return Number(val.integerValue);
+  if ("doubleValue" in val) return Number(val.doubleValue);
+  if ("booleanValue" in val) return Boolean(val.booleanValue);
+  if ("nullValue" in val) return null;
+  if ("arrayValue" in val) {
+    const values = val.arrayValue?.values || [];
+    return values.map(unpackFirestoreRestValue);
+  }
+  if ("mapValue" in val) {
+    const fields = val.mapValue?.fields || {};
+    const res: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(fields)) {
+      res[k] = unpackFirestoreRestValue(v);
+    }
+    return res;
+  }
+  if ("timestampValue" in val) return val.timestampValue;
+  return val;
+}
+
+function parseFirestoreRestDoc(doc: any): Record<string, unknown> {
+  const parts = String(doc.name || "").split("/");
+  const id = parts[parts.length - 1];
+  const data: Record<string, any> = { id };
+  if (doc.fields) {
+    for (const [k, v] of Object.entries(doc.fields)) {
+      data[k] = unpackFirestoreRestValue(v);
+    }
+  }
+  return data;
+}
+
 async function readActiveDocuments<T>(
   collectionName: string,
   normalize: (id: string, data: Record<string, unknown>) => T | null
 ): Promise<T[]> {
+  // 1. Ultra-fast direct REST read (bypasses Node.js client SDK timeout during SSR & works everywhere)
+  try {
+    const apiKey = firebaseConfig.apiKey;
+    const projectId = firebaseConfig.projectId;
+    if (apiKey && projectId) {
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}?pageSize=300&key=${apiKey}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        const docs = json.documents || [];
+        const parsed = docs
+          .map((d: any) => {
+            const raw = parseFirestoreRestDoc(d);
+            return normalize(raw.id as string, raw);
+          })
+          .filter((row: any): row is T => row !== null);
+        if (parsed.length > 0 || docs.length === 0) {
+          return parsed;
+        }
+      }
+    }
+  } catch {
+    // Fall through to Client SDK
+  }
+
+  // 2. Client SDK fallback
   try {
     const col = collection(db, collectionName);
     const snapshot = await getDocs(col);

@@ -95,6 +95,8 @@ import {
   firestoreRestReadDocument,
   firestoreRestSetDocument,
   firestoreRestDeleteDocument,
+  firestoreApiKeyReadCollection,
+  firestoreApiKeyReadDocument,
 } from "./firestore-rest";
 
 export async function storeReadCollection<T>(collectionName: string): Promise<T[]> {
@@ -113,11 +115,26 @@ export async function storeReadCollection<T>(collectionName: string): Promise<T[
     }
   }
 
-  // 2. Direct Cloud Firestore connection via authenticated REST API
+  // 2. Direct Cloud Firestore via public API key (works on Vercel without credentials)
+  //    Products and categories have "allow read: if true" in security rules.
+  try {
+    const apiKeyDocs = await firestoreApiKeyReadCollection<T>(collectionName);
+    if (apiKeyDocs !== null) {
+      const map: Record<string, any> = {};
+      apiKeyDocs.forEach((d: any) => { if (d.id) map[d.id] = d; });
+      if (apiKeyDocs.length > 0 || !fs.existsSync(path.join(DATA_DIR, `${collectionName}.json`))) {
+        saveCollectionData(collectionName, map);
+      }
+      return apiKeyDocs;
+    }
+  } catch (err) {
+    console.warn(`[firestore-store] apiKey read error for ${collectionName}:`, err);
+  }
+
+  // 3. OAuth-token-based REST API (local dev with firebase-tools logged in)
   try {
     const cloudDocs = await firestoreRestReadCollection<T>(collectionName);
     if (cloudDocs !== null) {
-      // If cloud docs exist, update local cache and return live data
       const map: Record<string, any> = {};
       cloudDocs.forEach((d: any) => { if (d.id) map[d.id] = d; });
       if (cloudDocs.length > 0 || !fs.existsSync(path.join(DATA_DIR, `${collectionName}.json`))) {
@@ -129,7 +146,7 @@ export async function storeReadCollection<T>(collectionName: string): Promise<T[
     console.warn(`[firestore-store] cloud REST read error for ${collectionName}:`, err);
   }
 
-  // 3. Fallback to persistent storage
+  // 4. Fallback to persistent storage
   const map = loadInitialCollectionData(collectionName);
   return Object.values(map) as T[];
 }
@@ -147,7 +164,15 @@ export async function storeReadDocument<T>(collectionName: string, id: string): 
     }
   }
 
-  // 2. Try direct Cloud Firestore REST API
+  // 2. Try public API key read
+  try {
+    const apiKeyDoc = await firestoreApiKeyReadDocument<T>(collectionName, id);
+    if (apiKeyDoc) return apiKeyDoc;
+  } catch (err) {
+    console.warn(`[firestore-store] apiKey read doc error for ${collectionName}/${id}:`, err);
+  }
+
+  // 3. Try direct Cloud Firestore REST API (OAuth)
   try {
     const cloudDoc = await firestoreRestReadDocument<T>(collectionName, id);
     if (cloudDoc) {
@@ -157,7 +182,7 @@ export async function storeReadDocument<T>(collectionName: string, id: string): 
     console.warn(`[firestore-store] cloud REST read doc error for ${collectionName}/${id}:`, err);
   }
 
-  // 3. Fallback to local store
+  // 4. Fallback to local store
   const map = loadInitialCollectionData(collectionName);
   return (map[id] as T) || null;
 }
