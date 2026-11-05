@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
+  Copy,
+  Check,
+  Send,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
@@ -44,6 +47,79 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
   const [courier, setCourier] = useState("BlueDart");
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [shippingShiprocket, setShippingShiprocket] = useState(false);
+  const [copiedUtr, setCopiedUtr] = useState(false);
+
+  const handleCopyUtr = (utrValue: string) => {
+    navigator.clipboard.writeText(utrValue);
+    setCopiedUtr(true);
+    setTimeout(() => setCopiedUtr(false), 2000);
+  };
+
+  const handleShipViaShiprocket = async () => {
+    setShippingShiprocket(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/delivery/shiprocket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_shipment",
+          orderId: order.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setOrder((prev: any) => ({
+          ...prev,
+          ...data.data,
+        }));
+        if (data.data.awbCode) setTrackingNumber(data.data.awbCode);
+        if (data.data.trackingUrl) setTrackingUrl(data.data.trackingUrl);
+        setSelectedStatus("shipped");
+        setMessage({ type: "success", text: data.message || "Shiprocket consignment created successfully." });
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to create Shiprocket consignment." });
+      }
+    } catch (e: any) {
+      setMessage({ type: "error", text: e?.message || "Shiprocket consignment creation failed." });
+    } finally {
+      setShippingShiprocket(false);
+    }
+  };
+
+  const handleVerifyPhonePePayment = async () => {
+    setUpdating(true);
+    setMessage(null);
+    try {
+      const res = await updateOrderPaymentStatus(order.id, "paid");
+      if (res.success) {
+        await updateOrderStatus(order.id, "processing", "PhonePe UTR verified by administrator");
+        setOrder((prev: any) => ({
+          ...prev,
+          paymentStatus: "paid",
+          status: "processing",
+          statusHistory: [
+            ...(prev.statusHistory || []),
+            {
+              status: "processing",
+              timestamp: new Date().toISOString(),
+              note: "PhonePe UTR verified by administrator",
+              updatedBy: "admin",
+            },
+          ],
+        }));
+        setSelectedStatus("processing");
+        setMessage({ type: "success", text: "PhonePe payment verified! Order moved to Processing." });
+      } else {
+        setMessage({ type: "error", text: res.error || "Failed to verify payment." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err?.message || "Failed to verify payment." });
+    } finally {
+      setUpdating(false);
+    }
+  };
 
 
   const handleUpdateStatus = async (e: React.FormEvent) => {
@@ -456,6 +532,35 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
               >
                 {updating ? "Updating..." : "Commit Status Change"}
               </button>
+              <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px dashed var(--adm-border)" }}>
+                <button
+                  type="button"
+                  disabled={shippingShiprocket}
+                  onClick={handleShipViaShiprocket}
+                  style={{
+                    width: "100%",
+                    padding: "11px 16px",
+                    borderRadius: "8px",
+                    backgroundColor: "#5F259F",
+                    color: "#FFFFFF",
+                    fontWeight: 700,
+                    fontSize: "13px",
+                    border: "none",
+                    cursor: shippingShiprocket ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    opacity: shippingShiprocket ? 0.7 : 1,
+                  }}
+                >
+                  <Send size={15} />
+                  <span>{shippingShiprocket ? "Dispatching via Shiprocket..." : "Ship via Shiprocket Logistics"}</span>
+                </button>
+                <div style={{ fontSize: "11px", color: "var(--adm-text-muted)", marginTop: "6px", textAlign: "center" }}>
+                  Generates AWB code, courier labels &amp; syncs live tracking link
+                </div>
+              </div>
             </form>
           </div>
 
@@ -472,7 +577,39 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                 <span style={{ fontWeight: 600, color: "var(--adm-text)" }}>{order.paymentMethod}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
+              {((order as any).upiTransactionId || (order as any).paymentTransactionId || order.paymentMethod?.toLowerCase().includes("phonepe")) ? (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "var(--adm-text-muted)" }}>PhonePe UTR / Txn:</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontFamily: "var(--adm-font-mono)", fontWeight: 700, color: "#5F259F", backgroundColor: "#FAF5FF", padding: "2px 8px", borderRadius: "4px" }}>
+                      {(order as any).upiTransactionId || (order as any).paymentTransactionId || "Not submitted"}
+                    </span>
+                    {((order as any).upiTransactionId || (order as any).paymentTransactionId) && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUtr((order as any).upiTransactionId || (order as any).paymentTransactionId)}
+                        style={{
+                          background: "none",
+                          border: "1px solid #5F259F",
+                          borderRadius: "4px",
+                          padding: "2px 6px",
+                          color: "#5F259F",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px",
+                          fontSize: "10px",
+                        }}
+                      >
+                        {copiedUtr ? <Check size={11} /> : <Copy size={11} />}
+                        <span>{copiedUtr ? "Copied" : "Copy"}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
                 <span style={{ color: "var(--adm-text-muted)" }}>Razorpay Order ID:</span>
+              )}
                 <span style={{ fontFamily: "var(--adm-font-mono)", color: "var(--adm-gold)" }}>
                   {order.razorpayOrderId || "N/A (Cash on Delivery)"}
                 </span>
@@ -505,6 +642,28 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
               >
                 <span style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>Update Payment:</span>
                 <div style={{ display: "flex", gap: "6px" }}>
+                  {((order as any).upiTransactionId || (order as any).paymentTransactionId || order.paymentMethod?.toLowerCase().includes("phonepe")) && order.paymentStatus !== "paid" && (
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={handleVerifyPhonePePayment}
+                      style={{
+                        padding: "5px 12px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        borderRadius: "5px",
+                        border: "1px solid #16A34A",
+                        backgroundColor: "#16A34A",
+                        color: "#FFFFFF",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      ✓ Verify PhonePe Payment
+                    </button>
+                  )}
                   {order.paymentStatus !== "paid" && (
                     <button
                       type="button"

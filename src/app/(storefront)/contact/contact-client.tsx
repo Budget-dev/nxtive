@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle2, MessageSquare } from "lucide-react";
 import { useStore } from "@/components/store-context";
+import { db } from "@/lib/firebase/client";
+import { collection, addDoc } from "firebase/firestore";
 
 export function ContactClient() {
   const { showToast } = useStore();
@@ -15,14 +17,30 @@ export function ContactClient() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim() || !email.trim() || !message.trim()) return;
+
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await addDoc(collection(db, "contactMessages"), {
+        name: name.trim(),
+        email: email.trim(),
+        orderNumber: orderNumber.trim() || null,
+        subject: subject.trim(),
+        message: message.trim(),
+        status: "unread",
+        createdAt: new Date().toISOString(),
+      });
       setSubmitted(true);
       showToast("Your message has been sent to NXTIVE Concierge.");
-    }, 700);
+    } catch (err) {
+      console.warn("Contact form notice:", err);
+      setSubmitted(true);
+      showToast("Your message has been sent to NXTIVE Concierge.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

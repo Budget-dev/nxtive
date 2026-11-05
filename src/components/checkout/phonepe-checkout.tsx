@@ -18,13 +18,16 @@ import { QRCodeSVG } from "qrcode.react";
 import { ArrowRight, CheckCircle2, Copy, ExternalLink, HelpCircle, Loader2, QrCode, ShieldCheck, Smartphone } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { buildPhonePeLink, buildGenericUpiLink, isMobile } from "@/lib/upi";
+import { generateOrderNumber } from "@/utils/slugify";
 
 export interface PhonePeCheckoutProps {
   amount: number;
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
+  userId?: string;
   shippingAddress?: any;
+  deliveryMethod?: string;
   items?: any[];
   onSuccess?: (orderId: string, utr: string) => void;
   onError?: (err: string) => void;
@@ -38,7 +41,9 @@ export function PhonePeCheckout({
   customerName,
   customerPhone,
   customerEmail,
+  userId,
   shippingAddress,
+  deliveryMethod,
   items,
   onSuccess,
   onError,
@@ -87,17 +92,42 @@ export function PhonePeCheckout({
     setBusy(true);
     setError(null);
     try {
-      // 1. Create order in Firestore
-      // Adheres strictly to firestore.rules keys:
-      // customerName, customerPhone, amount, status, paymentMethod, upiTransactionId, createdAt
+      const orderNumber = generateOrderNumber();
       const orderPayload: Record<string, any> = {
+        orderNumber,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
+        customerEmail: customerEmail?.trim() || "",
+        uid: userId || null,
+        userId: userId || null,
         amount: Number(amount),
-        status: "pending", // pending -> submitted -> verified / rejected
-        paymentMethod: "phonepe_manual",
+        total: Number(amount),
+        totalAmount: Number(amount),
+        items: (items || []).map((item) => ({
+          productId: item.id || item.productId || "",
+          title: item.title || "Item",
+          price: Number(item.price || 0),
+          quantity: Number(item.quantity || 1),
+          selectedSize: item.selectedSize || "M",
+          selectedColor: item.selectedColor || "",
+          image: item.image || "",
+        })),
+        shippingAddress: shippingAddress || {},
+        deliveryMethod: deliveryMethod || "Standard Domestic",
+        status: "pending",
+        paymentMethod: "phonepe",
+        paymentStatus: "pending_verification",
+        paymentTransactionId: null,
         upiTransactionId: null,
+        statusHistory: [
+          {
+            status: "pending",
+            timestamp: new Date().toISOString(),
+            note: "PhonePe checkout initiated",
+          },
+        ],
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
 
       const ref = await addDoc(collection(db, "orders"), orderPayload);
@@ -155,11 +185,21 @@ export function PhonePeCheckout({
     setBusy(true);
     setError(null);
     try {
-      // Update order in Firestore with UTR and status 'submitted'
+      // Update order in Firestore with UTR, paymentStatus, and processing status
       await updateDoc(doc(db, "orders", orderId), {
         upiTransactionId: cleanUtr,
-        status: "submitted",
+        paymentTransactionId: cleanUtr,
+        status: "processing",
+        paymentStatus: "pending_verification",
+        statusHistory: [
+          {
+            status: "pending_verification",
+            timestamp: new Date().toISOString(),
+            note: `PhonePe UPI transaction submitted with UTR/Ref: ${cleanUtr}. Awaiting admin verification.`,
+          },
+        ],
         submittedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       sessionStorage.removeItem("phonepe_order");

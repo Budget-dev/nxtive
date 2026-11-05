@@ -34,10 +34,27 @@ export interface NotificationSettings {
   notifyOnPendingReview: boolean;
 }
 
+export interface SocialGalleryItem {
+  id: string;
+  image: string;
+  alt: string;
+  link?: string;
+}
+
+export interface SocialGallerySettings {
+  heading: string;
+  subheading: string;
+  instagramUrl: string;
+  handle: string;
+  viewLabel?: string;
+  photos: SocialGalleryItem[];
+}
+
 export interface AdminAppSettings {
   general: GeneralSettings;
   store: StoreSettings;
   notifications: NotificationSettings;
+  socialGallery?: SocialGallerySettings;
   updatedAt?: string;
   updatedBy?: string;
 }

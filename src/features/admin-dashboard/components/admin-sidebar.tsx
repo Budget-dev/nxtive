@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -23,6 +23,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useAdminAuth } from "./admin-auth-context";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -163,6 +165,33 @@ export function AdminSidebar({
   onToggleCollapse,
 }: SidebarProps) {
   const pathname = usePathname();
+  const [liveCategories, setLiveCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
+
+  useEffect(() => {
+    try {
+      const q = query(collection(db, "categories"), orderBy("name", "asc"));
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot: any) => {
+          const items = snapshot.docs.map((d: any) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              name: data.name || data.title || d.id,
+              slug: data.slug || d.id,
+            };
+          });
+          setLiveCategories(items);
+        },
+        (err: any) => {
+          console.warn("Categories live listener note:", err?.message);
+        }
+      );
+      return () => unsubscribe();
+    } catch {
+      // Fallback
+    }
+  }, []);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     products: pathname.startsWith("/admin/products") || pathname.startsWith("/admin/inventory") || pathname.startsWith("/admin/categories"),
     orders: pathname.startsWith("/admin/orders"),
@@ -304,6 +333,51 @@ export function AdminSidebar({
                         </Link>
                       );
                     })}
+
+                    {/* Dynamic categories under Products linking to Add Product form */}
+                    {item.id === "products" && (
+                      <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed var(--adm-border)" }}>
+                        <div
+                          style={{
+                            fontSize: "10.5px",
+                            fontWeight: 800,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            color: "var(--adm-gold)",
+                            padding: "4px 12px 6px",
+                          }}
+                        >
+                          Add by Category
+                        </div>
+                        {(liveCategories.length > 0
+                          ? liveCategories
+                          : [
+                              { id: "t-shirts", name: "T-Shirts", slug: "t-shirts" },
+                              { id: "shirts", name: "Shirts", slug: "shirts" },
+                              { id: "hoodies", name: "Hoodies", slug: "hoodies" },
+                              { id: "bottoms", name: "Bottoms", slug: "bottoms" },
+                              { id: "jackets", name: "Jackets", slug: "jackets" },
+                              { id: "accessories", name: "Accessories", slug: "accessories" },
+                            ]
+                        ).map((cat) => {
+                          const href = `/admin/products/new?category=${encodeURIComponent(cat.name)}&categoryId=${encodeURIComponent(cat.id)}`;
+                          return (
+                            <Link
+                              key={cat.id}
+                              href={href}
+                              onClick={() => {
+                                if (window.innerWidth <= 1024) onClose();
+                              }}
+                              className="admin-submenu-item"
+                              style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                            >
+                              <span style={{ color: "var(--adm-gold)", fontWeight: 700 }}>+</span>
+                              <span>{cat.name}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

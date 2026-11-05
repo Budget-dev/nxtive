@@ -168,30 +168,10 @@ export default function CheckoutPage() {
       ? "Priority Express (1-2 Days)"
       : "Standard Domestic (3-5 Days)";
 
-    if (paymentMethod === "phonepe") {
-      // PhonePe flow is handled interactively within the payment card
-      const phonepeSection = document.getElementById("phonepe-payment-section");
-      if (phonepeSection) {
-        phonepeSection.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const order = await placeOrder({
-        shippingAddress,
-        paymentMethod: "Cash on Delivery (COD)",
-        deliveryMethod: deliveryMethodLabel,
-        userId: user?.uid,
-      });
-
-      setHasSubmitted(true);
-      router.push(`/checkout/success?orderId=${order.id}&method=cod`);
-    } catch (err: any) {
-      setOrderError(err?.message || "Something went wrong placing your order. Please try again.");
-      setIsSubmitting(false);
+    // PhonePe flow is handled interactively within the payment card
+    const phonepeSection = document.getElementById("phonepe-payment-section");
+    if (phonepeSection) {
+      phonepeSection.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
@@ -656,6 +636,8 @@ export default function CheckoutPage() {
                           customerName={`${firstName} ${lastName}`.trim() || user?.displayName || "NXTIVE Member"}
                           customerPhone={phone}
                           customerEmail={email}
+                          userId={user?.uid}
+                          deliveryMethod={deliveryMethod === "priority" ? "Priority Express (1-2 Days)" : "Standard Domestic (3-5 Days)"}
                           shippingAddress={{
                             fullName: `${firstName} ${lastName}`.trim(),
                             email,
@@ -677,37 +659,6 @@ export default function CheckoutPage() {
                       </div>
                     )}
                   </div>
-
-                  {/* Cash on Delivery Option */}
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      padding: "16px 20px",
-                      borderRadius: "10px",
-                      border: paymentMethod === "cod" ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
-                      backgroundColor: paymentMethod === "cod" ? "rgba(17,17,16,0.02)" : "#FFFFFF",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === "cod"}
-                      onChange={() => setPaymentMethod("cod")}
-                      style={{ accentColor: "#111110" }}
-                    />
-                    <Banknote size={18} color="#111110" />
-                    <div>
-                      <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110" }}>
-                        Cash on Delivery (COD)
-                      </span>
-                      <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
-                        Pay cash upon delivery at your doorstep
-                      </span>
-                    </div>
-                  </label>
                 </div>
               </div>
             </div>
@@ -847,13 +798,11 @@ export default function CheckoutPage() {
                   {isLoading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>{paymentMethod === "cod" ? "Placing Order..." : "Opening PhonePe..."}</span>
+                      <span>Opening PhonePe...</span>
                     </>
                   ) : (
                     <>
-                      <span>
-                        {paymentMethod === "cod" ? "Place Order (COD)" : "Pay With PhonePe UPI"}
-                      </span>
+                      <span>Pay With PhonePe UPI</span>
                       <ArrowRight size={16} />
                     </>
                   )}
@@ -863,7 +812,7 @@ export default function CheckoutPage() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "12px" }}>
                   <Lock size={12} color="#2B9348" />
                   <span style={{ fontSize: "11px", color: "#8E8880" }}>
-                    {paymentMethod === "phonepe" ? "Direct & Verified PhonePe UPI" : "Secured 256-Bit Encrypted Order"}
+                    Direct & Verified PhonePe UPI
                   </span>
                 </div>
 

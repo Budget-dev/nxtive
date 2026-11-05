@@ -48,11 +48,11 @@ export default function AdminOrdersPage() {
       const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
       const unsubscribe = onSnapshot(
         q,
-        (snap) => {
-          setPhonepeOrders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        (snap: any) => {
+          setPhonepeOrders(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
         },
-        (err) => {
-          console.warn("Firestore orders subscription note:", err.message);
+        (err: any) => {
+          console.warn("Firestore orders subscription note:", err?.message);
         }
       );
       return () => unsubscribe();

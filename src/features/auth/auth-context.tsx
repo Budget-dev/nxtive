@@ -197,6 +197,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
+
+    // Auto-detect mobile devices to prevent popup suppression
+    const isMobileDevice =
+      typeof window !== "undefined" &&
+      (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        window.innerWidth < 768);
+
+    if (isMobileDevice) {
+      try {
+        await signInWithRedirect(auth, provider);
+        return null;
+      } catch (err: any) {
+        const msg = formatAuthError(err);
+        setError(msg);
+        throw new Error(msg);
+      }
+    }
     try {
       const res = await signInWithPopup(auth, provider);
       if (res.user) {

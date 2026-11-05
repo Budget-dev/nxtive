@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Save,
@@ -46,6 +46,9 @@ const AVAILABLE_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "28", "30", "32", "34
 
 export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const paramCategory = searchParams ? searchParams.get("category") : null;
+  const paramCategoryId = searchParams ? searchParams.get("categoryId") : null;
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -69,6 +72,14 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
     }
     fetchCategories();
   }, []);
+
+  // Pre-fill category from query param if provided and not in edit mode
+  useEffect(() => {
+    if (paramCategory && !isEdit) {
+      setCategory(paramCategory as ProductCategory);
+      setCategoryOptions((prev) => Array.from(new Set([...prev, paramCategory])));
+    }
+  }, [paramCategory, isEdit]);
 
   const handleAddNewCategory = async () => {
     const trimmed = newCategoryName.trim();
@@ -237,6 +248,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         title: title.trim(),
         slug: slug.trim() || slugify(title),
         category,
+        categoryId: paramCategoryId || slugify(category),
         badge: badge === "None" ? undefined : badge,
         price: Number(price),
         originalPrice: originalPrice ? Number(originalPrice) : undefined,
@@ -275,6 +287,7 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
               imageUrl: mainImage.trim(),
               image: mainImage.trim(),
               category,
+        categoryId: paramCategoryId || slugify(category),
               price: Number(price),
               stock: Number(totalStock),
               totalStock: Number(totalStock),

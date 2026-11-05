@@ -12,12 +12,17 @@ import {
   AlertTriangle,
   ExternalLink,
   Database,
+  Camera,
+  Plus,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import {
   getAdminSettings,
   saveAdminSettings,
 } from "@/features/admin-dashboard/server/actions";
 import type { AdminAppSettings } from "@/types/settings";
+import { DEFAULT_SOCIAL_GALLERY } from "@/constants/social-gallery";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 function blankSettings(): AdminAppSettings {
@@ -53,11 +58,12 @@ function blankSettings(): AdminAppSettings {
       adminNotificationEmail: "",
       notifyOnPendingReview: false,
     },
+    socialGallery: DEFAULT_SOCIAL_GALLERY,
   };
 }
 
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<"general" | "store" | "notifications">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "store" | "notifications" | "social">("general");
   const [settings, setSettings] = useState<AdminAppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -518,15 +524,319 @@ export default function AdminSettingsPage() {
           </div>
         )}
 
+
+        {/* TAB 4: Social Media & FOLLOW @NXTIVE Gallery */}
+        {activeTab === "social" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Brand Social Links */}
+            <div className="admin-card" style={{ padding: "24px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                <Camera size={20} color="#5F259F" />
+                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#121110", margin: 0 }}>
+                  &ldquo;FOLLOW @NXTIVE&rdquo; Storefront Instagram Section
+                </h3>
+              </div>
+              <p style={{ fontSize: "13px", color: "var(--adm-text-muted)", marginBottom: "20px" }}>
+                Customize the Instagram follow section on the home page: headline, handle, Instagram URL, and editorial photos.
+              </p>
+
+              <div className="admin-form-grid-2">
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Section Heading</label>
+                  <input
+                    type="text"
+                    value={settings.socialGallery?.heading ?? "FOLLOW @NXTIVE"}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        socialGallery: {
+                          ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                          heading: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="FOLLOW @NXTIVE"
+                    className="admin-input"
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Subheading</label>
+                  <input
+                    type="text"
+                    value={settings.socialGallery?.subheading ?? "Real people. Real style. Tag us to be featured."}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        socialGallery: {
+                          ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                          subheading: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Real people. Real style. Tag us to be featured."
+                    className="admin-input"
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Instagram Handle</label>
+                  <input
+                    type="text"
+                    value={settings.socialGallery?.handle ?? "@NXTIVE"}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        socialGallery: {
+                          ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                          handle: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="@NXTIVE"
+                    className="admin-input"
+                  />
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Instagram Profile URL</label>
+                  <input
+                    type="url"
+                    value={settings.socialGallery?.instagramUrl ?? "https://instagram.com"}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        socialGallery: {
+                          ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                          instagramUrl: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="https://instagram.com/nxtive"
+                    className="admin-input"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Gallery Photos Manager */}
+            <div className="admin-card" style={{ padding: "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#121110", margin: 0 }}>
+                    Gallery Photos ({settings.socialGallery?.photos?.length || 0})
+                  </h3>
+                  <span style={{ fontSize: "12px", color: "var(--adm-text-muted)" }}>
+                    Paste image URLs, alt captions, and post links displayed in the storefront carousel
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentPhotos = settings.socialGallery?.photos || [];
+                      const newPhoto = {
+                        id: `photo-${Date.now()}`,
+                        image: "/images/nxtvie/hero-model.jpg",
+                        alt: "NXTIVE street style look",
+                        link: settings.socialGallery?.instagramUrl || "https://instagram.com",
+                      };
+                      setSettings({
+                        ...settings,
+                        socialGallery: {
+                          ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                          photos: [...currentPhotos, newPhoto],
+                        },
+                      });
+                    }}
+                    className="admin-btn-secondary admin-btn-sm"
+                    style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                  >
+                    <Plus size={14} />
+                    <span>Add Photo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("Reset gallery photos to default curated editorial images?")) {
+                        setSettings({
+                          ...settings,
+                          socialGallery: {
+                            ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                            photos: DEFAULT_SOCIAL_GALLERY.photos,
+                          },
+                        });
+                      }
+                    }}
+                    className="admin-btn-secondary admin-btn-sm"
+                    style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                  >
+                    <RefreshCw size={13} />
+                    <span>Reset Defaults</span>
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {(settings.socialGallery?.photos || []).map((photo, index) => (
+                  <div
+                    key={photo.id || index}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "16px",
+                      padding: "14px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--adm-border)",
+                      backgroundColor: "var(--adm-bg)",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {/* Thumbnail preview */}
+                    <div
+                      style={{
+                        width: "80px",
+                        height: "100px",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        backgroundColor: "#1C1917",
+                        flexShrink: 0,
+                        border: "1px solid var(--adm-border)",
+                      }}
+                    >
+                      <img
+                        src={photo.image}
+                        alt={photo.alt || `Photo ${index + 1}`}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/images/nxtvie/hero-model.jpg";
+                        }}
+                      />
+                    </div>
+
+                    {/* Inputs */}
+                    <div style={{ flex: 1, minWidth: "260px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--adm-text-muted)", display: "block", marginBottom: "2px" }}>
+                          Image URL (paste any image link or path)
+                        </label>
+                        <input
+                          type="text"
+                          value={photo.image}
+                          onChange={(e) => {
+                            const updatedPhotos = [...(settings.socialGallery?.photos || [])];
+                            updatedPhotos[index] = { ...updatedPhotos[index], image: e.target.value };
+                            setSettings({
+                              ...settings,
+                              socialGallery: {
+                                ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                                photos: updatedPhotos,
+                              },
+                            });
+                          }}
+                          placeholder="/images/... or https://..."
+                          className="admin-input"
+                          style={{ fontSize: "12px", padding: "6px 10px" }}
+                        />
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        <div>
+                          <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--adm-text-muted)", display: "block", marginBottom: "2px" }}>
+                            Alt Text / Description
+                          </label>
+                          <input
+                            type="text"
+                            value={photo.alt || ""}
+                            onChange={(e) => {
+                              const updatedPhotos = [...(settings.socialGallery?.photos || [])];
+                              updatedPhotos[index] = { ...updatedPhotos[index], alt: e.target.value };
+                              setSettings({
+                                ...settings,
+                                socialGallery: {
+                                  ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                                  photos: updatedPhotos,
+                                },
+                              });
+                            }}
+                            placeholder="Description of the look"
+                            className="admin-input"
+                            style={{ fontSize: "12px", padding: "6px 10px" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--adm-text-muted)", display: "block", marginBottom: "2px" }}>
+                            Post Link (Click destination)
+                          </label>
+                          <input
+                            type="text"
+                            value={photo.link || ""}
+                            onChange={(e) => {
+                              const updatedPhotos = [...(settings.socialGallery?.photos || [])];
+                              updatedPhotos[index] = { ...updatedPhotos[index], link: e.target.value };
+                              setSettings({
+                                ...settings,
+                                socialGallery: {
+                                  ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                                  photos: updatedPhotos,
+                                },
+                              });
+                            }}
+                            placeholder="https://instagram.com/p/..."
+                            className="admin-input"
+                            style={{ fontSize: "12px", padding: "6px 10px" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Delete action */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedPhotos = (settings.socialGallery?.photos || []).filter((_, i) => i !== index);
+                        setSettings({
+                          ...settings,
+                          socialGallery: {
+                            ...(settings.socialGallery || DEFAULT_SOCIAL_GALLERY),
+                            photos: updatedPhotos,
+                          },
+                        });
+                      }}
+                      style={{
+                        padding: "8px",
+                        borderRadius: "6px",
+                        backgroundColor: "#FEE2E2",
+                        color: "#DC2626",
+                        border: "1px solid #FCA5A5",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      title="Remove this photo"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "24px" }}>
-            <button
-              type="submit"
-              disabled={saving}
-              className="admin-btn-primary"
-            >
-              <Save size={15} />
-              <span>{saving ? "Saving..." : "Save Settings"}</span>
-            </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="admin-btn-primary"
+          >
+            <Save size={15} />
+            <span>{saving ? "Saving..." : "Save Settings"}</span>
+          </button>
         </div>
       </form>
     </div>

@@ -20,7 +20,8 @@ import type { Coupon } from "@/types/common";
 import type { Customer, AdminUser, AdminRoleDefinition } from "@/types/user";
 import type { Review } from "@/types/review";
 import type { ShippingProvider, Shipment, ShippingLog } from "@/types/delivery";
-import type { AdminAppSettings } from "@/types/settings";
+import type { AdminAppSettings, SocialGallerySettings } from "@/types/settings";
+import { DEFAULT_SOCIAL_GALLERY } from "@/constants/social-gallery";
 import { ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 
 function getDataErrorState(): AdminDataErrorState {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Heart, ShoppingBag, User, Menu, X, ArrowRight, Moon, Sun } from "lucide-react";
+import { Search, Heart, ShoppingBag, User, Menu, X, ArrowRight, Moon, Sun, Package, Truck } from "lucide-react";
 
 import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
@@ -269,6 +269,26 @@ export function Header() {
               <User size={19} strokeWidth={1.8} />
             </Link>
 
+            {/* Orders Icon */}
+            <Link
+              href="/orders"
+              aria-label="My Orders"
+              title="My Orders & Tracking"
+              style={{
+                color: "var(--text-dark)",
+                width: "44px",
+                height: "44px",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "opacity 0.2s ease",
+              }}
+              className="action-icon-btn"
+            >
+              <Package size={19} strokeWidth={1.8} />
+            </Link>
+
             {/* Wishlist Heart Icon */}
             <Link
               href="/wishlist"
@@ -521,6 +541,42 @@ export function Header() {
               >
                 <User size={18} />
                 <span>{user ? "My Account" : "Sign In / Register"}</span>
+              </Link>
+              <Link
+                href="/orders"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  document.body.style.overflow = "";
+                }}
+                style={{
+                  fontSize: "14px",
+                  color: "var(--text-dark)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  minHeight: "44px",
+                }}
+              >
+                <Package size={18} />
+                <span>My Orders</span>
+              </Link>
+              <Link
+                href="/orders"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  document.body.style.overflow = "";
+                }}
+                style={{
+                  fontSize: "14px",
+                  color: "var(--text-dark)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  minHeight: "44px",
+                }}
+              >
+                <Truck size={18} />
+                <span>Track Order</span>
               </Link>
               <button
                 type="button"

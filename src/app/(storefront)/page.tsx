@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
   ShoppingBag,
@@ -17,96 +18,11 @@ import {
   Heart,
   Eye,
 } from "lucide-react";
-import { useStore, ProductItem } from "@/components/store-context";
-import { MOCK_PRODUCTS, Product } from "@/constants/mock-products";
-
-// 5 Categories from reference
-const CATEGORIES = [
-  { name: "T-Shirts", image: "/images/nxtvie/cat-tshirts.jpg", href: "/categories/t-shirts" },
-  { name: "Shirts", image: "/images/nxtvie/cat-shirts.jpg", href: "/categories/shirts" },
-  { name: "Hoodies", image: "/images/nxtvie/cat-hoodies.jpg", href: "/categories/hoodies" },
-  { name: "Bottoms", image: "/images/nxtvie/cat-bottoms.jpg", href: "/categories/bottoms" },
-  { name: "Accessories", image: "/images/nxtvie/cat-accessories.jpg", href: "/categories/accessories" },
-];
-
-// Category sections with 2 featured cards per category
-interface CategorySectionConfig {
-  slug: string;
-  name: string;
-  eyebrow: string;
-  tagline: string;
-  href: string;
-  products: Product[];
-}
-
-const CATEGORY_SECTIONS: CategorySectionConfig[] = [
-  {
-    slug: "t-shirts",
-    name: "T-Shirts",
-    eyebrow: "Core Drop 01",
-    tagline: "Heavyweight 260-300 GSM combed organic cotton tees with architectural drop shoulders.",
-    href: "/categories/t-shirts",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "oversized-essential-tee") || MOCK_PRODUCTS[0],
-      MOCK_PRODUCTS.find((p) => p.slug === "minimal-logo-tee") || MOCK_PRODUCTS[1],
-    ],
-  },
-  {
-    slug: "hoodies",
-    name: "Hoodies",
-    eyebrow: "Heavyweight Volume",
-    tagline: "Substantial 450 GSM French terry loopback pullovers with double-layered hoods.",
-    href: "/categories/hoodies",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "core-hoodie") || MOCK_PRODUCTS[3],
-      MOCK_PRODUCTS.find((p) => p.slug === "asian-minimal-modern-hoodie") || MOCK_PRODUCTS[7],
-    ],
-  },
-  {
-    slug: "shirts",
-    name: "Shirts",
-    eyebrow: "Summer Layering",
-    tagline: "Breathable linen-cotton camp shirts and workwear overshirts for effortless everyday styling.",
-    href: "/categories/shirts",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "relaxed-fit-shirt") || MOCK_PRODUCTS[2],
-      MOCK_PRODUCTS.find((p) => p.slug === "camp-collar-linen-shirt") || MOCK_PRODUCTS[2],
-    ],
-  },
-  {
-    slug: "bottoms",
-    name: "Bottoms",
-    eyebrow: "Urban Movement",
-    tagline: "Articulated ripstop tactical cargo pants and relaxed wide-leg brushed fleece track pants.",
-    href: "/categories/bottoms",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "cargo-pants") || MOCK_PRODUCTS[4],
-      MOCK_PRODUCTS.find((p) => p.slug === "urban-runner-relaxed-sweats") || MOCK_PRODUCTS[4],
-    ],
-  },
-  {
-    slug: "jackets",
-    name: "Jackets",
-    eyebrow: "Specialized Fabrics",
-    tagline: "Technical weather-resistant memory nylon windbreakers engineered with Aquaguard zips.",
-    href: "/categories/jackets",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "jackets-for-every-journey") || MOCK_PRODUCTS[6],
-      MOCK_PRODUCTS.find((p) => p.slug === "specialized-technical-jacket") || MOCK_PRODUCTS[6],
-    ],
-  },
-  {
-    slug: "accessories",
-    name: "Accessories",
-    eyebrow: "Signature Details",
-    tagline: "Structured 6-panel low-profile dad caps and heavyweight 16oz organic canvas daily carry totes.",
-    href: "/categories/accessories",
-    products: [
-      MOCK_PRODUCTS.find((p) => p.slug === "nxtvie-cap") || MOCK_PRODUCTS[5],
-      MOCK_PRODUCTS.find((p) => p.slug === "heavyweight-canvas-tote") || MOCK_PRODUCTS[5],
-    ],
-  },
-];
+import { useStore } from "@/components/store-context";
+import type { Product, Category } from "@/types/product";
+import { categoriesFromProducts, productsForCategory, DEFAULT_CATEGORIES } from "@/lib/catalog";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
+import { DEFAULT_SOCIAL_GALLERY } from "@/constants/social-gallery";
 
 // Social gallery photos
 const GALLERY_PHOTOS = [
@@ -195,7 +111,7 @@ const CINEMATIC_HERO_SLIDES = [
   },
 ];
 
-// Dedicated 2-Card Layout Product Item (Instant render without framer-motion delay)
+// Dedicated Product Item Card with Framer Motion hover feedback
 function TwoCardProduct({ product }: { product: Product }) {
   const { addToCart, toggleWishlist, isInWishlist, setQuickViewProduct } = useStore();
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
@@ -222,7 +138,10 @@ function TwoCardProduct({ product }: { product: Product }) {
   };
 
   return (
-    <div className="two-card-item">
+    <motion.div
+      className="two-card-item"
+      whileHover={{ y: -5, transition: { duration: 0.25, ease: "easeOut" } }}
+    >
       {/* Media Box */}
       <div className="two-card-media-box">
         <Link href={`/products/${product.slug || product.id}`} className="two-card-img-link">
@@ -321,6 +240,85 @@ function TwoCardProduct({ product }: { product: Product }) {
           </button>
         </div>
       </div>
+    </motion.div>
+  );
+}
+
+// Auto-scrolling Product Track: smoothly auto-scrolls horizontally; pauses when the user hovers or interacts, resumes smoothly when leaving
+function AutoScrollingProductTrack({ products }: { products: Product[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const interactingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Duplicate items to ensure smooth continuous loop
+  const displayProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    if (products.length >= 6) return [...products, ...products];
+    if (products.length >= 3) return [...products, ...products, ...products];
+    return [...products, ...products, ...products, ...products];
+  }, [products]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || displayProducts.length === 0) return;
+
+    let animId: number;
+    const speed = 0.65; // Luxury smooth scroll speed (pixels per frame)
+
+    const step = () => {
+      if (!isInteracting && el) {
+        el.scrollLeft += speed;
+        const halfWidth = el.scrollWidth / 2;
+        if (halfWidth > 0 && el.scrollLeft >= halfWidth) {
+          el.scrollLeft -= halfWidth;
+        }
+      }
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [isInteracting, displayProducts]);
+
+  const handlePointerEnter = () => {
+    if (interactingTimeoutRef.current) clearTimeout(interactingTimeoutRef.current);
+    setIsInteracting(true);
+  };
+
+  const handlePointerLeave = () => {
+    if (interactingTimeoutRef.current) clearTimeout(interactingTimeoutRef.current);
+    interactingTimeoutRef.current = setTimeout(() => {
+      setIsInteracting(false);
+    }, 400);
+  };
+
+  const handleTouchStart = () => {
+    if (interactingTimeoutRef.current) clearTimeout(interactingTimeoutRef.current);
+    setIsInteracting(true);
+  };
+
+  const handleTouchEnd = () => {
+    if (interactingTimeoutRef.current) clearTimeout(interactingTimeoutRef.current);
+    interactingTimeoutRef.current = setTimeout(() => {
+      setIsInteracting(false);
+    }, 1200);
+  };
+
+  return (
+    <div
+      className="autoscroll-track-wrapper"
+      onMouseEnter={handlePointerEnter}
+      onMouseLeave={handlePointerLeave}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div ref={containerRef} className="autoscroll-track-container">
+        {displayProducts.map((prod, index) => (
+          <div key={`${prod.id}-${index}`} className="autoscroll-card-item">
+            <TwoCardProduct product={prod} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -328,6 +326,54 @@ function TwoCardProduct({ product }: { product: Product }) {
 export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const touchStartXRef = useRef<number | null>(null);
+  const { products, categories, ready } = useStorefrontCatalog();
+  const [socialGallery, setSocialGallery] = useState(DEFAULT_SOCIAL_GALLERY);
+
+  useEffect(() => {
+    fetch("/api/social-gallery")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.success && json?.data) {
+          setSocialGallery(json.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const browseCategories = useMemo(
+    () => (categories && categories.length > 0 ? categories : categoriesFromProducts(products)),
+    [categories, products]
+  );
+
+  const departmentCategories = useMemo(() => {
+    const primaryOrder = ["t-shirts", "shirts", "hoodies", "bottoms", "jackets", "accessories"];
+    const matched = primaryOrder
+      .map((slug) => browseCategories.find((c) => c.slug === slug))
+      .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
+    return matched.length > 0 ? matched : browseCategories.slice(0, 5);
+  }, [browseCategories]);
+
+  const categorySections = useMemo(() => {
+    const coreSlugs = ["t-shirts", "hoodies", "shirts", "bottoms", "jackets", "accessories"];
+    const sectionsList = coreSlugs
+      .map((slug) => browseCategories.find((c) => c.slug === slug))
+      .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
+    const source = sectionsList.length > 0 ? sectionsList : browseCategories;
+
+    return source
+      .map((category) => {
+        const catProducts = productsForCategory(products, category.slug);
+        return {
+          slug: category.slug,
+          name: category.name,
+          eyebrow: category.title || category.name,
+          tagline: category.tagline,
+          href: `/categories/${category.slug}`,
+          products: catProducts,
+        };
+      })
+      .filter((section) => section.products.length > 0);
+  }, [browseCategories, products]);
 
   const nextSlide = useCallback(() => {
     setActiveSlide((prev) => (prev + 1) % CINEMATIC_HERO_SLIDES.length);
@@ -535,7 +581,7 @@ export default function HomePage() {
               }}
             >
               <img
-                src="/images/logo/nxtive-logo-wide-light.png"
+                src="/images/logo/nxtive-lightning-logo-white.png"
                 alt="NXTIVE"
                 style={{
                   height: "clamp(24px, 3.2vw, 34px)",
@@ -645,22 +691,7 @@ export default function HomePage() {
             >
               <Link
                 href={currentSlide.primaryHref}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  backgroundColor: "#FFFFFF",
-                  color: "#111110",
-                  padding: "14px 32px",
-                  borderRadius: "9999px",
-                  fontSize: "13.5px",
-                  fontWeight: 700,
-                  letterSpacing: "0.01em",
-                  transition: "all 0.25s ease",
-                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)",
-                  textDecoration: "none",
-                }}
-                className="banner-cta-white"
+                className="banner-cta-primary"
               >
                 <span>{currentSlide.primaryCta}</span>
                 <ArrowRight size={15} />
@@ -668,23 +699,7 @@ export default function HomePage() {
 
               <Link
                 href={currentSlide.secondaryHref}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                  color: "#FFFFFF",
-                  border: "1px solid rgba(255, 255, 255, 0.3)",
-                  backdropFilter: "blur(10px)",
-                  padding: "14px 26px",
-                  borderRadius: "9999px",
-                  fontSize: "13.5px",
-                  fontWeight: 600,
-                  letterSpacing: "0.01em",
-                  transition: "all 0.25s ease",
-                  textDecoration: "none",
-                }}
-                className="hero-secondary-btn"
+                className="banner-cta-secondary"
               >
                 <span>{currentSlide.secondaryCta}</span>
               </Link>
@@ -875,15 +890,15 @@ export default function HomePage() {
             }}
             className="categories-grid"
           >
-            {CATEGORIES.map((cat) => (
+            {departmentCategories.map((cat) => (
               <Link
-                key={cat.name}
-                href={cat.href}
+                key={cat.id || cat.slug || cat.name}
+                href={`/categories/${cat.slug}`}
                 className="category-card"
               >
                 <div className="category-card-media">
                   <img
-                    src={cat.image}
+                    src={cat.image || "/images/placeholder.jpg"}
                     alt={cat.name}
                     loading="lazy"
                     decoding="async"
@@ -892,7 +907,6 @@ export default function HomePage() {
                 </div>
                 <div className="category-card-footer">
                   <span className="cat-name">{cat.name}</span>
-                  <ArrowRight size={14} className="cat-arrow" />
                 </div>
               </Link>
             ))}
@@ -900,71 +914,39 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. CATEGORY SECTIONS WITH 2-CARD LAYOUT & "SEE ALL" NAVIGATION */}
+      {/* 3. DYNAMIC PRODUCT CATEGORY SHOWCASES (First 2 categories) */}
+      {categorySections.slice(0, 2).map((section) => (
+        <section key={section.slug} className="category-showcase-section">
+          <div className="container">
+            <div className="category-showcase-header">
+              <div className="category-header-top">
+                <div>
+                  <div className="category-badge-pill">
+                    <span className="badge-dot" />
+                    <span>{section.eyebrow}</span>
+                  </div>
+                  <h2 className="category-showcase-title">{section.name}</h2>
+                </div>
 
-      {/* Section A: T-SHIRTS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[0].eyebrow}</span>
+                <Link
+                  href={section.href}
+                  className="see-all-cta-btn"
+                  aria-label={`See all ${section.name}`}
+                >
+                  <span>See All {section.name}</span>
+                  <ArrowRight size={14} />
+                </Link>
               </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[0].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[0].tagline}</p>
+              {section.tagline && (
+                <p className="category-showcase-tagline">{section.tagline}</p>
+              )}
             </div>
 
-            <Link
-              href={CATEGORY_SECTIONS[0].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[0].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[0].name}</span>
-              <ArrowRight size={15} />
-            </Link>
+            {/* Smooth Auto-scrolling Products Track */}
+            <AutoScrollingProductTrack products={section.products} />
           </div>
-
-          {/* 2-Card Layout Grid */}
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[0].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section B: HOODIES (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[1].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[1].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[1].tagline}</p>
-            </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[1].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[1].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[1].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          {/* 2-Card Layout Grid */}
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[1].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      ))}
 
       {/* 4. EDITORIAL COLLECTION BANNERS (Urban Essentials & Premium Basics) */}
       <section style={{ padding: "16px 0 44px 0" }} className="collections-section">
@@ -1006,7 +988,7 @@ export default function HomePage() {
               <div style={{ position: "relative", zIndex: 2, maxWidth: "380px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
                   <img
-                    src="/images/logo/nxtive-logo-wide-light.png"
+                    src="/images/logo/nxtive-lightning-logo-white.png"
                     alt="NXTIVE"
                     style={{ height: "18px", width: "auto", objectFit: "contain" }}
                   />
@@ -1108,7 +1090,7 @@ export default function HomePage() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                   <img
-                    src="/images/logo/nxtive-logo-wide-dark.png"
+                    src="/images/logo/nxtive-lightning-logo.png"
                     alt="NXTIVE"
                     style={{ height: "16px", width: "auto", objectFit: "contain" }}
                   />
@@ -1178,129 +1160,88 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Section C: SHIRTS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[2].eyebrow}</span>
+      {/* Dynamic Remaining Category Showcases (Categories from index 2 onwards) */}
+      {categorySections.slice(2).map((section) => (
+        <section key={section.slug} className="category-showcase-section">
+          <div className="container">
+            <div className="category-showcase-header">
+              <div className="category-header-top">
+                <div>
+                  <div className="category-badge-pill">
+                    <span className="badge-dot" />
+                    <span>{section.eyebrow}</span>
+                  </div>
+                  <h2 className="category-showcase-title">{section.name}</h2>
+                </div>
+
+                <Link
+                  href={section.href}
+                  className="see-all-cta-btn"
+                  aria-label={`See all ${section.name}`}
+                >
+                  <span>See All {section.name}</span>
+                  <ArrowRight size={14} />
+                </Link>
               </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[2].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[2].tagline}</p>
+              {section.tagline && (
+                <p className="category-showcase-tagline">{section.tagline}</p>
+              )}
             </div>
 
-            <Link
-              href={CATEGORY_SECTIONS[2].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[2].name}`}
+            <AutoScrollingProductTrack products={section.products} />
+          </div>
+        </section>
+      ))}
+
+      {/* Empty State when database has 0 products */}
+      {ready && products.length === 0 && (
+        <section style={{ padding: "40px 0 60px 0" }}>
+          <div className="container" style={{ textAlign: "center" }}>
+            <div
+              style={{
+                maxWidth: "480px",
+                margin: "0 auto",
+                padding: "36px 24px",
+                background: "rgba(255, 255, 255, 0.75)",
+                borderRadius: "16px",
+                border: "1px solid rgba(0, 0, 0, 0.06)",
+                boxShadow: "0 6px 20px rgba(0, 0, 0, 0.04)",
+              }}
             >
-              <span>See All {CATEGORY_SECTIONS[2].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[2].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section D: BOTTOMS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[3].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[3].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[3].tagline}</p>
+              <Sparkles size={28} color="#C78D4E" style={{ margin: "0 auto 12px" }} />
+              <h3
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  marginBottom: "8px",
+                  color: "#151413",
+                }}
+              >
+                Seasonal Drops Coming Soon
+              </h3>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#78726A",
+                  lineHeight: 1.5,
+                  marginBottom: "20px",
+                }}
+              >
+                New collection pieces are currently in curation. Explore our departments or visit the store catalog.
+              </p>
+              <Link
+                href="/products"
+                className="see-all-cta-btn"
+                style={{ margin: "0 auto", display: "inline-flex" }}
+              >
+                <span>Explore Catalog</span>
+                <ArrowRight size={14} />
+              </Link>
             </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[3].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[3].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[3].name}</span>
-              <ArrowRight size={15} />
-            </Link>
           </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[3].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section E: JACKETS (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[4].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[4].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[4].tagline}</p>
-            </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[4].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[4].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[4].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[4].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section F: ACCESSORIES (2 Cards + See All) */}
-      <section className="category-showcase-section">
-        <div className="container">
-          <div className="category-showcase-header">
-            <div>
-              <div className="category-badge-pill">
-                <span className="badge-dot" />
-                <span>{CATEGORY_SECTIONS[5].eyebrow}</span>
-              </div>
-              <h2 className="category-showcase-title">{CATEGORY_SECTIONS[5].name}</h2>
-              <p className="category-showcase-tagline">{CATEGORY_SECTIONS[5].tagline}</p>
-            </div>
-
-            <Link
-              href={CATEGORY_SECTIONS[5].href}
-              className="see-all-cta-btn"
-              aria-label={`See all ${CATEGORY_SECTIONS[5].name}`}
-            >
-              <span>See All {CATEGORY_SECTIONS[5].name}</span>
-              <ArrowRight size={15} />
-            </Link>
-          </div>
-
-          <div className="two-card-grid">
-            {CATEGORY_SECTIONS[5].products.map((prod) => (
-              <TwoCardProduct key={prod.id} product={prod} />
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 5. TRUST / FEATURES STRIP (4 Pillars) */}
       <section style={{ padding: "16px 0 54px 0" }} className="features-section">
@@ -1392,7 +1333,7 @@ export default function HomePage() {
             >
               <div style={{ marginBottom: "16px" }}>
                 <img
-                  src="/images/logo/nxtive-logo-wide-dark.png"
+                  src="/images/logo/nxtive-lightning-logo.png"
                   alt="NXTIVE"
                   style={{ height: "24px", width: "auto", objectFit: "contain" }}
                 />
@@ -1497,7 +1438,7 @@ export default function HomePage() {
                   lineHeight: 1.1,
                 }}
               >
-                FOLLOW @NXTIVE
+                {socialGallery.heading || "FOLLOW @NXTIVE"}
               </h2>
               <p
                 style={{
@@ -1506,12 +1447,12 @@ export default function HomePage() {
                   marginTop: "4px",
                 }}
               >
-                Real people. Real style. Tag us to be featured.
+                {socialGallery.subheading || "Real people. Real style. Tag us to be featured."}
               </p>
             </div>
 
             <a
-              href="https://instagram.com"
+              href={socialGallery.instagramUrl || "https://instagram.com"}
               target="_blank"
               rel="noreferrer"
               style={{
@@ -1526,7 +1467,7 @@ export default function HomePage() {
               }}
               className="view-all-link"
             >
-              <span>View on Instagram</span>
+              <span>{socialGallery.viewLabel || "View on Instagram"}</span>
               <ArrowRight size={13} />
             </a>
           </div>
@@ -1539,10 +1480,10 @@ export default function HomePage() {
             }}
             className="gallery-grid"
           >
-            {GALLERY_PHOTOS.map((photo) => (
+            {(socialGallery.photos && socialGallery.photos.length > 0 ? socialGallery.photos : GALLERY_PHOTOS).map((photo, idx) => (
               <a
-                key={photo.id}
-                href="https://instagram.com"
+                key={photo.id || idx}
+                href={(photo as any).link || socialGallery.instagramUrl || "https://instagram.com"}
                 target="_blank"
                 rel="noreferrer"
                 style={{
@@ -1588,16 +1529,89 @@ export default function HomePage() {
             border-color: rgba(255, 255, 255, 0.5) !important;
             transform: translateY(-50%) scale(1.08) !important;
           }
-          .hero-secondary-btn:hover {
-            background-color: rgba(255, 255, 255, 0.2) !important;
-            border-color: rgba(255, 255, 255, 0.6) !important;
-            transform: translateY(-2px);
-          }
-          .banner-cta-white:hover {
-            background-color: #F0EDE6 !important;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
-          }
+        }
+
+        /* Hero Banner CTA Buttons */
+        .hero-cta-row {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          flex-wrap: wrap;
+          margin-bottom: 28px;
+        }
+
+        .banner-cta-primary {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          background: linear-gradient(135deg, #FAF8F5 0%, #EDE7DD 100%);
+          color: #121110;
+          padding: 13px 28px;
+          border-radius: 9999px;
+          font-size: 13.5px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          text-decoration: none;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.2);
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .banner-cta-primary:hover {
+          transform: translateY(-2px) scale(1.02);
+          background: #FFFFFF;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 0 0 0 2px rgba(255, 255, 255, 0.4);
+          color: #0B0B0A;
+        }
+
+        .banner-cta-secondary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(255, 255, 255, 0.12);
+          color: #FFFFFF;
+          border: 1px solid rgba(255, 255, 255, 0.32);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          padding: 13px 24px;
+          border-radius: 9999px;
+          font-size: 13.5px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          text-decoration: none;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .banner-cta-secondary:hover {
+          background: rgba(255, 255, 255, 0.22);
+          border-color: rgba(255, 255, 255, 0.7);
+          transform: translateY(-2px);
+          color: #FFFFFF;
+        }
+
+        .banner-cta-white {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #FFFFFF;
+          color: #121110;
+          padding: 11px 22px;
+          border-radius: 9999px;
+          font-size: 12.5px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          text-decoration: none;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+          transition: all 0.25s ease;
+        }
+
+        .banner-cta-white:hover {
+          background-color: var(--accent-next, #C78D4E);
+          color: #FFFFFF;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
           .story-cta-btn:hover {
             background-color: #2D2A26 !important;
             transform: translateY(-2px);
@@ -1657,21 +1671,32 @@ export default function HomePage() {
           opacity: 0.7;
         }
 
+        /* Refined Desktop Category Cards */
         .category-card {
           display: flex;
           flex-direction: column;
-          border-radius: 10px;
-          overflow: hidden;
-          background-color: var(--bg-sand-bar, #EFECE4);
-          border: 1px solid rgba(0, 0, 0, 0.05);
+          align-items: center;
           text-decoration: none;
-          transition: transform 0.25s ease, box-shadow 0.25s ease;
+          background: transparent;
+          transition: transform 0.25s ease;
+        }
+        .category-card:hover {
+          transform: translateY(-3px);
         }
         .category-card-media {
           width: 100%;
-          height: 145px;
+          aspect-ratio: 1 / 1;
+          max-height: 120px;
+          border-radius: 14px;
           overflow: hidden;
-          background-color: #DDD8CE;
+          position: relative;
+          background-color: #EDE8DE;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
+        .category-card:hover .category-card-media {
+          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
         }
         .cat-img {
           width: 100%;
@@ -1679,25 +1704,31 @@ export default function HomePage() {
           object-fit: cover;
           transition: transform 0.35s ease;
         }
+        .category-card:hover .cat-img {
+          transform: scale(1.08);
+        }
         .category-card-footer {
-          padding: 10px 12px;
+          margin-top: 10px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          background-color: var(--bg-sand-bar, #EFECE4);
+          justify-content: center;
+          gap: 6px;
+          background: transparent;
+          border: none;
+          padding: 0;
         }
         .cat-name {
           font-size: 13px;
           font-weight: 700;
-          color: #181716;
+          color: var(--text-dark, #181716);
+          letter-spacing: 0.01em;
         }
         .cat-arrow {
-          color: #181716;
-          transition: transform 0.2s ease;
+          display: none;
         }
 
         /* ---------------------------------------------------- */
-        /* CATEGORY SHOWCASE SECTION & 2-CARD LAYOUT STYLES     */
+        /* CATEGORY SHOWCASE SECTION & AUTO-SCROLL STYLES      */
         /* ---------------------------------------------------- */
         .category-showcase-section {
           padding: 38px 0 46px 0;
@@ -1705,11 +1736,15 @@ export default function HomePage() {
         }
 
         .category-showcase-header {
+          margin-bottom: 22px;
+        }
+
+        .category-header-top {
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
           gap: 16px;
-          margin-bottom: 22px;
+          margin-bottom: 6px;
         }
 
         .category-badge-pill {
@@ -1758,9 +1793,9 @@ export default function HomePage() {
           gap: 8px;
           background-color: #121110;
           color: #FFFFFF;
-          padding: 10px 22px;
+          padding: 9px 20px;
           border-radius: 9999px;
-          font-size: 13px;
+          font-size: 12.5px;
           font-weight: 700;
           letter-spacing: 0.02em;
           text-decoration: none;
@@ -1776,11 +1811,29 @@ export default function HomePage() {
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
         }
 
-        /* 2-CARD LAYOUT GRID */
-        .two-card-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 24px;
+        /* AUTO-SCROLLING TRACK STYLES */
+        .autoscroll-track-wrapper {
+          position: relative;
+          width: 100%;
+          overflow: hidden;
+          padding: 8px 0 16px 0;
+        }
+        .autoscroll-track-container {
+          display: flex;
+          gap: 20px;
+          overflow-x: auto;
+          scroll-behavior: auto;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+          padding: 4px 6px;
+        }
+        .autoscroll-track-container::-webkit-scrollbar {
+          display: none;
+        }
+        .autoscroll-card-item {
+          flex: 0 0 270px;
+          width: 270px;
         }
 
         .two-card-item {
@@ -2078,20 +2131,29 @@ export default function HomePage() {
             margin-bottom: 20px !important;
             max-width: 100% !important;
           }
+          /* Refined Mobile Hero CTA Row */
           .hero-cta-row {
             display: flex !important;
-            flex-direction: column !important;
-            align-items: stretch !important;
+            flex-direction: row !important;
+            align-items: center !important;
             gap: 10px !important;
-            margin-bottom: 12px !important;
+            margin-bottom: 14px !important;
+            flex-wrap: nowrap !important;
           }
-          .hero-cta-row > a {
-            width: 100% !important;
-            min-height: 44px !important;
+          .banner-cta-primary {
+            flex: 1 1 auto !important;
+            padding: 11px 18px !important;
+            font-size: 12px !important;
             justify-content: center !important;
-            text-align: center !important;
-            font-size: 13px !important;
-            padding: 12px 20px !important;
+            white-space: nowrap !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+          }
+          .banner-cta-secondary {
+            flex: 1 1 auto !important;
+            padding: 11px 16px !important;
+            font-size: 12px !important;
+            justify-content: center !important;
+            white-space: nowrap !important;
           }
           .hero-slide-indicators {
             bottom: 14px !important;
@@ -2123,60 +2185,137 @@ export default function HomePage() {
             margin-top: 2px !important;
           }
 
-          /* Category horizontal scroll bar */
+          /* Compact Mobile Categories Horizontal Scroll (Sleek Circle Highlights) */
+          .categories-preview-section {
+            padding: 14px 0 10px 0 !important;
+          }
+          .categories-preview-section .section-title-wrap {
+            margin-bottom: 10px !important;
+          }
+          /* Compact Mobile Category Cards (Clean Rounded Rectangles, NOT circles) */
+          .categories-preview-section {
+            padding: 16px 0 14px 0 !important;
+          }
+          .categories-preview-section .section-title-wrap {
+            margin-bottom: 12px !important;
+          }
           .categories-grid {
             display: flex !important;
-            gap: 12px !important;
-            margin: 0 !important;
-            padding: 4px 4px 12px 4px !important;
+            gap: 10px !important;
+            margin: 0 -16px !important;
+            padding: 4px 16px 8px 16px !important;
             overflow-x: auto !important;
-            scroll-snap-type: x mandatory !important;
             scrollbar-width: none !important;
             -webkit-overflow-scrolling: touch !important;
-            overscroll-behavior-x: contain !important;
           }
           .categories-grid::-webkit-scrollbar {
-            display: none;
+            display: none !important;
           }
           .category-card {
-            flex: 0 0 135px !important;
-            width: 135px !important;
-            scroll-snap-align: start !important;
-            border-radius: 10px !important;
+            flex: 0 0 96px !important;
+            width: 96px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 6px !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            text-decoration: none !important;
+            transition: transform 0.2s ease !important;
+          }
+          .category-card:active {
+            transform: scale(0.97) !important;
           }
           .category-card-media {
-            height: 125px !important;
+            width: 96px !important;
+            height: 104px !important;
+            min-height: 104px !important;
+            max-height: 104px !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05) !important;
+            background-color: #EDE8DE !important;
+            position: relative !important;
+          }
+          .category-card-media img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            object-position: center 25% !important;
+            display: block !important;
+          }
+          .category-card-footer {
+            margin-top: 2px !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            justify-content: center !important;
           }
           .cat-name {
-            font-size: 12px !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: var(--text-dark, #151413) !important;
+            text-align: center !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 94px !important;
+            display: block !important;
+            line-height: 1.25 !important;
+            letter-spacing: 0.01em !important;
+          }
+          .cat-arrow {
+            display: none !important;
           }
 
-          /* 2-Card Layout on Mobile */
+          /* Category Showcase Layout on Mobile */
           .category-showcase-section {
-            padding: 26px 0 32px 0 !important;
+            padding: 22px 0 26px 0 !important;
           }
           .category-showcase-header {
-            margin-bottom: 14px !important;
-            flex-wrap: wrap !important;
-            gap: 8px !important;
+            margin-bottom: 12px !important;
+          }
+          .category-header-top {
+            display: flex !important;
             align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px !important;
+            margin-bottom: 4px !important;
           }
           .category-showcase-title {
             font-size: 20px !important;
+          }
+          .see-all-cta-btn {
+            padding: 6px 14px !important;
+            font-size: 11px !important;
+            border-radius: 9999px !important;
           }
           .category-showcase-tagline {
             display: -webkit-box !important;
             -webkit-line-clamp: 2 !important;
             -webkit-box-orient: vertical !important;
             overflow: hidden !important;
-            font-size: 12px !important;
+            font-size: 11.5px !important;
             line-height: 1.35 !important;
             margin-top: 3px !important;
           }
-          .see-all-cta-btn {
-            padding: 7px 15px !important;
-            font-size: 11.5px !important;
-            border-radius: 9999px !important;
+
+          /* Mobile Auto-scrolling Track */
+          .autoscroll-track-wrapper {
+            margin: 0 -16px !important;
+            padding: 4px 0 8px 0 !important;
+            width: calc(100% + 32px) !important;
+          }
+          .autoscroll-track-container {
+            gap: 12px !important;
+            padding: 4px 16px !important;
+          }
+          .autoscroll-card-item {
+            flex: 0 0 185px !important;
+            width: 185px !important;
           }
 
           .two-card-grid {
