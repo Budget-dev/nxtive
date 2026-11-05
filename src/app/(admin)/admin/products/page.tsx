@@ -17,7 +17,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminProducts, deleteProduct, saveProduct } from "@/features/admin-dashboard/server/actions";
+import { collection, getDocs, deleteDoc, doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
+import { normalizeProduct, invalidateCatalogCache } from "@/lib/catalog";
 import type { Product } from "@/types/product";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
@@ -36,11 +38,35 @@ export default function AdminProductsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminProducts({
-        category: categoryFilter !== "all" ? categoryFilter : undefined,
-        search: search ? search : undefined,
-        stockStatus: stockFilter !== "all" ? stockFilter : undefined,
-      });
+      const snap = await getDocs(collection(db, "products"));
+      let data: Product[] = snap.docs
+        .map((d: any) => normalizeProduct(d.id, d.data()))
+        .filter((p: any): p is Product => p !== null);
+
+      if (categoryFilter && categoryFilter !== "all") {
+        data = data.filter(
+          (p) =>
+            p.category?.toLowerCase() === categoryFilter.toLowerCase() ||
+            p.categoryId?.toLowerCase() === categoryFilter.toLowerCase()
+        );
+      }
+
+      if (search && search.trim()) {
+        const q = search.toLowerCase().trim();
+        data = data.filter(
+          (p) =>
+            p.title.toLowerCase().includes(q) ||
+            p.slug.toLowerCase().includes(q) ||
+            (p.sku && p.sku.toLowerCase().includes(q))
+        );
+      }
+
+      if (stockFilter && stockFilter !== "all") {
+        if (stockFilter === "in_stock") data = data.filter((p) => p.inStock && (p.stock || p.totalStock || 0) > 0);
+        else if (stockFilter === "low_stock") data = data.filter((p) => (p.stock || p.totalStock || 0) > 0 && (p.stock || p.totalStock || 0) <= (p.lowStockThreshold || 5));
+        else if (stockFilter === "out_of_stock") data = data.filter((p) => !p.inStock || (p.stock || p.totalStock || 0) === 0);
+      }
+
       setProducts(data);
     } catch (err) {
       console.error("Failed to fetch products", err);
@@ -66,8 +92,8 @@ export default function AdminProductsPage() {
     setDeletingId(id);
     setShowConfirmModal(null);
     try {
-      const result = await deleteProduct(id);
-      if (!result.success) throw new Error(result.error || "Unable to delete product");
+      await deleteDoc(doc(db, "products", id));
+      invalidateCatalogCache();
       setProducts((prev) => prev.filter((p) => p.id !== id));
       setSelectedIds((prev) => prev.filter((item) => item !== id));
     } catch (err) {
@@ -92,10 +118,10 @@ export default function AdminProductsPage() {
   };
 
   const handleToggleActive = async (p: Product) => {
-    const updated = { ...p, isActive: !p.isActive };
+    const updated = { ...p, isActive: !p.isActive, updatedAt: new Date().toISOString() };
     try {
-      const result = await saveProduct(updated);
-      if (!result.success) throw new Error(result.error || "Unable to update product status");
+      await setDoc(doc(db, "products", p.id), updated, { merge: true });
+      invalidateCatalogCache();
       setProducts((prev) => prev.map((item) => (item.id === p.id ? updated : item)));
     } catch (err) {
       setError(adminErrorMessage(err));

@@ -264,24 +264,6 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
     } catch { }
   }
 
-  // 2. Try fetching from server API route
-  if (typeof window !== "undefined") {
-    try {
-      const res = await fetch("/api/products", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.products)) {
-          storefrontProductsCache = { timestamp: now, data: json.products };
-          try {
-            sessionStorage.setItem("nxtive_cache_products", JSON.stringify(json.products));
-            sessionStorage.setItem("nxtive_cache_products_time", String(now));
-          } catch { }
-          return json.products;
-        }
-      }
-    } catch { }
-  }
-
   // 3. Fallback to direct active documents read
   try {
     const products = await readActiveDocuments("products", normalizeProduct);
@@ -314,24 +296,6 @@ export async function fetchStorefrontCategories(): Promise<Category[]> {
         if (Array.isArray(parsed) && parsed.length > 0) {
           storefrontCategoriesCache = { timestamp: now, data: parsed };
           return parsed;
-        }
-      }
-    } catch { }
-  }
-
-  // 2. Try fetching from fast server API route
-  if (typeof window !== "undefined") {
-    try {
-      const res = await fetch("/api/categories", { cache: "no-store" });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.categories) && json.categories.length > 0) {
-          storefrontCategoriesCache = { timestamp: now, data: json.categories };
-          try {
-            sessionStorage.setItem("nxtive_cache_categories", JSON.stringify(json.categories));
-            sessionStorage.setItem("nxtive_cache_categories_time", String(now));
-          } catch { }
-          return json.categories;
         }
       }
     } catch { }

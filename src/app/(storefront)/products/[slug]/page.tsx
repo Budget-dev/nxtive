@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { fetchStorefrontProducts, relatedProducts } from "@/lib/catalog";
 import { ProductDetailClient } from "./product-detail-client";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const dynamicParams = true;
 
 interface ProductPageProps {

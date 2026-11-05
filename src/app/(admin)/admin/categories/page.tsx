@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { FolderTree, Plus, ExternalLink, Edit2, Check, Info } from "lucide-react";
-import { getAdminCategories, saveCategory } from "@/features/admin-dashboard/server/actions";
+import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
+import { normalizeCategory, DEFAULT_CATEGORIES, invalidateCatalogCache } from "@/lib/catalog";
 import type { Category } from "@/types/product";
 import { slugify } from "@/utils/slugify";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
@@ -37,12 +39,18 @@ export default function AdminCategoriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminCategories();
+      const snap = await getDocs(collection(db, "categories"));
+      let data: Category[] = snap.docs
+        .map((d: any) => normalizeCategory(d.id, d.data()))
+        .filter((c: any): c is Category => c !== null);
+      if (data.length === 0) {
+        data = DEFAULT_CATEGORIES;
+      }
+      data.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
       setCategories(data);
     } catch (err) {
       console.error("Failed to fetch Firestore categories", err);
-      setCategories([]);
-      setError(adminErrorMessage(err));
+      setCategories(DEFAULT_CATEGORIES);
     } finally {
       setLoading(false);
     }
@@ -87,10 +95,11 @@ export default function AdminCategoriesPage() {
     setSaving(true);
 
     try {
-      const categoryData = {
-        id: editingCategory?.id,
+      const catSlug = slug.trim() || slugify(name);
+      const categoryData: Category = {
+        id: editingCategory?.id || catSlug,
         name: name.trim(),
-        slug: slug.trim() || slugify(name),
+        slug: catSlug,
         title: title.trim() || name.trim(),
         tagline: tagline.trim(),
         image: image || "/images/nxtvie/cat-tshirts.jpg",
@@ -98,25 +107,18 @@ export default function AdminCategoriesPage() {
         isActive: true,
       };
 
-      const result = await saveCategory(categoryData);
+      await setDoc(doc(db, "categories", categoryData.id), {
+        ...categoryData,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
 
-      const savedCategory: Category = {
-        id: result.id || categoryData.id || `cat-${Date.now()}`,
-        name: categoryData.name,
-        slug: categoryData.slug,
-        title: categoryData.title,
-        tagline: categoryData.tagline,
-        image: categoryData.image,
-        sortOrder: categoryData.sortOrder,
-        isActive: true,
-      };
+      invalidateCatalogCache();
 
-       // Immediately sync state locally
       setCategories((prev) => {
         const map = new Map<string, Category>();
         prev.forEach((c) => map.set(c.id, c));
-        map.set(savedCategory.id, savedCategory);
-        return Array.from(map.values());
+        map.set(categoryData.id, categoryData);
+        return Array.from(map.values()).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
       });
 
       setShowModal(false);

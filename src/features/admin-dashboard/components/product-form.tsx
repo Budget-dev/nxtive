@@ -16,10 +16,9 @@ import {
 } from "lucide-react";
 import { slugify } from "@/utils/slugify";
 import type { Product, ProductCategory, ProductBadge } from "@/types/product";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { invalidateCatalogCache } from "@/lib/catalog";
-import { saveProduct, getAdminCategories, saveCategory } from "../server/actions";
 
 interface ProductFormProps {
   initialProduct?: Product;
@@ -57,17 +56,22 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
 
-  // Load existing categories from Firestore categories collection
+  // Load existing categories directly from Firestore Client SDK
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const cats = await getAdminCategories();
-        if (cats && cats.length > 0) {
-          const names = Array.from(new Set([...cats.map((c) => c.name), ...DEFAULT_CATEGORIES]));
+        const snap = await getDocs(collection(db, "categories"));
+        if (!snap.empty) {
+          const names = Array.from(
+            new Set([
+              ...snap.docs.map((d: any) => d.data().name as string).filter(Boolean),
+              ...DEFAULT_CATEGORIES,
+            ])
+          );
           setCategoryOptions(names);
         }
       } catch (err) {
-        // Fallback to DEFAULT_CATEGORIES if not yet seeded
+        console.warn("[product-form] Categories load fallback:", err);
       }
     }
     fetchCategories();
@@ -87,35 +91,24 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
     setCreatingCategory(true);
     try {
       const catSlug = slugify(trimmed);
-      await saveCategory({
-        name: trimmed,
-        title: trimmed,
-        slug: catSlug,
-        isActive: true,
-      });
-
-      try {
-        await setDoc(
-          doc(db, "categories", catSlug),
-          {
-            id: catSlug,
-            name: trimmed,
-            title: trimmed,
-            slug: catSlug,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
-      } catch {
-        // Firestore client write fallback handled
-      }
+      await setDoc(
+        doc(db, "categories", catSlug),
+        {
+          id: catSlug,
+          name: trimmed,
+          title: trimmed,
+          slug: catSlug,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
 
       setCategoryOptions((prev) => Array.from(new Set([...prev, trimmed])));
       setCategory(trimmed as ProductCategory);
       setNewCategoryName("");
       setShowNewCategoryInput(false);
-      invalidateCatalogCache(); // category
+      invalidateCatalogCache();
     } catch (err: any) {
       alert("Failed to create category: " + (err?.message || "Unknown error"));
     } finally {
@@ -273,59 +266,18 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         updatedAt: now,
       };
 
-      // PRIMARY write path: direct API route → storeSetDocument → Firestore REST (API key, works on Vercel)
-      let savedId: string | null = null;
-      try {
-        const apiRes = await fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(productPayload),
-        });
-        const apiData = await apiRes.json();
-        if (apiData.success) {
-          savedId = apiData.id;
-        } else {
-          console.warn("[product-form] API route returned error:", apiData.error);
-        }
-      } catch (apiErr) {
-        console.warn("[product-form] API route call failed:", apiErr);
-      }
+      // Direct Firestore Client SDK write using Firebase web API key
+      const docId = initialProduct?.id || `prod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const prodRef = doc(db, "products", docId);
+      const fullDoc = {
+        ...productPayload,
+        id: docId,
+        isActive: true,
+        createdAt: initialProduct?.createdAt || now,
+        updatedAt: now,
+      };
 
-      // SECONDARY write path: server action (works locally with firebase-tools token)
-      let serverRes: { success: boolean; id: string; error?: string } | null = null;
-      try {
-        serverRes = await saveProduct(productPayload);
-        if (serverRes.success && !savedId) {
-          savedId = serverRes.id;
-        }
-      } catch (saErr) {
-        console.warn("[product-form] Server action failed:", saErr);
-      }
-
-      // TERTIARY write path: Firebase client SDK (requires admin to be signed in)
-      const docId = savedId || serverRes?.id || `prod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      try {
-        const prodRef = doc(db, "products", docId);
-        await setDoc(
-          prodRef,
-          {
-            ...productPayload,
-            id: docId,
-            isActive: true,
-            createdAt: initialProduct?.createdAt || now,
-            updatedAt: now,
-          },
-          { merge: true }
-        );
-        if (!savedId) savedId = docId;
-      } catch (clientErr: any) {
-        console.warn("[product-form] Client SDK Firestore write note:", clientErr?.code, clientErr?.message);
-      }
-
-      if (!savedId) {
-        setMessage({ type: "error", text: "Failed to save product. Please check your connection and try again." });
-        return;
-      }
+      await setDoc(prodRef, fullDoc, { merge: true });
 
       invalidateCatalogCache();
       setMessage({

@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import type { Category, Product } from "@/types/product";
 import { ProductCard } from "@/components/ui/product-card";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
+import { productsForCategory } from "@/lib/catalog";
 import { sharpImageSrc } from "@/lib/sharp-image";
 
 interface CategoryViewClientProps {
@@ -42,6 +44,15 @@ export function CategoryViewClient({
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [gridCols, setGridCols] = useState<3 | 4>(4);
 
+  // Live real-time Firestore catalog synchronization
+  const { products: liveCatalog, ready } = useStorefrontCatalog();
+  const activeProducts = useMemo(() => {
+    if (ready && Array.isArray(liveCatalog) && liveCatalog.length > 0) {
+      return productsForCategory(liveCatalog, category.slug);
+    }
+    return initialProducts;
+  }, [ready, liveCatalog, category.slug, initialProducts]);
+
   const sizes = ["All", "S", "M", "L", "XL", "XXL", "30", "32", "34", "36"];
   const colorOptions = [
     { name: "All", hex: "transparent" },
@@ -54,7 +65,7 @@ export function CategoryViewClient({
 
   // Derived filtered & sorted products
   const filteredProducts = useMemo(() => {
-    return initialProducts
+    return activeProducts
       .filter((p) => {
         if (!p) return false;
 
@@ -92,7 +103,7 @@ export function CategoryViewClient({
         if (sortBy === "newest") return (b.badge === "New" ? 1 : 0) - (a.badge === "New" ? 1 : 0);
         return 0; // default featured
       });
-  }, [initialProducts, selectedSize, selectedColor, inStockOnly, priceMax, sortBy]);
+  }, [activeProducts, selectedSize, selectedColor, inStockOnly, priceMax, sortBy]);
 
   const hasActiveFilters =
     selectedSize !== "All" ||
@@ -261,7 +272,7 @@ export function CategoryViewClient({
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <Package size={14} color="#E0A96D" />
                 <span>
-                  <strong>{initialProducts.length}</strong> Curated Piece{initialProducts.length !== 1 ? "s" : ""}
+                  <strong>{activeProducts.length}</strong> Curated Piece{activeProducts.length !== 1 ? "s" : ""}
                 </span>
               </div>
               <span style={{ opacity: 0.3 }}>•</span>
