@@ -14,7 +14,7 @@ export function slugify(text: string): string {
 export function generateOrderNumber(): string {
   const year = new Date().getFullYear();
   const rand = Math.floor(10000 + Math.random() * 90000);
-  return `NX-${year}-${rand}`;
+  return `NXTIVE-${year}-${rand}`;
 }
 
 /** Generate a tracking number */

@@ -415,10 +415,10 @@ export default function AdminOrdersPage() {
                       <td style={{ fontSize: "12px", color: "var(--adm-text-muted)", whiteSpace: "nowrap" }}>
                         {o.createdAt && !isNaN(new Date(o.createdAt).getTime())
                           ? new Date(o.createdAt).toLocaleDateString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })
                           : "—"}
                       </td>
                       <td>

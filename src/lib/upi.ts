@@ -27,21 +27,12 @@ export function buildPhonePeLink({
   const numAmount = typeof amount === "number" ? amount.toFixed(2) : Number(amount).toFixed(2);
   const transactionNote = note || `Order ${orderId}`;
 
-  const params = new URLSearchParams({
-    pa: vpa,
-    pn: name,
-    am: numAmount,
-    cu: "INR",
-    tn: transactionNote,
-    tr: orderId,
-  });
-
-  return `phonepe://pay?${params.toString()}`;
+  return `phonepe://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(numAmount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
 }
 
 /**
  * Builds a universal generic UPI intent link (upi://pay).
- * Supported by Google Pay, Paytm, CRED, BHIM, and other UPI client apps.
+ * Supported by Google Pay, PhonePe, Paytm, CRED, BHIM, and all UPI QR scanners.
  */
 export function buildGenericUpiLink({
   payeeVpa,
@@ -55,16 +46,7 @@ export function buildGenericUpiLink({
   const numAmount = typeof amount === "number" ? amount.toFixed(2) : Number(amount).toFixed(2);
   const transactionNote = note || `Order ${orderId}`;
 
-  const params = new URLSearchParams({
-    pa: vpa,
-    pn: name,
-    am: numAmount,
-    cu: "INR",
-    tn: transactionNote,
-    tr: orderId,
-  });
-
-  return `upi://pay?${params.toString()}`;
+  return `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(numAmount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
 }
 
 /**

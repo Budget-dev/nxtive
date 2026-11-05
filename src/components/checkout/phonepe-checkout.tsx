@@ -2,26 +2,26 @@
 
 // components/checkout/phonepe-checkout.tsx
 //
-// Direct PhonePe UPI Checkout Component.
+// Direct PhonePe UPI & Universal UPI QR Checkout Component.
 // Flow:
-//   1. Customer taps "Pay with PhonePe" -> creates a Firestore order
-//      (status: "pending") and redirects to phonepe://pay (mobile) or shows
-//      a QR code built from the same link (desktop).
-//   2. Customer pays in the PhonePe app, comes back, pastes the transaction
-//      ID / UTR PhonePe gave them -> order becomes "submitted".
-//   3. Admin checks the real payment in their PhonePe Business app / bank
-//      statement and marks it "verified" from the admin panel.
+//   1. Customer taps "Pay with PhonePe" (or "Pay ₹149 Advance for COD") ->
+//      creates Firestore order with formatted NXTIVE order number and displays
+//      a 100% compliant NPCI UPI QR code + deep-links for PhonePe/GPay/Paytm.
+//   2. Customer scans QR or pays in app, pastes transaction ID/UTR -> order marked submitted.
+//   3. Admin verifies transaction in PhonePe Business / bank statement.
 
 import React, { useEffect, useState } from "react";
 import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowRight, CheckCircle2, Copy, ExternalLink, HelpCircle, Loader2, QrCode, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowRight, CheckCircle2, Copy, ExternalLink, HelpCircle, Loader2, QrCode, ShieldCheck, Smartphone, Banknote } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { buildPhonePeLink, buildGenericUpiLink, isMobile } from "@/lib/upi";
 import { generateOrderNumber } from "@/utils/slugify";
 
 export interface PhonePeCheckoutProps {
-  amount: number;
+  amount: number; // Amount payable now (149 for COD; finalTotal for Prepaid UPI)
+  totalOrderAmount?: number; // Total value of order
+  isCod?: boolean; // Whether this is ₹149 advance for COD
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
@@ -29,7 +29,7 @@ export interface PhonePeCheckoutProps {
   shippingAddress?: any;
   deliveryMethod?: string;
   items?: any[];
-  onSuccess?: (orderId: string, utr: string) => void;
+  onSuccess?: (orderId: string, utr: string, orderNumber: string) => void;
   onError?: (err: string) => void;
 }
 
@@ -38,6 +38,8 @@ const PAYEE_NAME = process.env.NEXT_PUBLIC_PHONEPE_NAME || "NXTIVE Menswear";
 
 export function PhonePeCheckout({
   amount,
+  totalOrderAmount,
+  isCod = false,
   customerName,
   customerPhone,
   customerEmail,
@@ -49,6 +51,7 @@ export function PhonePeCheckout({
   onError,
 }: PhonePeCheckoutProps) {
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [phonepeLink, setPhonepeLink] = useState<string | null>(null);
   const [genericLink, setGenericLink] = useState<string | null>(null);
   const [step, setStep] = useState<"idle" | "created" | "submitted">("idle");
@@ -58,12 +61,15 @@ export function PhonePeCheckout({
   const [copiedVpa, setCopiedVpa] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
-  // Detect mobile on mount
+  const fullOrderValue = totalOrderAmount && totalOrderAmount > 0 ? totalOrderAmount : amount;
+  const codBalanceDue = isCod ? Math.max(0, fullOrderValue - amount) : 0;
+
+  // Detect mobile device
   useEffect(() => {
     setIsMobileDevice(isMobile());
   }, []);
 
-  // Resume an in-progress order if the customer reloads/returns to the tab after paying in PhonePe
+  // Resume in-progress order if customer reloads tab
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem("phonepe_order");
@@ -71,6 +77,7 @@ export function PhonePeCheckout({
         const parsed = JSON.parse(saved);
         if (parsed.orderId && parsed.amount === amount) {
           setOrderId(parsed.orderId);
+          setOrderNumber(parsed.orderNumber || null);
           setPhonepeLink(parsed.phonepeLink);
           setGenericLink(parsed.genericLink);
           setStep("created");
@@ -92,17 +99,19 @@ export function PhonePeCheckout({
     setBusy(true);
     setError(null);
     try {
-      const orderNumber = generateOrderNumber();
+      const generatedOrderNumber = generateOrderNumber();
       const orderPayload: Record<string, any> = {
-        orderNumber,
+        orderNumber: generatedOrderNumber,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail?.trim() || "",
         uid: userId || null,
         userId: userId || null,
-        amount: Number(amount),
-        total: Number(amount),
-        totalAmount: Number(amount),
+        amount: Number(fullOrderValue),
+        total: Number(fullOrderValue),
+        totalAmount: Number(fullOrderValue),
+        advanceAmount: isCod ? Number(amount) : Number(fullOrderValue),
+        codBalanceDue: isCod ? Number(codBalanceDue) : 0,
         items: (items || []).map((item) => ({
           productId: item.id || item.productId || "",
           title: item.title || "Item",
@@ -113,17 +122,19 @@ export function PhonePeCheckout({
           image: item.image || "",
         })),
         shippingAddress: shippingAddress || {},
-        deliveryMethod: deliveryMethod || "Standard Domestic",
+        deliveryMethod: deliveryMethod || "Standard Domestic (3-5 Days)",
         status: "pending",
-        paymentMethod: "phonepe",
-        paymentStatus: "pending_verification",
+        paymentMethod: isCod ? "cod_partial" : "phonepe",
+        paymentStatus: isCod ? "advance_pending" : "pending_verification",
         paymentTransactionId: null,
         upiTransactionId: null,
         statusHistory: [
           {
             status: "pending",
             timestamp: new Date().toISOString(),
-            note: "PhonePe checkout initiated",
+            note: isCod
+              ? `Order created with COD (₹${amount} advance booking fee due via UPI; ₹${codBalanceDue} due on delivery).`
+              : "Prepaid PhonePe UPI checkout initiated.",
           },
         ],
         createdAt: serverTimestamp(),
@@ -135,8 +146,11 @@ export function PhonePeCheckout({
       const linkArgs = {
         payeeVpa: PAYEE_VPA,
         payeeName: PAYEE_NAME,
-        amount,
+        amount, // ₹149 for COD advance; full total for Prepaid UPI
         orderId: ref.id,
+        note: isCod
+          ? `NXTIVE COD Adv ${generatedOrderNumber}`
+          : `NXTIVE Order ${generatedOrderNumber}`,
       };
       const ppLink = buildPhonePeLink(linkArgs);
       const upiLink = buildGenericUpiLink(linkArgs);
@@ -145,6 +159,7 @@ export function PhonePeCheckout({
         "phonepe_order",
         JSON.stringify({
           orderId: ref.id,
+          orderNumber: generatedOrderNumber,
           amount,
           phonepeLink: ppLink,
           genericLink: upiLink,
@@ -152,17 +167,18 @@ export function PhonePeCheckout({
       );
 
       setOrderId(ref.id);
+      setOrderNumber(generatedOrderNumber);
       setPhonepeLink(ppLink);
       setGenericLink(upiLink);
       setStep("created");
 
-      // Mobile redirect: Opens the PhonePe app directly
+      // Mobile: redirect to PhonePe app if available
       if (isMobile()) {
         window.location.href = ppLink;
       }
     } catch (e: any) {
       console.error("PhonePe order creation failed:", e);
-      const errorMsg = e?.message || "Couldn't initiate PhonePe payment. Please try again.";
+      const errorMsg = e?.message || "Couldn't initiate UPI payment. Please try again.";
       setError(errorMsg);
       onError?.(errorMsg);
     } finally {
@@ -174,7 +190,7 @@ export function PhonePeCheckout({
     e.preventDefault();
     const cleanUtr = utr.trim();
     if (!cleanUtr) {
-      setError("Please enter the transaction ID or 12-digit UTR shown in PhonePe after paying.");
+      setError("Please enter the transaction ID or 12-digit UTR shown in PhonePe / your UPI app after paying.");
       return;
     }
     if (!orderId) {
@@ -185,17 +201,18 @@ export function PhonePeCheckout({
     setBusy(true);
     setError(null);
     try {
-      // Update order in Firestore with UTR, paymentStatus, and processing status
       await updateDoc(doc(db, "orders", orderId), {
         upiTransactionId: cleanUtr,
         paymentTransactionId: cleanUtr,
         status: "processing",
-        paymentStatus: "pending_verification",
+        paymentStatus: isCod ? "advance_submitted" : "pending_verification",
         statusHistory: [
           {
-            status: "pending_verification",
+            status: isCod ? "advance_submitted" : "pending_verification",
             timestamp: new Date().toISOString(),
-            note: `PhonePe UPI transaction submitted with UTR/Ref: ${cleanUtr}. Awaiting admin verification.`,
+            note: isCod
+              ? `₹${amount} advance payment submitted with UTR: ${cleanUtr}. Remaining ₹${codBalanceDue} due on delivery.`
+              : `PhonePe UPI transaction submitted with UTR/Ref: ${cleanUtr}. Awaiting admin verification.`,
           },
         ],
         submittedAt: serverTimestamp(),
@@ -204,7 +221,7 @@ export function PhonePeCheckout({
 
       sessionStorage.removeItem("phonepe_order");
       setStep("submitted");
-      onSuccess?.(orderId, cleanUtr);
+      onSuccess?.(orderId, cleanUtr, orderNumber || "");
     } catch (e: any) {
       console.error("Failed to submit transaction UTR:", e);
       setError("Couldn't submit your transaction ID. Please check your connection and try again.");
@@ -223,7 +240,7 @@ export function PhonePeCheckout({
     return (
       <div
         style={{
-          borderRadius: "12px",
+          borderRadius: "14px",
           border: "1px solid #B7E4C7",
           backgroundColor: "#F0FDF4",
           padding: "24px",
@@ -232,17 +249,19 @@ export function PhonePeCheckout({
         }}
       >
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
-          <CheckCircle2 size={36} color="#16A34A" />
+          <CheckCircle2 size={40} color="#16A34A" />
         </div>
-        <h4 style={{ fontSize: "16px", fontWeight: 800, marginBottom: "6px", color: "#14532D" }}>
-          Payment Details Received!
+        <h4 style={{ fontSize: "17px", fontWeight: 800, marginBottom: "6px", color: "#14532D" }}>
+          {isCod ? "COD Order Confirmed with ₹149 Advance!" : "Payment Details Received!"}
         </h4>
-        <p style={{ fontSize: "13px", lineHeight: "1.6", color: "#166534", maxWidth: "420px", margin: "0 auto 16px" }}>
-          Thank you! We've received your PhonePe transaction ID (<strong>{utr}</strong>).
-          Our concierge will verify the deposit and confirm your order dispatch shortly.
+        <p style={{ fontSize: "13px", lineHeight: "1.6", color: "#166534", maxWidth: "440px", margin: "0 auto 16px" }}>
+          Thank you! We've received your transaction reference (<strong>{utr}</strong>).
+          {isCod
+            ? ` Your package will be dispatched soon. Please keep ₹${codBalanceDue} ready in cash for the delivery partner.`
+            : " Our concierge will verify the deposit and confirm your order dispatch shortly."}
         </p>
-        <div style={{ fontSize: "12px", color: "#15803D", fontFamily: "monospace", backgroundColor: "#DCFCE7", padding: "6px 14px", borderRadius: "6px", display: "inline-block" }}>
-          Order ID: {orderId}
+        <div style={{ fontSize: "13px", fontWeight: 800, color: "#15803D", fontFamily: "monospace", backgroundColor: "#DCFCE7", padding: "8px 18px", borderRadius: "8px", display: "inline-block" }}>
+          Order #: {orderNumber || orderId}
         </div>
       </div>
     );
@@ -253,18 +272,19 @@ export function PhonePeCheckout({
       {/* Step 1: Idle state */}
       {step === "idle" && (
         <div>
+          {/* Summary Box */}
           <div
             style={{
               padding: "16px 18px",
-              backgroundColor: "#FAF5FF",
+              backgroundColor: isCod ? "#F7F5F0" : "#FAF5FF",
               borderRadius: "10px",
-              border: "1px solid #E9D5FF",
+              border: isCod ? "1px solid #E5E0D5" : "1px solid #E9D5FF",
               marginBottom: "14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               flexWrap: "wrap",
-              gap: "10px",
+              gap: "12px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -273,7 +293,7 @@ export function PhonePeCheckout({
                   width: "36px",
                   height: "36px",
                   borderRadius: "8px",
-                  backgroundColor: "#5F259F",
+                  backgroundColor: isCod ? "#111110" : "#5F259F",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -282,22 +302,31 @@ export function PhonePeCheckout({
                   fontSize: "15px",
                 }}
               >
-                पे
+                {isCod ? <Banknote size={18} /> : "पे"}
               </div>
               <div>
                 <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
-                  Instant PhonePe UPI
+                  {isCod ? "Cash on Delivery (₹149 Advance)" : "Instant PhonePe & UPI"}
                 </div>
                 <div style={{ fontSize: "11.5px", color: "#6B7280" }}>
-                  Direct app redirect on mobile · Scan QR on desktop
+                  {isCod
+                    ? `Pay ₹${amount} now via UPI · Pay remaining ₹${codBalanceDue} in cash on delivery`
+                    : "Direct app redirect on mobile · Scan UPI QR on desktop"}
                 </div>
               </div>
             </div>
-            <span style={{ fontSize: "15px", fontWeight: 800, color: "#5F259F" }}>
-              ₹{Number(amount).toFixed(2)}
-            </span>
+
+            <div style={{ textAlign: "right" }}>
+              <span style={{ fontSize: "11px", color: "#6B7280", display: "block" }}>
+                {isCod ? "Payable Now" : "Total Due"}
+              </span>
+              <span style={{ fontSize: "16px", fontWeight: 900, color: isCod ? "#111110" : "#5F259F" }}>
+                ₹{Number(amount).toFixed(2)}
+              </span>
+            </div>
           </div>
 
+          {/* Pay Button */}
           <button
             type="button"
             onClick={handlePay}
@@ -306,7 +335,7 @@ export function PhonePeCheckout({
               width: "100%",
               padding: "15px 22px",
               borderRadius: "10px",
-              backgroundColor: "#5F259F",
+              backgroundColor: isCod ? "#111110" : "#5F259F",
               color: "#FFFFFF",
               fontSize: "14.5px",
               fontWeight: 800,
@@ -316,19 +345,25 @@ export function PhonePeCheckout({
               alignItems: "center",
               justifyContent: "center",
               gap: "10px",
-              boxShadow: "0 4px 14px rgba(95, 37, 159, 0.25)",
+              boxShadow: isCod ? "0 4px 14px rgba(0,0,0,0.18)" : "0 4px 14px rgba(95, 37, 159, 0.25)",
               transition: "transform 0.15s ease, background-color 0.15s ease",
             }}
           >
             {busy ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>Opening PhonePe...</span>
+                <span>Generating UPI Payment...</span>
+              </>
+            ) : isCod ? (
+              <>
+                <Smartphone size={18} />
+                <span>Pay ₹149 Advance & Place COD Order</span>
+                <ArrowRight size={16} />
               </>
             ) : (
               <>
                 <Smartphone size={18} />
-                <span>Pay ₹{Number(amount).toFixed(2)} with PhonePe</span>
+                <span>Pay ₹{Number(amount).toFixed(2)} with PhonePe UPI</span>
                 <ArrowRight size={16} />
               </>
             )}
@@ -336,103 +371,154 @@ export function PhonePeCheckout({
         </div>
       )}
 
-      {/* Step 2: Order Created - Show QR Code / App Link & UTR Form */}
+      {/* Step 2: Order Created - Show Universal UPI QR Code & UTR Form */}
       {step === "created" && (
         <div
           style={{
-            borderRadius: "12px",
+            borderRadius: "14px",
             border: "1px solid #E5E7EB",
             backgroundColor: "#FFFFFF",
-            padding: "20px",
+            padding: "22px",
             display: "flex",
             flexDirection: "column",
             gap: "18px",
           }}
         >
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #F3F4F6", paddingBottom: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{ width: "26px", height: "26px", borderRadius: "6px", backgroundColor: "#5F259F", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", fontSize: "13px", fontWeight: 800 }}>
-                पे
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #F3F4F6", paddingBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+            <div>
+              <span style={{ fontSize: "11px", fontWeight: 800, color: "#936037", textTransform: "uppercase", letterSpacing: "0.08em", display: "block" }}>
+                Order #{orderNumber || orderId}
+              </span>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: "#111110" }}>
+                {isCod ? "Pay ₹149 COD Advance" : "PhonePe & UPI Payment"}
               </div>
-              <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
-                PhonePe Payment Request
+            </div>
+
+            <div style={{ textAlign: "right" }}>
+              <span style={{ fontSize: "11px", color: "#6B7280", display: "block" }}>Amount to Pay</span>
+              <span style={{ fontSize: "18px", fontWeight: 900, color: "#5F259F" }}>
+                ₹{Number(amount).toFixed(2)}
               </span>
             </div>
-            <span style={{ fontSize: "14.5px", fontWeight: 800, color: "#111110" }}>
-              ₹{Number(amount).toFixed(2)}
-            </span>
           </div>
 
-          {/* Desktop: QR Code */}
-          {!isMobileDevice && phonepeLink && (
+          {/* COD Notice if applicable */}
+          {isCod && (
+            <div style={{ padding: "10px 14px", borderRadius: "8px", backgroundColor: "#FEF3C7", border: "1px solid #FDE68A", fontSize: "12px", color: "#92400E", lineHeight: "1.5" }}>
+              <strong>COD Breakdown:</strong> Paying ₹149 advance now via UPI confirms your order. The remaining balance of <strong>₹{codBalanceDue.toFixed(2)}</strong> will be collected in cash upon doorstep delivery.
+            </div>
+          )}
+
+          {/* Desktop & Tablet: Universal UPI QR Code (Scannable by PhonePe, GPay, Paytm, BHIM, Camera) */}
+          {genericLink && (
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 textAlign: "center",
-                padding: "16px",
-                backgroundColor: "#F9FAFB",
-                borderRadius: "10px",
+                padding: "20px",
+                backgroundColor: "#FAF9F6",
+                borderRadius: "12px",
                 border: "1px dashed #D1D5DB",
-                gap: "12px",
+                gap: "14px",
               }}
             >
               <div
                 style={{
-                  padding: "12px",
+                  padding: "16px",
                   backgroundColor: "#FFFFFF",
-                  borderRadius: "12px",
-                  boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
-                }}
-              >
-                <QRCodeSVG value={phonepeLink} size={200} level="M" />
-              </div>
-              <div>
-                <p style={{ fontSize: "13px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
-                  Scan with the PhonePe App to Pay
-                </p>
-                <p style={{ fontSize: "12px", color: "#6B7280" }}>
-                  Open PhonePe on your mobile phone, tap the QR scanner icon, and complete payment.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Mobile Direct Tap Link */}
-          {isMobileDevice && phonepeLink && (
-            <div style={{ textAlign: "center", padding: "10px 0" }}>
-              <a
-                href={phonepeLink}
-                style={{
+                  borderRadius: "16px",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
                   display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  width: "100%",
-                  padding: "14px 20px",
-                  borderRadius: "10px",
-                  backgroundColor: "#5F259F",
-                  color: "#FFFFFF",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  boxShadow: "0 2px 8px rgba(95, 37, 159, 0.2)",
                 }}
               >
-                <Smartphone size={18} />
-                <span>Tap to Open PhonePe App</span>
-                <ExternalLink size={15} />
-              </a>
-              <span style={{ fontSize: "11.5px", color: "#6B7280", marginTop: "6px", display: "block" }}>
-                PhonePe didn't open automatically? Tap the button above.
-              </span>
+                {/* Standard NPCI upi://pay URI ensures 100% scanning success on any UPI app */}
+                <QRCodeSVG
+                  value={genericLink}
+                  size={210}
+                  level="M"
+                  includeMargin={true}
+                />
+              </div>
+
+              <div>
+                <p style={{ fontSize: "14px", fontWeight: 800, color: "#111110", marginBottom: "4px" }}>
+                  Scan with Any UPI App to Pay
+                </p>
+                <p style={{ fontSize: "12px", color: "#6B7280", maxWidth: "360px", margin: "0 auto" }}>
+                  Open <strong>PhonePe, Google Pay, Paytm, CRED, or BHIM</strong>, scan this QR code, and complete the payment of <strong>₹{Number(amount).toFixed(2)}</strong>.
+                </p>
+              </div>
+
+              {/* Supported apps icons */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#EDE9FE", color: "#5F259F" }}>PhonePe</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#E0F2FE", color: "#0369A1" }}>Google Pay</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#EFF6FF", color: "#1D4ED8" }}>Paytm</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#ECFDF5", color: "#047857" }}>BHIM / CRED</span>
+              </div>
             </div>
           )}
 
-          {/* Fallback UPI Options */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid #F3F4F6", paddingTop: "12px" }}>
+          {/* Mobile Direct Tap Links */}
+          {isMobileDevice && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "6px 0" }}>
+              {phonepeLink && (
+                <a
+                  href={phonepeLink}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    width: "100%",
+                    padding: "14px 20px",
+                    borderRadius: "10px",
+                    backgroundColor: "#5F259F",
+                    color: "#FFFFFF",
+                    fontSize: "14.5px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    boxShadow: "0 3px 10px rgba(95, 37, 159, 0.25)",
+                  }}
+                >
+                  <Smartphone size={18} />
+                  <span>Tap to Open PhonePe App</span>
+                  <ExternalLink size={15} />
+                </a>
+              )}
+
+              {genericLink && (
+                <a
+                  href={genericLink}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    width: "100%",
+                    padding: "13px 18px",
+                    borderRadius: "10px",
+                    backgroundColor: "#FFFFFF",
+                    color: "#111110",
+                    border: "1px solid rgba(0,0,0,0.18)",
+                    fontSize: "13.5px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                  }}
+                >
+                  <QrCode size={16} />
+                  <span>Pay with GPay / Paytm / Other UPI</span>
+                  <ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Manual UPI ID Fallback */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid #F3F4F6", paddingTop: "14px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#4B5563" }}>
               <span>Payee UPI ID: <strong>{PAYEE_VPA}</strong></span>
               <button
@@ -442,33 +528,18 @@ export function PhonePeCheckout({
                   background: "none",
                   border: "none",
                   color: copiedVpa ? "#16A34A" : "#5F259F",
-                  fontSize: "11.5px",
-                  fontWeight: 600,
+                  fontSize: "12px",
+                  fontWeight: 700,
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: "4px",
                 }}
               >
-                <Copy size={12} />
+                <Copy size={13} />
                 <span>{copiedVpa ? "Copied!" : "Copy UPI ID"}</span>
               </button>
             </div>
-
-            {genericLink && (
-              <a
-                href={genericLink}
-                style={{
-                  textAlign: "center",
-                  fontSize: "12px",
-                  color: "#6B7280",
-                  textDecoration: "underline",
-                  marginTop: "4px",
-                }}
-              >
-                Don't have PhonePe? Pay with any other UPI app (GPay / Paytm / CRED)
-              </a>
-            )}
           </div>
 
           {/* Form: Submit UTR / Transaction ID */}
@@ -477,9 +548,9 @@ export function PhonePeCheckout({
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: "10px",
+              gap: "12px",
               borderTop: "1px solid #F3F4F6",
-              paddingTop: "14px",
+              paddingTop: "16px",
             }}
           >
             <div>
@@ -488,28 +559,28 @@ export function PhonePeCheckout({
                 style={{
                   display: "block",
                   fontSize: "13px",
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: "#111110",
                   marginBottom: "4px",
                 }}
               >
-                Already paid? Enter PhonePe Transaction ID / UTR
+                Enter 12-Digit UPI Transaction ID / UTR
               </label>
               <span style={{ fontSize: "11.5px", color: "#6B7280", display: "block", marginBottom: "8px" }}>
-                Find this in your PhonePe app under Payment Details (e.g. <code>T261101...</code> or 12-digit UTR).
+                Once paid, copy the 12-digit UTR from PhonePe, Google Pay, or Paytm payment receipt.
               </span>
               <input
                 id="phonepe-utr-input"
                 type="text"
                 value={utr}
                 onChange={(e) => setUtr(e.target.value)}
-                placeholder="e.g. T2611012345678912 or 432198765432"
+                placeholder="e.g. 432198765432 or T26110..."
                 style={{
                   width: "100%",
-                  padding: "11px 14px",
+                  padding: "12px 14px",
                   borderRadius: "8px",
                   border: "1px solid #D1D5DB",
-                  fontSize: "13.5px",
+                  fontSize: "14px",
                   fontFamily: "monospace",
                   outline: "none",
                   backgroundColor: "#FAF9F6",
@@ -522,12 +593,12 @@ export function PhonePeCheckout({
               disabled={busy}
               style={{
                 width: "100%",
-                padding: "13px",
+                padding: "14px",
                 borderRadius: "8px",
                 backgroundColor: "#111110",
                 color: "#FFFFFF",
-                fontSize: "13.5px",
-                fontWeight: 700,
+                fontSize: "14px",
+                fontWeight: 800,
                 border: "none",
                 cursor: busy ? "not-allowed" : "pointer",
                 display: "flex",
@@ -539,10 +610,10 @@ export function PhonePeCheckout({
               {busy ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Submitting...</span>
+                  <span>Confirming Order...</span>
                 </>
               ) : (
-                <span>Confirm & Submit Order</span>
+                <span>Confirm Payment & Submit Order</span>
               )}
             </button>
           </form>
@@ -552,12 +623,13 @@ export function PhonePeCheckout({
       {error && (
         <div
           style={{
-            padding: "10px 14px",
+            padding: "12px 16px",
             borderRadius: "8px",
             backgroundColor: "#FEF2F2",
             border: "1px solid #FCA5A5",
             color: "#B91C1C",
             fontSize: "12.5px",
+            fontWeight: 600,
           }}
         >
           {error}

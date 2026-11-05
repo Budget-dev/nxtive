@@ -8,9 +8,9 @@ describe("E-Commerce Helpers & Validation", () => {
     expect(slugify("French Terry Hoodie - Limited Edition!")).toBe("french-terry-hoodie-limited-edition");
   });
 
-  it("generates order numbers with NX prefix and current year", () => {
+  it("generates order numbers with NXTIVE prefix and current year", () => {
     const orderNumber = generateOrderNumber();
-    expect(orderNumber).toMatch(/^NX-\d{4}-\d{5}$/);
+    expect(orderNumber).toMatch(/^NXTIVE-\d{4}-\d{5}$/);
   });
 
   it("generates tracking numbers with courier prefix", () => {

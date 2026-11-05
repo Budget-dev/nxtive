@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +14,9 @@ import {
   Lock,
   LocateFixed,
   MapPin,
+  X,
+  User,
+  CheckCircle2,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
@@ -58,8 +61,8 @@ const INDIAN_STATES = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartSubtotal, discountAmount, shippingFee, cartGrandTotal, couponCode, placeOrder, clearCart } = useStore();
-  const { user } = useAuth();
+  const { cart, cartSubtotal, discountAmount, shippingFee, clearCart, couponCode } = useStore();
+  const { user, loginWithEmail, signupWithEmail, loginWithGoogle } = useAuth();
 
   // Form states
   const [email, setEmail] = useState(user?.email || "");
@@ -71,16 +74,36 @@ export default function CheckoutPage() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("Maharashtra");
   const [postalCode, setPostalCode] = useState("");
-  const [deliveryMethod, setDeliveryMethod] = useState("standard");
-  const [paymentMethod, setPaymentMethod] = useState("phonepe");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
   const [orderError, setOrderError] = useState<string | null>(null);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
-  const deliveryCost = deliveryMethod === "priority" ? 150 : shippingFee;
+  // Auth popup modal states
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authGoogleLoading, setAuthGoogleLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Free standard shipping across India
+  const deliveryCost = 0;
   const finalTotal = Math.max(0, cartSubtotal - discountAmount + deliveryCost);
+
+  // Auto-fill user email and name if logged in
+  useEffect(() => {
+    if (user) {
+      if (user.email && !email) setEmail(user.email);
+      if (user.displayName && (!firstName && !lastName)) {
+        const parts = user.displayName.split(" ");
+        setFirstName(parts[0] || "");
+        setLastName(parts.slice(1).join(" ") || "");
+      }
+    }
+  }, [user]);
 
   const fillFromCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -130,18 +153,56 @@ export default function CheckoutPage() {
     );
   };
 
-  const handleSubmitOrder = async (e: React.FormEvent) => {
+  const handleAuthModalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0 || isSubmitting || hasSubmitted) return;
+    setAuthError(null);
+    setAuthLoading(true);
 
+    try {
+      if (authMode === "login") {
+        await loginWithEmail(authEmail.trim(), authPassword);
+      } else {
+        if (!authName.trim()) {
+          setAuthError("Please enter your full name.");
+          setAuthLoading(false);
+          return;
+        }
+        await signupWithEmail(authEmail.trim(), authPassword, authName.trim());
+      }
+      setShowAuthModal(false);
+      setOrderError(null);
+    } catch (err: any) {
+      setAuthError(err?.message || "Authentication failed. Please check your credentials.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError(null);
+    setAuthGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      setShowAuthModal(false);
+      setOrderError(null);
+    } catch (err: any) {
+      setAuthError(err?.message || "Google sign-in was cancelled or failed.");
+    } finally {
+      setAuthGoogleLoading(false);
+    }
+  };
+
+  const handleOrderInitiation = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Enforce sign-in popup before placing order
     if (!user) {
-      setOrderError("Please sign in before placing your order. Your order history is protected by your account.");
+      setShowAuthModal(true);
       return;
     }
 
-    // Basic validation
     if (!email.trim() || !phone.trim() || !firstName.trim() || !lastName.trim() || !street.trim() || !city.trim() || !postalCode.trim()) {
-      setOrderError("Please fill in all required fields.");
+      setOrderError("Please fill in all required shipping and contact fields.");
       return;
     }
 
@@ -152,32 +213,14 @@ export default function CheckoutPage() {
 
     setOrderError(null);
 
-    const shippingAddress = {
-      fullName: `${firstName} ${lastName}`.trim(),
-      email,
-      phone,
-      street,
-      apartment,
-      city,
-      state,
-      postalCode,
-      country: "India",
-    };
-
-    const deliveryMethodLabel = deliveryMethod === "priority"
-      ? "Priority Express (1-2 Days)"
-      : "Standard Domestic (3-5 Days)";
-
-    // PhonePe flow is handled interactively within the payment card
-    const phonepeSection = document.getElementById("phonepe-payment-section");
-    if (phonepeSection) {
-      phonepeSection.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Scroll smoothly to the payment section
+    const paymentSection = document.getElementById("payment-section");
+    if (paymentSection) {
+      paymentSection.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
-  const isLoading = isSubmitting;
-
-  if (cart.length === 0 && !isSubmitting) {
+  if (cart.length === 0) {
     return (
       <div style={{ backgroundColor: "#F5F3ED", minHeight: "100vh", padding: "80px 20px", textAlign: "center" }}>
         <div style={{ maxWidth: "480px", margin: "0 auto", backgroundColor: "#FFFFFF", padding: "40px", borderRadius: "14px" }}>
@@ -206,7 +249,7 @@ export default function CheckoutPage() {
 
   return (
     <div style={{ backgroundColor: "#F5F3ED", minHeight: "100vh", paddingBottom: "80px" }}>
-      {/* Streamlined Checkout Header */}
+      {/* Checkout Top Bar */}
       <header
         style={{
           borderBottom: "1px solid rgba(0,0,0,0.08)",
@@ -224,7 +267,7 @@ export default function CheckoutPage() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#6B655D" }}>
             <Lock size={13} color="#2B9348" />
-            <span>Secure 256-Bit Encrypted Checkout</span>
+            <span>Secure Encrypted Checkout</span>
           </div>
 
           <Link
@@ -245,11 +288,11 @@ export default function CheckoutPage() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Checkout Container */}
       <div className="container" style={{ paddingTop: "36px" }}>
-        <form onSubmit={handleSubmitOrder}>
+        <form onSubmit={handleOrderInitiation}>
           <div className="checkout-grid">
-            {/* Left: Checkout Form Steps */}
+            {/* Left: Checkout Steps (Delivery Method Card completely removed) */}
             <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
               {/* 1. Contact Information */}
               <div className="checkout-card">
@@ -257,9 +300,25 @@ export default function CheckoutPage() {
                   <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: 0 }}>
                     1. Contact Information
                   </h2>
-                  {!user && (
-                    <span style={{ fontSize: "12px", color: "#666" }}>
-                      Already a member? <Link href="/login" style={{ color: "#111110", fontWeight: 700, textDecoration: "underline" }}>Sign in</Link>
+                  {!user ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthModal(true)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: "12.5px",
+                        fontWeight: 700,
+                        color: "#111110",
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Sign In / Register
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: "12px", color: "#2B9348", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                      <CheckCircle2 size={13} /> Signed in as {user.displayName || user.email}
                     </span>
                   )}
                 </div>
@@ -317,7 +376,7 @@ export default function CheckoutPage() {
                       2. Shipping Address
                     </h2>
                     <p style={{ fontSize: "12px", color: "#777", lineHeight: 1.45 }}>
-                      Use your location for a quicker, more accurate address or enter it manually below.
+                      Free insured domestic delivery dispatched via express courier (3-5 business days).
                     </p>
                   </div>
                   <button
@@ -329,19 +388,20 @@ export default function CheckoutPage() {
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "7px",
-                      minHeight: "40px",
-                      padding: "9px 13px",
+                      minHeight: "38px",
+                      padding: "8px 14px",
                       borderRadius: "9999px",
                       border: "1px solid rgba(17,17,16,0.16)",
                       backgroundColor: "#FFFFFF",
                       color: "#111110",
                       fontSize: "12px",
                       fontWeight: 700,
+                      cursor: "pointer",
                       opacity: locationLoading ? 0.65 : 1,
                     }}
                   >
-                    <LocateFixed size={15} />
-                    {locationLoading ? "Finding location…" : "Use my location"}
+                    <LocateFixed size={14} />
+                    {locationLoading ? "Detecting…" : "Use my location"}
                   </button>
                 </div>
 
@@ -472,101 +532,21 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* 3. Delivery Method */}
-              <div className="checkout-card">
+              {/* 3. Payment Method (With COD ₹149 Advance Option) */}
+              <div className="checkout-card" id="payment-section">
                 <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", marginBottom: "18px" }}>
-                  3. Delivery Method
+                  3. Payment Method
                 </h2>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "16px 20px",
-                      borderRadius: "10px",
-                      border: deliveryMethod === "standard" ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
-                      backgroundColor: deliveryMethod === "standard" ? "rgba(17,17,16,0.02)" : "#FFFFFF",
-                      cursor: "pointer",
-                      flexWrap: "wrap",
-                      gap: "10px",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <input
-                        type="radio"
-                        name="delivery"
-                        checked={deliveryMethod === "standard"}
-                        onChange={() => setDeliveryMethod("standard")}
-                        style={{ accentColor: "#111110" }}
-                      />
-                      <div>
-                        <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
-                          Standard Express Delivery (3-5 business days)
-                        </div>
-                        <div style={{ fontSize: "12px", color: "#666" }}>
-                          Insured nationwide air cargo tracking
-                        </div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: "13.5px", fontWeight: 700, color: shippingFee === 0 ? "#2B9348" : "#111110" }}>
-                      {shippingFee === 0 ? "FREE" : `₹${shippingFee}`}
-                    </span>
-                  </label>
-
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "16px 20px",
-                      borderRadius: "10px",
-                      border: deliveryMethod === "priority" ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
-                      backgroundColor: deliveryMethod === "priority" ? "rgba(17,17,16,0.02)" : "#FFFFFF",
-                      cursor: "pointer",
-                      flexWrap: "wrap",
-                      gap: "10px",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <input
-                        type="radio"
-                        name="delivery"
-                        checked={deliveryMethod === "priority"}
-                        onChange={() => setDeliveryMethod("priority")}
-                        style={{ accentColor: "#111110" }}
-                      />
-                      <div>
-                        <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
-                          Priority VIP Courier (1-2 business days)
-                        </div>
-                        <div style={{ fontSize: "12px", color: "#666" }}>
-                          Priority dispatch via Blue Dart / Delhivery Express
-                        </div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>₹150</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* 4. Payment Method */}
-              <div className="checkout-card">
-                <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", marginBottom: "18px" }}>
-                  4. Payment Method
-                </h2>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {/* PhonePe Direct UPI & QR Option */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  {/* Option A: PhonePe Full Prepaid UPI */}
                   <div
-                    id="phonepe-payment-section"
                     style={{
-                      borderRadius: "10px",
+                      borderRadius: "12px",
                       border: paymentMethod === "phonepe" ? "2px solid #5F259F" : "1px solid rgba(0,0,0,0.12)",
                       backgroundColor: paymentMethod === "phonepe" ? "#FAF5FF" : "#FFFFFF",
                       overflow: "hidden",
-                      transition: "border-color 0.2s ease",
+                      transition: "all 0.2s ease",
                     }}
                   >
                     <label
@@ -583,7 +563,7 @@ export default function CheckoutPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                         <input
                           type="radio"
-                          name="payment"
+                          name="paymentOption"
                           checked={paymentMethod === "phonepe"}
                           onChange={() => setPaymentMethod("phonepe")}
                           style={{ accentColor: "#5F259F" }}
@@ -591,8 +571,8 @@ export default function CheckoutPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                           <div
                             style={{
-                              width: "28px",
-                              height: "28px",
+                              width: "30px",
+                              height: "30px",
                               borderRadius: "6px",
                               backgroundColor: "#5F259F",
                               color: "#FFFFFF",
@@ -607,10 +587,10 @@ export default function CheckoutPage() {
                           </div>
                           <div>
                             <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110" }}>
-                              PhonePe UPI & QR
+                              PhonePe UPI & QR (100% Prepaid)
                             </span>
                             <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
-                              Direct app redirect on mobile · Scan QR with PhonePe on desktop
+                              Pay full ₹{finalTotal.toLocaleString("en-IN")} · Fastest priority dispatch
                             </span>
                           </div>
                         </div>
@@ -625,37 +605,191 @@ export default function CheckoutPage() {
                           borderRadius: "4px",
                         }}
                       >
-                        Instant & Recommended
+                        Fastest Dispatch
                       </span>
                     </label>
 
                     {paymentMethod === "phonepe" && (
                       <div style={{ padding: "16px 20px 20px", borderTop: "1px solid #E9D5FF", backgroundColor: "#FFFFFF" }}>
-                        <PhonePeCheckout
-                          amount={finalTotal}
-                          customerName={`${firstName} ${lastName}`.trim() || user?.displayName || "NXTIVE Member"}
-                          customerPhone={phone}
-                          customerEmail={email}
-                          userId={user?.uid}
-                          deliveryMethod={deliveryMethod === "priority" ? "Priority Express (1-2 Days)" : "Standard Domestic (3-5 Days)"}
-                          shippingAddress={{
-                            fullName: `${firstName} ${lastName}`.trim(),
-                            email,
-                            phone,
-                            street,
-                            apartment,
-                            city,
-                            state,
-                            postalCode,
-                            country: "India",
-                          }}
-                          items={cart}
-                          onSuccess={(orderId, utr) => {
-                            clearCart();
-                            router.push(`/checkout/success?orderId=${orderId}&method=phonepe&utr=${encodeURIComponent(utr)}`);
-                          }}
-                          onError={(msg) => setOrderError(msg)}
+                        {!user ? (
+                          <div style={{ textAlign: "center", padding: "16px 10px" }}>
+                            <p style={{ fontSize: "13.5px", color: "#666", marginBottom: "14px" }}>
+                              Please sign in to proceed with secure UPI payment.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowAuthModal(true)}
+                              style={{
+                                padding: "12px 24px",
+                                borderRadius: "9999px",
+                                backgroundColor: "#111110",
+                                color: "#FFFFFF",
+                                fontSize: "13.5px",
+                                fontWeight: 700,
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Sign In to Continue
+                            </button>
+                          </div>
+                        ) : (
+                          <PhonePeCheckout
+                            amount={finalTotal}
+                            isCod={false}
+                            customerName={`${firstName} ${lastName}`.trim() || user?.displayName || "NXTIVE Member"}
+                            customerPhone={phone}
+                            customerEmail={email}
+                            userId={user?.uid}
+                            shippingAddress={{
+                              fullName: `${firstName} ${lastName}`.trim(),
+                              email,
+                              phone,
+                              street,
+                              apartment,
+                              city,
+                              state,
+                              postalCode,
+                              country: "India",
+                            }}
+                            items={cart}
+                            onSuccess={(orderId, utr, orderNumber) => {
+                              clearCart();
+                              router.push(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=phonepe&utr=${encodeURIComponent(utr)}`);
+                            }}
+                            onError={(msg) => setOrderError(msg)}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Option B: Cash on Delivery with ₹149 Advance */}
+                  <div
+                    style={{
+                      borderRadius: "12px",
+                      border: paymentMethod === "cod" ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
+                      backgroundColor: paymentMethod === "cod" ? "#FAF9F6" : "#FFFFFF",
+                      overflow: "hidden",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "16px 20px",
+                        cursor: "pointer",
+                        flexWrap: "wrap",
+                        gap: "10px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <input
+                          type="radio"
+                          name="paymentOption"
+                          checked={paymentMethod === "cod"}
+                          onChange={() => setPaymentMethod("cod")}
+                          style={{ accentColor: "#111110" }}
                         />
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <div
+                            style={{
+                              width: "30px",
+                              height: "30px",
+                              borderRadius: "6px",
+                              backgroundColor: "#111110",
+                              color: "#FFFFFF",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 900,
+                              fontSize: "13px",
+                            }}
+                          >
+                            <Banknote size={16} />
+                          </div>
+                          <div>
+                            <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110" }}>
+                              Cash on Delivery (₹149 Advance + Balance on Delivery)
+                            </span>
+                            <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
+                              Pay ₹149 booking fee now via UPI · Pay remaining ₹{Math.max(0, finalTotal - 149).toLocaleString("en-IN")} in cash to courier
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: "#92400E",
+                          backgroundColor: "#FEF3C7",
+                          padding: "3px 9px",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        ₹149 Advance Required
+                      </span>
+                    </label>
+
+                    {paymentMethod === "cod" && (
+                      <div style={{ padding: "16px 20px 20px", borderTop: "1px solid #E5E0D5", backgroundColor: "#FFFFFF" }}>
+                        <div style={{ marginBottom: "14px", padding: "12px 14px", borderRadius: "8px", backgroundColor: "#FFFBEB", border: "1px solid #FDE68A", fontSize: "12.5px", color: "#92400E", lineHeight: "1.5" }}>
+                          <strong>How COD Works at NXTIVE:</strong> To prevent courier rejections, a ₹149 commitment fee is paid upfront via UPI. Your remaining balance of <strong>₹{Math.max(0, finalTotal - 149).toLocaleString("en-IN")}</strong> will be collected in cash at your doorstep upon parcel delivery.
+                        </div>
+
+                        {!user ? (
+                          <div style={{ textAlign: "center", padding: "16px 10px" }}>
+                            <p style={{ fontSize: "13.5px", color: "#666", marginBottom: "14px" }}>
+                              Please sign in to confirm your Cash on Delivery order.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowAuthModal(true)}
+                              style={{
+                                padding: "12px 24px",
+                                borderRadius: "9999px",
+                                backgroundColor: "#111110",
+                                color: "#FFFFFF",
+                                fontSize: "13.5px",
+                                fontWeight: 700,
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Sign In to Continue
+                            </button>
+                          </div>
+                        ) : (
+                          <PhonePeCheckout
+                            amount={149}
+                            totalOrderAmount={finalTotal}
+                            isCod={true}
+                            customerName={`${firstName} ${lastName}`.trim() || user?.displayName || "NXTIVE Member"}
+                            customerPhone={phone}
+                            customerEmail={email}
+                            userId={user?.uid}
+                            shippingAddress={{
+                              fullName: `${firstName} ${lastName}`.trim(),
+                              email,
+                              phone,
+                              street,
+                              apartment,
+                              city,
+                              state,
+                              postalCode,
+                              country: "India",
+                            }}
+                            items={cart}
+                            onSuccess={(orderId, utr, orderNumber) => {
+                              clearCart();
+                              router.push(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=cod&utr=${encodeURIComponent(utr)}`);
+                            }}
+                            onError={(msg) => setOrderError(msg)}
+                          />
+                        )}
                       </div>
                     )}
                   </div>
@@ -676,7 +810,7 @@ export default function CheckoutPage() {
                     Order Summary ({cart.length})
                   </h3>
                   <Link href="/cart" style={{ fontSize: "12px", color: "#111110", textDecoration: "underline" }}>
-                    Edit
+                    Edit Bag
                   </Link>
                 </div>
 
@@ -748,11 +882,24 @@ export default function CheckoutPage() {
                   )}
 
                   <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
-                    <span>Shipping ({deliveryMethod === "priority" ? "Priority" : "Standard"})</span>
-                    <span style={{ fontWeight: 600, color: deliveryCost === 0 ? "#2B9348" : "#111110" }}>
-                      {deliveryCost === 0 ? "FREE" : `₹${deliveryCost}`}
+                    <span>Shipping</span>
+                    <span style={{ fontWeight: 700, color: "#2B9348" }}>
+                      FREE
                     </span>
                   </div>
+
+                  {paymentMethod === "cod" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", backgroundColor: "#FEF3C7", padding: "10px 12px", borderRadius: "8px", marginTop: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "#92400E", fontWeight: 700 }}>
+                        <span>Advance Due Now (UPI):</span>
+                        <span>₹149</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "#92400E" }}>
+                        <span>Cash Due on Delivery:</span>
+                        <span>₹{Math.max(0, finalTotal - 149).toLocaleString("en-IN")}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Final Total */}
@@ -766,58 +913,85 @@ export default function CheckoutPage() {
                     marginBottom: "24px",
                   }}
                 >
-                  <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>Total Due</span>
+                  <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
+                    {paymentMethod === "cod" ? "Total Order Value" : "Total Due"}
+                  </span>
                   <span style={{ fontSize: "24px", fontWeight: 900, color: "#111110" }}>
                     ₹{finalTotal.toLocaleString("en-IN")}
                   </span>
                 </div>
 
-                {/* Submit Order Button */}
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  style={{
-                    width: "100%",
-                    padding: "15px 24px",
-                    borderRadius: "9999px",
-                    backgroundColor: "#111110",
-                    color: "#FFFFFF",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                    letterSpacing: "0.02em",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    cursor: isLoading ? "not-allowed" : "pointer",
-                    boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-                    opacity: isLoading ? 0.75 : 1,
-                    border: "none",
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Opening PhonePe...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Pay With PhonePe UPI</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
+                {/* Submit Order Action Button */}
+                {!user ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthModal(true)}
+                    style={{
+                      width: "100%",
+                      padding: "15px 24px",
+                      borderRadius: "9999px",
+                      backgroundColor: "#111110",
+                      color: "#FFFFFF",
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      letterSpacing: "0.02em",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                      border: "none",
+                    }}
+                  >
+                    <span>Sign In to Place Order</span>
+                    <ArrowRight size={16} />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    style={{
+                      width: "100%",
+                      padding: "15px 24px",
+                      borderRadius: "9999px",
+                      backgroundColor: paymentMethod === "cod" ? "#111110" : "#5F259F",
+                      color: "#FFFFFF",
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      letterSpacing: "0.02em",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                      border: "none",
+                    }}
+                  >
+                    {paymentMethod === "cod" ? (
+                      <>
+                        <span>Pay ₹149 Advance & Place COD</span>
+                        <ArrowRight size={16} />
+                      </>
+                    ) : (
+                      <>
+                        <span>Pay ₹{finalTotal.toLocaleString("en-IN")} via PhonePe UPI</span>
+                        <ArrowRight size={16} />
+                      </>
+                    )}
+                  </button>
+                )}
 
                 {/* Trust Badge */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "12px" }}>
                   <Lock size={12} color="#2B9348" />
                   <span style={{ fontSize: "11px", color: "#8E8880" }}>
-                    Direct & Verified PhonePe UPI
+                    Verified NXTIVE Gateway & Secure Checkout
                   </span>
                 </div>
 
                 <p style={{ fontSize: "11px", color: "#8E8880", textAlign: "center", marginTop: "10px", lineHeight: 1.4 }}>
-                  By completing order, you agree to NXTIVE Terms of Service & 7-Day Return Policy.
+                  By completing your order, you agree to NXTIVE Terms of Service & 7-Day Exchange Policy.
                 </p>
 
                 {orderError && (
@@ -839,6 +1013,239 @@ export default function CheckoutPage() {
           </div>
         </form>
       </div>
+
+      {/* ─── Sign-In Modal Popup (Required Before Placing Order) ─── */}
+      {showAuthModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: "rgba(0,0,0,0.65)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setShowAuthModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              maxWidth: "430px",
+              width: "100%",
+              padding: "32px",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
+              position: "relative",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowAuthModal(false)}
+              style={{
+                position: "absolute",
+                top: "18px",
+                right: "18px",
+                background: "none",
+                border: "none",
+                color: "#666",
+                cursor: "pointer",
+                padding: "4px",
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: "22px" }}>
+              <span style={{ fontSize: "10.5px", fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#936037", display: "block", marginBottom: "6px" }}>
+                NXTIVE Client Access
+              </span>
+              <h3 style={{ fontSize: "22px", fontWeight: 900, color: "#111110", marginBottom: "6px" }}>
+                {authMode === "login" ? "Sign In to Complete Order" : "Create Your Account"}
+              </h3>
+              <p style={{ fontSize: "12.5px", color: "#6A645C", lineHeight: 1.45 }}>
+                {authMode === "login"
+                  ? "Access your live order tracking, priority dispatch, and customer guarantees."
+                  : "Join NXTIVE in one click to manage orders and fast-track dispatch."}
+              </p>
+            </div>
+
+            {/* Google 1-Click Sign-In */}
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={authGoogleLoading}
+              style={{
+                width: "100%",
+                padding: "12px 18px",
+                borderRadius: "10px",
+                border: "1px solid rgba(0,0,0,0.18)",
+                backgroundColor: "#FFFFFF",
+                color: "#111110",
+                fontSize: "13.5px",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "10px",
+                cursor: authGoogleLoading ? "not-allowed" : "pointer",
+                marginBottom: "18px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>{authGoogleLoading ? "Signing in..." : "Continue with Google"}</span>
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+              <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(0,0,0,0.1)" }} />
+              <span style={{ fontSize: "11px", color: "#8E8880", textTransform: "uppercase", letterSpacing: "0.08em" }}>or email</span>
+              <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(0,0,0,0.1)" }} />
+            </div>
+
+            {/* Email Form */}
+            <form onSubmit={handleAuthModalSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {authMode === "signup" && (
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={authName}
+                    onChange={(e) => setAuthName(e.target.value)}
+                    placeholder="Sandeep Sandy"
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(0,0,0,0.15)",
+                      fontSize: "13px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="name@domain.com"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    fontSize: "13px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "4px" }}>
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    fontSize: "13px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              {authError && (
+                <div style={{ padding: "8px 12px", borderRadius: "6px", backgroundColor: "#FEF2F2", border: "1px solid #FCA5A5", color: "#991B1B", fontSize: "12px" }}>
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                style={{
+                  width: "100%",
+                  padding: "13px",
+                  borderRadius: "8px",
+                  backgroundColor: "#111110",
+                  color: "#FFFFFF",
+                  fontSize: "13.5px",
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: authLoading ? "not-allowed" : "pointer",
+                  marginTop: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Please wait...</span>
+                  </>
+                ) : (
+                  <span>{authMode === "login" ? "Sign In & Continue" : "Create Account & Continue"}</span>
+                )}
+              </button>
+            </form>
+
+            {/* Toggle Mode */}
+            <div style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: "#666" }}>
+              {authMode === "login" ? (
+                <>
+                  Don't have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode("signup"); setAuthError(null); }}
+                    style={{ background: "none", border: "none", color: "#111110", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}
+                  >
+                    Create one here
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already registered?{" "}
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                    style={{ background: "none", border: "none", color: "#111110", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}
+                  >
+                    Sign in here
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         @keyframes spin {

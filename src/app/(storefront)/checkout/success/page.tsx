@@ -19,9 +19,16 @@ import { useStore } from "@/components/store-context";
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
+  const orderNumberParam = searchParams.get("orderNumber");
+  const utr = searchParams.get("utr");
+  const method = searchParams.get("method");
   const { orders } = useStore();
 
   const currentOrder = orderId ? orders.find((o) => o.id === orderId) : undefined;
+  const displayOrderNumber =
+    orderNumberParam ||
+    (currentOrder as any)?.orderNumber ||
+    (orderId?.startsWith("NXT") ? orderId : orderId ? `NXTIVE-${orderId.slice(-6).toUpperCase()}` : "");
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "60px 0 90px 0" }}>
@@ -109,7 +116,7 @@ function OrderSuccessContent() {
                   Order Reference
                 </div>
                 <div style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.01em", marginTop: "2px" }}>
-                  #{currentOrder.id}
+                  #{displayOrderNumber || currentOrder.id}
                 </div>
               </div>
 
@@ -302,7 +309,9 @@ function OrderSuccessContent() {
                     <span>Payment Information</span>
                   </div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#111110" }}>
-                    {currentOrder.paymentMethod}
+                    {(currentOrder as any)?.paymentMethod === "cod_partial" || method === "cod"
+                      ? "Cash on Delivery (₹149 Advance Paid)"
+                      : currentOrder.paymentMethod}
                   </div>
                   <div style={{ fontSize: "12.5px", color: "#6F6961", marginTop: "2px" }}>
                     Status:{" "}
@@ -312,7 +321,9 @@ function OrderSuccessContent() {
                         fontWeight: 700,
                       }}
                     >
-                      {currentOrder.paymentStatus}
+                      {(currentOrder as any)?.paymentMethod === "cod_partial" || method === "cod"
+                        ? "Advance Paid · Balance on Delivery"
+                        : currentOrder.paymentStatus}
                     </span>
                   </div>
                 </div>
@@ -348,6 +359,19 @@ function OrderSuccessContent() {
                   <span>Grand Total</span>
                   <span>₹{currentOrder.total.toLocaleString("en-IN")}</span>
                 </div>
+
+                {((currentOrder as any)?.paymentMethod === "cod_partial" || method === "cod") && (
+                  <div style={{ marginTop: "12px", borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#16A34A", fontWeight: 600, marginBottom: "4px" }}>
+                      <span>Advance Paid via UPI</span>
+                      <span>-₹149</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "15px", color: "#92400E", fontWeight: 800 }}>
+                      <span>Cash Due on Delivery</span>
+                      <span>₹{Math.max(0, currentOrder.total - 149).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -364,7 +388,7 @@ function OrderSuccessContent() {
           >
             <div
               style={{
-                backgroundColor: "#5F259F",
+                backgroundColor: method === "cod" ? "#1F2937" : "#5F259F",
                 color: "#FFFFFF",
                 padding: "20px 28px",
                 display: "flex",
@@ -376,10 +400,10 @@ function OrderSuccessContent() {
             >
               <div>
                 <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.8)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  PhonePe Order Reference
+                  {method === "cod" ? "COD Order Reference" : "Order Reference"}
                 </div>
                 <div style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.01em", marginTop: "2px" }}>
-                  #{orderId}
+                  #{displayOrderNumber || orderId}
                 </div>
               </div>
               <div
@@ -387,12 +411,12 @@ function OrderSuccessContent() {
                   fontSize: "12px",
                   fontWeight: 700,
                   color: "#FFFFFF",
-                  backgroundColor: "rgba(255,255,255,0.2)",
+                  backgroundColor: method === "cod" ? "#16A34A" : "rgba(255,255,255,0.2)",
                   padding: "4px 12px",
                   borderRadius: "9999px",
                 }}
               >
-                Submitted / Pending Verification
+                {method === "cod" ? "Advance Paid · COD Confirmed" : "Submitted / Pending Verification"}
               </div>
             </div>
 
@@ -402,21 +426,32 @@ function OrderSuccessContent() {
                   display: "flex",
                   alignItems: "flex-start",
                   gap: "14px",
-                  backgroundColor: "#FAF5FF",
+                  backgroundColor: method === "cod" ? "#F0FDF4" : "#FAF5FF",
                   padding: "16px 20px",
                   borderRadius: "10px",
-                  border: "1px solid #E9D5FF",
+                  border: method === "cod" ? "1px solid #BBF7D0" : "1px solid #E9D5FF",
                   marginBottom: "20px",
                 }}
               >
-                <CheckCircle2 size={22} color="#5F259F" style={{ flexShrink: 0, marginTop: "2px" }} />
+                <CheckCircle2 size={22} color={method === "cod" ? "#16A34A" : "#5F259F"} style={{ flexShrink: 0, marginTop: "2px" }} />
                 <div>
                   <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
-                    Your PhonePe Transaction Details Have Been Received
+                    {method === "cod"
+                      ? "Advance Paid & Cash on Delivery Confirmed"
+                      : "Your UPI Payment Details Have Been Received"}
                   </h4>
                   <p style={{ fontSize: "13px", color: "#6B7280", lineHeight: "1.5" }}>
-                    We have registered your payment reference {searchParams.get("utr") ? `(UTR: ${searchParams.get("utr")})` : ""}.
-                    Our concierge will cross-check the transaction with our PhonePe Business gateway and dispatch your package immediately upon verification.
+                    {method === "cod" ? (
+                      <>
+                        We have registered your ₹149 advance commitment payment {utr ? <strong>(UTR: {utr})</strong> : ""}.
+                        Your package will be prepared and dispatched with priority. The remaining order balance will be collected in cash at your doorstep upon delivery.
+                      </>
+                    ) : (
+                      <>
+                        We have registered your payment reference {utr ? <strong>(UTR: {utr})</strong> : ""}.
+                        Our team will cross-check the transaction and dispatch your package immediately upon verification.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
