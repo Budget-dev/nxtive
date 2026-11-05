@@ -5,8 +5,9 @@
  * @param amount - Amount in INR (not paise)
  * @param showSymbol - Whether to prefix ₹ (default true)
  */
-export function formatCurrency(amount: number, showSymbol = true): string {
-  const formatted = amount.toLocaleString("en-IN", {
+export function formatCurrency(amount?: number | null, showSymbol = true): string {
+  const numericAmount = typeof amount === "number" && !isNaN(amount) ? amount : Number(amount) || 0;
+  const formatted = numericAmount.toLocaleString("en-IN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });

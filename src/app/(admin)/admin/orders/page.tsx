@@ -392,15 +392,15 @@ export default function AdminOrdersPage() {
                       <td>
                         {o.items?.length || 1} {o.items?.length === 1 ? "item" : "items"}
                       </td>
-                      <td style={{ fontWeight: 800 }}>{formatCurrency(o.total)}</td>
+                      <td style={{ fontWeight: 800 }}>{formatCurrency(o.total ?? (o as any).amount ?? (o as any).totalAmount ?? 0)}</td>
                       <td>
                         <span className={`admin-badge ${o.paymentStatus === "paid" ? "green" : "amber"}`}>
-                          {o.paymentStatus}
+                          {o.paymentStatus || "pending"}
                         </span>
                       </td>
                       <td>
                         <span className={`admin-badge ${badgeClass}`}>
-                          {ORDER_STATUS_LABELS[o.status] || o.status}
+                          {ORDER_STATUS_LABELS[o.status] || o.status || "Pending"}
                         </span>
                       </td>
                       <td>
@@ -413,11 +413,13 @@ export default function AdminOrdersPage() {
                         )}
                       </td>
                       <td style={{ fontSize: "12px", color: "var(--adm-text-muted)", whiteSpace: "nowrap" }}>
-                        {new Date(o.createdAt).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {o.createdAt && !isNaN(new Date(o.createdAt).getTime())
+                          ? new Date(o.createdAt).toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
                       </td>
                       <td>
                         <Link

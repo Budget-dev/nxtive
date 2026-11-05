@@ -263,7 +263,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     readCustomers(),
   ]);
 
-  const allOrders = sortNewest(orders);
+  const allOrders = sortNewest(orders).map((order: any) => ({
+    ...order,
+    total: Number(order.total ?? order.amount ?? order.totalAmount ?? 0),
+    orderNumber: order.orderNumber || (order.id ? `#${String(order.id).slice(-6).toUpperCase()}` : "—"),
+    status: order.status || "pending",
+  }));
   const allReviews = sortNewest(reviews);
   const pendingOrders = allOrders.filter((order) =>
     order.status === "pending" || order.status === "processing"
@@ -617,7 +622,12 @@ export async function getAdminOrders(filter?: { status?: string; search?: string
     throw new Error("Order status filter is invalid.");
   }
   if (filter?.search !== undefined) boundedText(filter.search, "Order search", 200);
-  let orders = sortNewest(await readCollection<Order>("orders"));
+  let orders = sortNewest(await readCollection<Order>("orders")).map((order: any) => ({
+    ...order,
+    total: Number(order.total ?? order.amount ?? order.totalAmount ?? 0),
+    orderNumber: order.orderNumber || (order.id ? `#${String(order.id).slice(-6).toUpperCase()}` : "—"),
+    status: order.status || "pending",
+  }));
   if (filter?.status && filter.status !== "all") {
     orders = orders.filter((order) => order.status?.toLowerCase() === filter.status?.toLowerCase());
   }

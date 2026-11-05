@@ -232,7 +232,7 @@ export default function AdminDashboardPage() {
               <Users size={18} />
             </div>
           </div>
-          <div className="admin-kpi-value">{stats.totalCustomers.toLocaleString()}</div>
+          <div className="admin-kpi-value">{(stats.totalCustomers ?? 0).toLocaleString()}</div>
           <div className="admin-kpi-trend">
             <span className="admin-kpi-trend-note">Registered customer records</span>
           </div>
@@ -396,18 +396,20 @@ export default function AdminDashboardPage() {
                       <td style={{ whiteSpace: "nowrap" }}>
                         {ord.items?.length || 1} {ord.items?.length === 1 ? "item" : "items"}
                       </td>
-                      <td style={{ fontWeight: 700 }}>{formatCurrency(ord.total)}</td>
+                      <td style={{ fontWeight: 700 }}>{formatCurrency(ord.total ?? (ord as any).amount ?? (ord as any).totalAmount ?? 0)}</td>
                       <td>
                         <span className={`admin-badge ${badgeClass}`}>
-                          {ord.status.charAt(0).toUpperCase() + ord.status.slice(1)}
+                          {ord.status ? ord.status.charAt(0).toUpperCase() + ord.status.slice(1) : "Pending"}
                         </span>
                       </td>
                       <td style={{ fontSize: "12px", color: "var(--adm-text-muted)", whiteSpace: "nowrap" }}>
-                        {new Date(ord.createdAt).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {ord.createdAt && !isNaN(new Date(ord.createdAt).getTime())
+                          ? new Date(ord.createdAt).toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
                       </td>
                       <td>
                         <Link
