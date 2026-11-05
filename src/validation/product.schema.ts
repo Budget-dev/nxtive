@@ -25,7 +25,6 @@ export const createProductSchema = z.object({
     "Shirts",
     "Hoodies",
     "Bottoms",
-    "Accessories",
     "Jackets",
   ] as const),
   collections: z.array(z.string()).default([]),

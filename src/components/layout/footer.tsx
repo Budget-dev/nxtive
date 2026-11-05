@@ -134,7 +134,7 @@ export function Footer() {
               Shop
             </h4>
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
-              {["Men", "New Arrivals", "Clothing", "Accessories", "Collections", "Sale"].map((item) => (
+              {["Men", "New Arrivals", "Clothing", "Collections", "Sale"].map((item) => (
                 <li key={item}>
                   <Link
                       href={`/categories/${item.toLowerCase().replace(/\s+/g, "-")}`}

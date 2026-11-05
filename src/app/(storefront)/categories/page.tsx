@@ -7,7 +7,7 @@ import { sharpImageSrc } from "@/lib/sharp-image";
 
 export const metadata: Metadata = {
   title: "Categories & Collections — NXTIVE Menswear",
-  description: "Explore all NXTIVE collections: Men, New Arrivals, Heavyweight Tees, Hoodies, Technical Jackets, and Accessories.",
+  description: "Explore all NXTIVE collections: Men, New Arrivals, Heavyweight Tees, Hoodies, Technical Jackets.",
 };
 
 export const revalidate = 60;

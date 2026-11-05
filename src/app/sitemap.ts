@@ -124,7 +124,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "hoodies",
     "bottoms",
     "jackets",
-    "accessories",
     "new-arrivals",
     "urban-essentials",
     "premium-basics",

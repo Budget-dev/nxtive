@@ -86,7 +86,6 @@ export function Header() {
     { label: "Men", href: "/categories/men" },
     { label: "New Arrivals", href: "/categories/new-arrivals" },
     { label: "Clothing", href: "/categories/clothing" },
-    { label: "Accessories", href: "/categories/accessories" },
     { label: "Collections", href: "/categories/collections" },
     { label: "Sale", href: "/categories/sale" },
   ];

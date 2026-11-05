@@ -32,7 +32,6 @@ const DEFAULT_CATEGORIES: string[] = [
   "Hoodies",
   "Bottoms",
   "Jackets",
-  "Accessories",
 ];
 
 const BADGES: (ProductBadge | "None")[] = [

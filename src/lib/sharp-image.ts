@@ -3,7 +3,6 @@ const SHARP_IMAGE_SOURCES: Record<string, string> = {
   "/images/nxtvie/cat-shirts.jpg": "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg",
   "/images/nxtvie/cat-hoodies.jpg": "/images/nxtvie/product-core-hoodie-hd.jpg",
   "/images/nxtvie/cat-bottoms.jpg": "/images/nxtvie/product-cargo-pants-hd.jpg",
-  "/images/nxtvie/cat-accessories.jpg": "/images/nxtvie/product-cap-hd.jpg",
   "/images/nxtvie/product-oversized-tee.jpg": "/images/nxtvie/product-oversized-tee-hd.jpg",
   "/images/nxtvie/product-minimal-logo-tee.jpg": "/images/nxtvie/product-minimal-logo-tee-hd.jpg",
   "/images/nxtvie/product-relaxed-fit-shirt.jpg": "/images/nxtvie/product-relaxed-fit-shirt-hd.jpg",

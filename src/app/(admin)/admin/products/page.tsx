@@ -177,7 +177,6 @@ export default function AdminProductsPage() {
                 <option value="Hoodies">Hoodies</option>
                 <option value="Bottoms">Bottoms</option>
                 <option value="Jackets">Jackets</option>
-                <option value="Accessories">Accessories</option>
               </select>
             </div>
 

@@ -346,7 +346,7 @@ export default function HomePage() {
   );
 
   const departmentCategories = useMemo(() => {
-    const primaryOrder = ["t-shirts", "shirts", "hoodies", "bottoms", "jackets", "accessories"];
+    const primaryOrder = ["t-shirts", "shirts", "hoodies", "bottoms", "jackets"];
     const matched = primaryOrder
       .map((slug) => browseCategories.find((c) => c.slug === slug))
       .filter((c): c is (typeof browseCategories)[number] => Boolean(c));

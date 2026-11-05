@@ -24,7 +24,6 @@ export type ProductCategory =
   | "Shirts"
   | "Hoodies"
   | "Bottoms"
-  | "Accessories"
   | "Jackets"
   | (string & {});
 

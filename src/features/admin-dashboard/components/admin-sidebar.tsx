@@ -357,8 +357,7 @@ export function AdminSidebar({
                               { id: "hoodies", name: "Hoodies", slug: "hoodies" },
                               { id: "bottoms", name: "Bottoms", slug: "bottoms" },
                               { id: "jackets", name: "Jackets", slug: "jackets" },
-                              { id: "accessories", name: "Accessories", slug: "accessories" },
-                            ]
+                              ]
                         ).map((cat) => {
                           const href = `/admin/products/new?category=${encodeURIComponent(cat.name)}&categoryId=${encodeURIComponent(cat.id)}`;
                           return (

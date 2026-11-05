@@ -7,7 +7,6 @@ const CATEGORIES: ProductCategory[] = [
   "Shirts",
   "Hoodies",
   "Bottoms",
-  "Accessories",
   "Jackets",
 ];
 
@@ -54,11 +53,11 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     badge: asBadge(data.badge),
     colors: Array.isArray(data.colors)
       ? data.colors
-          .filter((color) => color && typeof color === "object")
-          .map((color) => ({
-            name: String((color as { name?: unknown }).name || ""),
-            hex: String((color as { hex?: unknown }).hex || "#181818"),
-          }))
+        .filter((color) => color && typeof color === "object")
+        .map((color) => ({
+          name: String((color as { name?: unknown }).name || ""),
+          hex: String((color as { hex?: unknown }).hex || "#181818"),
+        }))
       : [],
     sizes: asStringList(data.sizes),
     description: String(data.description || ""),
@@ -159,16 +158,6 @@ export const DEFAULT_CATEGORIES: Category[] = [
     sortOrder: 5,
     isActive: true,
   },
-  {
-    id: "accessories",
-    slug: "accessories",
-    name: "Accessories",
-    title: "Caps & Accessories",
-    tagline: "Everyday street caps, canvas tote bags, and lifestyle accessories.",
-    image: "/images/nxtvie/cat-accessories.jpg",
-    sortOrder: 6,
-    isActive: true,
-  },
 ];
 
 // ZERO mock products - true empty state until items are created in Firestore/admin
@@ -189,7 +178,7 @@ export function invalidateCatalogCache() {
       sessionStorage.removeItem("nxtive_cache_categories");
       sessionStorage.removeItem("nxtive_cache_categories_time");
       window.dispatchEvent(new CustomEvent("nxtive:catalog-invalidated"));
-    } catch {}
+    } catch { }
   }
 }
 
@@ -211,7 +200,7 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
           return parsed;
         }
       }
-    } catch {}
+    } catch { }
   }
 
   // 2. Try fetching from server API route
@@ -225,11 +214,11 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
           try {
             sessionStorage.setItem("nxtive_cache_products", JSON.stringify(json.products));
             sessionStorage.setItem("nxtive_cache_products_time", String(now));
-          } catch {}
+          } catch { }
           return json.products;
         }
       }
-    } catch {}
+    } catch { }
   }
 
   // 3. Fallback to direct active documents read
@@ -240,7 +229,7 @@ export async function fetchStorefrontProducts(): Promise<Product[]> {
       try {
         sessionStorage.setItem("nxtive_cache_products", JSON.stringify(products));
         sessionStorage.setItem("nxtive_cache_products_time", String(now));
-      } catch {}
+      } catch { }
     }
     return products;
   } catch {
@@ -266,7 +255,7 @@ export async function fetchStorefrontCategories(): Promise<Category[]> {
           return parsed;
         }
       }
-    } catch {}
+    } catch { }
   }
 
   // 2. Try fetching from fast server API route
@@ -280,11 +269,11 @@ export async function fetchStorefrontCategories(): Promise<Category[]> {
           try {
             sessionStorage.setItem("nxtive_cache_categories", JSON.stringify(json.categories));
             sessionStorage.setItem("nxtive_cache_categories_time", String(now));
-          } catch {}
+          } catch { }
           return json.categories;
         }
       }
-    } catch {}
+    } catch { }
   }
 
   // 3. Fallback to direct active documents read
@@ -299,7 +288,7 @@ export async function fetchStorefrontCategories(): Promise<Category[]> {
       try {
         sessionStorage.setItem("nxtive_cache_categories", JSON.stringify(sorted));
         sessionStorage.setItem("nxtive_cache_categories_time", String(now));
-      } catch {}
+      } catch { }
     }
     return sorted;
   } catch {
@@ -342,12 +331,12 @@ export function productsForCategory(products: Product[], slug: string): Product[
 
   // Men / Menswear: NXTIVE is a contemporary menswear brand, so Men includes all apparel
   if (normalized === "men" || normalized === "menswear") {
-    return products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
+    return products;
   }
 
   // Clothing: All non-accessory garments
   if (normalized === "clothing") {
-    return products.filter((p) => String(p?.category || "").toLowerCase() !== "accessories");
+    return products;
   }
 
   // Sale drops
