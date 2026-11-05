@@ -16,6 +16,7 @@ import {
   Copy,
   Check,
   Send,
+  Printer,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
@@ -269,11 +270,35 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
           </p>
         </div>
 
-        {order.paymentStatus === "paid" && (
-          <span className="admin-action-btn-secondary" style={{ color: "var(--adm-text-muted)", cursor: "not-allowed" }}>
-            Refund unavailable until payment provider integration is implemented
-          </span>
-        )}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <Link
+            href={`/admin/orders/${order.id}/invoice`}
+            target="_blank"
+            className="admin-btn-secondary"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 18px",
+              backgroundColor: "rgba(242, 172, 36, 0.12)",
+              color: "#F2AC24",
+              border: "1px solid rgba(242, 172, 36, 0.3)",
+              fontWeight: 700,
+              textDecoration: "none",
+              borderRadius: "8px",
+              fontSize: "0.85rem",
+            }}
+          >
+            <Printer size={16} />
+            <span>Generate Tax Invoice</span>
+          </Link>
+
+          {order.paymentStatus === "paid" && (
+            <span className="admin-action-btn-secondary" style={{ color: "var(--adm-text-muted)", cursor: "not-allowed" }}>
+              Refund unavailable
+            </span>
+          )}
+        </div>
       </div>
 
       {message && (

@@ -14,6 +14,8 @@ import {
   CreditCard,
   RefreshCw,
   ExternalLink,
+  FileText,
+  Printer,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import { getAdminOrders } from "@/features/admin-dashboard/server/actions";
@@ -422,12 +424,31 @@ export default function AdminOrdersPage() {
                           : "—"}
                       </td>
                       <td>
-                        <Link
-                          href={`/admin/orders/${o.id}`}
-                          className="admin-btn-secondary admin-btn-sm"
-                        >
-                          Fulfill
-                        </Link>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <Link
+                            href={`/admin/orders/${o.id}`}
+                            className="admin-btn-secondary admin-btn-sm"
+                          >
+                            Fulfill
+                          </Link>
+                          <Link
+                            href={`/admin/orders/${o.id}/invoice`}
+                            target="_blank"
+                            className="admin-btn-secondary admin-btn-sm"
+                            title="Generate Tax Invoice"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              backgroundColor: "rgba(242, 172, 36, 0.1)",
+                              color: "#F2AC24",
+                              borderColor: "rgba(242, 172, 36, 0.25)",
+                            }}
+                          >
+                            <FileText size={12} />
+                            <span>Invoice</span>
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
