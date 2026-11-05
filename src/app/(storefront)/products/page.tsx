@@ -170,7 +170,7 @@ function ProductsContent() {
             {searchQ ? `Search: "${searchQ}"` : "All Apparel & Essentials"}
           </h1>
           <p style={{ fontSize: "14px", color: "var(--text-muted)", maxWidth: "560px" }}>
-            Explore the complete collection of modern menswear inspired by Asian street style, minimal design, and everyday comfort.
+            Explore our complete collection of modern Indian streetwear — heavyweight oversized tees, comfortable hoodies, cargo pants, and everyday layers.
           </p>
         </div>
       </section>

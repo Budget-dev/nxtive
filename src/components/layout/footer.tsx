@@ -66,7 +66,7 @@ export function Footer() {
                 marginBottom: "22px",
               }}
             >
-              Modern menswear inspired by Asian style. Minimal design. Everyday comfort. For new generations.
+              Homegrown Indian streetwear brand. Premium oversized fits, breathable cotton, and everyday comfort for new generations.
             </p>
 
             {/* Social Icons & Backlinks */}

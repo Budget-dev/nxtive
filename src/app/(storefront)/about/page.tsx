@@ -6,7 +6,7 @@ import { ArrowRight, Compass, Shield, Feather, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Our Story — NXTIVE Menswear",
-  description: "Modern menswear inspired by Asian style. Minimal design. Everyday comfort. For new generations.",
+  description: "Homegrown Indian streetwear brand. Premium oversized fits, breathable cotton, and everyday comfort for new generations.",
 };
 
 export default function AboutPage() {
@@ -81,7 +81,7 @@ export default function AboutPage() {
               margin: "0 auto",
             }}
           >
-            Born at the intersection of Tokyo streetwear precision and Mumbai creative pulse, NXTIVE crafts silhouettes that redefine casual modern luxury for the next generation.
+            Born from India's modern streetwear culture, NXTIVE crafts everyday oversized fits and premium streetwear essentials designed for new generations.
           </p>
         </div>
       </section>
@@ -150,7 +150,7 @@ export default function AboutPage() {
                 <div>
                   <div style={{ fontSize: "28px", fontWeight: 900, color: "#111110" }}>280+</div>
                   <div style={{ fontSize: "12px", color: "#837D74", textTransform: "uppercase", fontWeight: 600 }}>
-                    GSM Heavyweight French Terry
+                    GSM Heavyweight Cotton Fleece
                   </div>
                 </div>
                 <div style={{ borderLeft: "1px solid rgba(0,0,0,0.1)", paddingLeft: "24px" }}>
@@ -222,13 +222,13 @@ export default function AboutPage() {
             {[
               {
                 icon: <Feather size={24} color="#936037" />,
-                title: "Custom Heavyweight Knits",
-                desc: "We engineer dense loopback terry and structured jerseys that hold their architectural silhouette after countless washes.",
+                title: "Heavyweight 100% Cotton",
+                desc: "We use high-density combed cotton and thick fleece that maintain their rich shape and soft feel wash after wash.",
               },
               {
                 icon: <Compass size={24} color="#936037" />,
-                title: "Subtle Asian-Minimalist Cuts",
-                desc: "Drop shoulders, boxy torsos, and clean necklines designed around natural movement rather than restrictive tailoring.",
+                title: "Comfortable Oversized Fits",
+                desc: "Relaxed drop shoulders, boxy silhouettes, and breathable fits made specifically for Indian weather and everyday street style.",
               },
               {
                 icon: <Sparkles size={24} color="#936037" />,
@@ -307,7 +307,7 @@ export default function AboutPage() {
             <div style={{ position: "relative", height: "380px", borderRadius: "12px", overflow: "hidden" }}>
               <Image
                 src="/images/nxtvie/promo-asian-minimal-hd.jpg"
-                alt="NXTIVE Asian Minimal Collection"
+                alt="NXTIVE Indian Streetwear Collection"
                 fill
                 style={{ objectFit: "cover" }}
                 sizes="(max-width: 768px) 100vw, 33vw"

@@ -243,7 +243,7 @@ export function CategoryViewClient({
               }}
             >
               {category.tagline ||
-                "Architectural silhouettes, heavyweight fabrics, and contemporary Asian minimalism designed for effortless daily wear."}
+                "Heavyweight pure cotton fabrics, comfortable oversized fits, and clean Indian street style designed for everyday wear."}
             </p>
 
             {/* Micro Highlights Pill Row */}

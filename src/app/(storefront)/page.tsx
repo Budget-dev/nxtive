@@ -43,7 +43,7 @@ const CINEMATIC_HERO_SLIDES = [
     headlineLine1: "WEAR YOUR",
     headlineAccent: "NEXT",
     headlineLine2: "SIDE.",
-    subtitle: "NXTIVE brings modern menswear inspired by Asian streetwear, minimal aesthetics, and everyday comfort.",
+    subtitle: "NXTIVE brings homegrown Indian streetwear, oversized fits, and premium everyday comfort for new generations.",
     primaryCta: "Shop New Arrivals",
     primaryHref: "/categories/new-arrivals",
     secondaryCta: "Explore Urban",
@@ -57,11 +57,11 @@ const CINEMATIC_HERO_SLIDES = [
   },
   {
     id: 2,
-    tag: "Technical Outerwear & Layering",
+    tag: "Streetwear Jackets & Layering",
     headlineLine1: "MADE BY",
     headlineAccent: "SPECIALIZED",
     headlineLine2: "FABRICS.",
-    subtitle: "Heavyweight technical outerwear, breathable fleece zip-ups, and weather-treated utility fits built for all conditions.",
+    subtitle: "Heavyweight jackets, stylish windcheaters, and comfortable layering pieces made for Indian weather.",
     primaryCta: "Shop Outerwear",
     primaryHref: "/categories/jackets",
     secondaryCta: "Explore Fabrics",
@@ -75,17 +75,17 @@ const CINEMATIC_HERO_SLIDES = [
   },
   {
     id: 3,
-    tag: "Asian Minimal Modern // Twilight Edit",
+    tag: "Oversized Streetwear // Twilight Edit",
     headlineLine1: "STYLE THAT",
     headlineAccent: "MOVES",
     headlineLine2: "WITH YOU.",
-    subtitle: "Charcoal washed oversized hoodies, relaxed dropped silhouettes, and contemporary street minimalism for the night city.",
+    subtitle: "Heavyweight oversized hoodies, relaxed drop-shoulder fits, and comfortable streetwear designed for everyday wear.",
     primaryCta: "Shop Hoodies",
     primaryHref: "/categories/hoodies",
     secondaryCta: "View Lookbook",
     secondaryHref: "/products",
     image: "/images/cinematic/banner-nxtive-hoodie.jpg",
-    alt: "NXTIVE Asian Minimal Modern Twilight Skyline Campaign",
+    alt: "NXTIVE Modern Indian Streetwear Twilight Skyline Campaign",
     scriptTag: "Nightfall\nSeries",
     accentColor: "#F4A261",
     badge: "Trending Worldwide",
@@ -93,11 +93,11 @@ const CINEMATIC_HERO_SLIDES = [
   },
   {
     id: 4,
-    tag: "Curated Wardrobe Staples",
+    tag: "Everyday Streetwear Staples",
     headlineLine1: "TIMELESS PIECES.",
     headlineAccent: "BETTER",
     headlineLine2: "EVERYDAY.",
-    subtitle: "Precision-tailored organic ribbed mocknecks, boxy heavyweight tees, and architectural streetwear staples.",
+    subtitle: "Heavyweight drop-shoulder t-shirts, boxy tees, and timeless streetwear essentials made from pure cotton.",
     primaryCta: "Shop Premium Basics",
     primaryHref: "/categories/premium-basics",
     secondaryCta: "All Menswear",
@@ -1358,7 +1358,7 @@ export default function HomePage() {
                   marginBottom: "28px",
                 }}
               >
-                NXTIVE is a mindset — inspired by Asian culture, built for the new generation. Minimal. Modern. Always Evolving.
+                NXTIVE is a homegrown Indian streetwear brand built for the new generation. Modern. Minimal. Always Evolving.
               </p>
               <div>
                 <Link

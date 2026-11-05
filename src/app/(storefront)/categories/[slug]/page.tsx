@@ -18,11 +18,11 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   const categories = await fetchStorefrontCategories();
   const categoryMeta = categories.find((c) => c.slug === normalizedSlug) || {
     name: normalizedSlug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-    tagline: "Explore contemporary oversized and minimal luxury streetwear.",
+    tagline: "Explore premium oversized fits, heavyweight tees, and modern streetwear.",
   };
 
   return {
-    title: `${categoryMeta.name} | NXTIVE Asian Streetwear`,
+    title: `${categoryMeta.name} | NXTIVE Streetwear India`,
     description:
       categoryMeta.tagline ||
       `Discover the latest drops in ${categoryMeta.name} from NXTIVE. Engineered for form, weight, and timeless drape.`,
