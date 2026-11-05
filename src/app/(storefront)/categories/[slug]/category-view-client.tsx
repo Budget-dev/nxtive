@@ -119,13 +119,6 @@ export function CategoryViewClient({
     setSortBy("featured");
   };
 
-  // Recommended products if current list is empty or small
-  const recommendedFallbacks = useMemo(() => {
-    return allProducts
-      .filter((p) => p.category !== category.name)
-      .slice(0, 4);
-  }, [allProducts, category.name]);
-
   return (
     <div style={{ backgroundColor: "#F7F6F2", minHeight: "100vh", paddingBottom: "100px" }}>
       {/* ─── LUXURY CATEGORY HERO BANNER ────────────────────────────── */}
@@ -880,36 +873,6 @@ export function CategoryViewClient({
                 <span>Browse All Products</span>
                 <ArrowRight size={14} />
               </Link>
-            )}
-
-            {/* Fallback items recommendation */}
-            {recommendedFallbacks.length > 0 && (
-              <div style={{ marginTop: "50px", textAlign: "left" }}>
-                <h4
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "#181716",
-                    marginBottom: "16px",
-                    textAlign: "center",
-                  }}
-                >
-                  Explore Trending Streetwear Staples
-                </h4>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: "16px",
-                  }}
-                >
-                  {recommendedFallbacks.map((item) => (
-                    <ProductCard key={item.id} product={item} />
-                  ))}
-                </div>
-              </div>
             )}
           </div>
         ) : (

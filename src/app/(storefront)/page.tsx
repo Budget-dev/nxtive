@@ -250,17 +250,21 @@ function AutoScrollingProductTrack({ products }: { products: Product[] }) {
   const [isInteracting, setIsInteracting] = useState(false);
   const interactingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Duplicate items to ensure smooth continuous loop
+  // Only auto-scroll loop if there are at least 5 products to create a natural continuous ticker.
+  // When a category only has 1 to 4 products, DO NOT artificially clone them into duplicate cards!
+  const shouldLoop = Boolean(products && products.length >= 5);
+
   const displayProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
-    if (products.length >= 6) return [...products, ...products];
-    if (products.length >= 3) return [...products, ...products, ...products];
-    return [...products, ...products, ...products, ...products];
-  }, [products]);
+    if (!shouldLoop) {
+      return products; // Display only actual real products without cloning!
+    }
+    return [...products, ...products];
+  }, [products, shouldLoop]);
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || displayProducts.length === 0) return;
+    if (!el || !shouldLoop || displayProducts.length === 0) return;
 
     let animId: number;
     const speed = 0.65; // Luxury smooth scroll speed (pixels per frame)
@@ -278,7 +282,7 @@ function AutoScrollingProductTrack({ products }: { products: Product[] }) {
 
     animId = requestAnimationFrame(step);
     return () => cancelAnimationFrame(animId);
-  }, [isInteracting, displayProducts]);
+  }, [isInteracting, displayProducts, shouldLoop]);
 
   const handlePointerEnter = () => {
     if (interactingTimeoutRef.current) clearTimeout(interactingTimeoutRef.current);
