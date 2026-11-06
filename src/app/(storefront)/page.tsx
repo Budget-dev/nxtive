@@ -337,8 +337,9 @@ export default function HomePage() {
     fetch("/api/social-gallery")
       .then((res) => res.json())
       .then((json) => {
-        if (json?.success && json?.data) {
-          setSocialGallery(json.data);
+        const gallery = json?.socialGallery || json?.data;
+        if (json?.success && gallery) {
+          setSocialGallery(gallery);
         }
       })
       .catch(() => {});

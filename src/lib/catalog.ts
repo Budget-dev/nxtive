@@ -136,7 +136,7 @@ async function readActiveDocuments<T>(
     const projectId = firebaseConfig.projectId;
     if (apiKey && projectId) {
       const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}?pageSize=300&key=${apiKey}`;
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url, { next: { revalidate: 60 } } as RequestInit);
       if (res.ok) {
         const json = await res.json();
         const docs = json.documents || [];
@@ -227,7 +227,7 @@ export const FALLBACK_PRODUCTS: Product[] = [];
 // High-speed catalog cache to boost page transitions & eliminate redundant queries
 let storefrontProductsCache: { timestamp: number; data: Product[] } | null = null;
 let storefrontCategoriesCache: { timestamp: number; data: Category[] } | null = null;
-const CATALOG_CACHE_TTL_MS = 4_000;
+const CATALOG_CACHE_TTL_MS = 120_000; // 2 minutes fresh memory & session cache
 
 export function invalidateCatalogCache() {
   storefrontProductsCache = null;

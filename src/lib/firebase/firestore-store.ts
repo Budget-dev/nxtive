@@ -12,6 +12,18 @@ const DATA_DIR = IS_SERVERLESS
   : path.join(process.cwd(), ".data", "firestore");
 
 const MEMORY_STORE: Record<string, Record<string, any>> = {};
+const MEMORY_STORE_TIMESTAMPS: Record<string, number> = {};
+const COLLECTION_CACHE_TTL_MS = 25_000; // 25s memory cache to accelerate server actions & dashboard reads
+
+export function invalidateServerStoreCache(collectionName?: string) {
+  if (collectionName) {
+    delete MEMORY_STORE_TIMESTAMPS[collectionName];
+  } else {
+    for (const key of Object.keys(MEMORY_STORE_TIMESTAMPS)) {
+      delete MEMORY_STORE_TIMESTAMPS[key];
+    }
+  }
+}
 
 function ensureDirectoryExists() {
   try {
@@ -81,6 +93,7 @@ function loadInitialCollectionData(collectionName: string): Record<string, any> 
 
 function saveCollectionData(collectionName: string, data: Record<string, any>) {
   MEMORY_STORE[collectionName] = data;
+  MEMORY_STORE_TIMESTAMPS[collectionName] = Date.now();
   try {
     ensureDirectoryExists();
     const filePath = path.join(DATA_DIR, `${collectionName}.json`);
@@ -100,6 +113,15 @@ import {
 } from "./firestore-rest";
 
 export async function storeReadCollection<T>(collectionName: string): Promise<T[]> {
+  const now = Date.now();
+  if (
+    MEMORY_STORE[collectionName] &&
+    MEMORY_STORE_TIMESTAMPS[collectionName] &&
+    now - MEMORY_STORE_TIMESTAMPS[collectionName] < COLLECTION_CACHE_TTL_MS
+  ) {
+    return Object.values(MEMORY_STORE[collectionName]) as T[];
+  }
+
   // 1. If service account is available, try adminDb first
   if (hasAdminCredentials) {
     try {

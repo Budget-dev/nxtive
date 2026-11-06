@@ -23,9 +23,46 @@ import { normalizeProduct, invalidateCatalogCache } from "@/lib/catalog";
 import type { Product } from "@/types/product";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
+let cachedAdminRawProducts: Product[] | null = null;
+let lastAdminProductsFetchTime = 0;
+const ADMIN_PRODUCTS_CACHE_TTL_MS = 60_000;
+
+function filterProductsList(
+  all: Product[],
+  cat: string,
+  stock: string,
+  q: string
+): Product[] {
+  let data = all;
+  if (cat && cat !== "all") {
+    data = data.filter(
+      (p) =>
+        p.category?.toLowerCase() === cat.toLowerCase() ||
+        p.categoryId?.toLowerCase() === cat.toLowerCase()
+    );
+  }
+  if (q && q.trim()) {
+    const query = q.toLowerCase().trim();
+    data = data.filter(
+      (p) =>
+        p.title.toLowerCase().includes(query) ||
+        p.slug.toLowerCase().includes(query) ||
+        (p.sku && p.sku.toLowerCase().includes(query))
+    );
+  }
+  if (stock && stock !== "all") {
+    if (stock === "in_stock") data = data.filter((p) => p.inStock && (p.stock || p.totalStock || 0) > 0);
+    else if (stock === "low_stock") data = data.filter((p) => (p.stock || p.totalStock || 0) > 0 && (p.stock || p.totalStock || 0) <= (p.lowStockThreshold || 5));
+    else if (stock === "out_of_stock") data = data.filter((p) => !p.inStock || (p.stock || p.totalStock || 0) === 0);
+  }
+  return data;
+}
+
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>(() =>
+    cachedAdminRawProducts ? filterProductsList(cachedAdminRawProducts, "all", "all", "") : []
+  );
+  const [loading, setLoading] = useState(() => !cachedAdminRawProducts);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -34,44 +71,32 @@ export default function AdminProductsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState<{ id: string; title: string } | null>(null);
 
-  const loadProducts = async () => {
-    setLoading(true);
+  const loadProducts = async (force = false) => {
+    const now = Date.now();
+    if (!force && cachedAdminRawProducts && now - lastAdminProductsFetchTime < ADMIN_PRODUCTS_CACHE_TTL_MS) {
+      setProducts(filterProductsList(cachedAdminRawProducts, categoryFilter, stockFilter, search));
+      setLoading(false);
+      return;
+    }
+    if (!cachedAdminRawProducts) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const snap = await getDocs(collection(db, "products"));
-      let data: Product[] = snap.docs
+      const raw: Product[] = snap.docs
         .map((d: any) => normalizeProduct(d.id, d.data()))
         .filter((p: any): p is Product => p !== null);
 
-      if (categoryFilter && categoryFilter !== "all") {
-        data = data.filter(
-          (p) =>
-            p.category?.toLowerCase() === categoryFilter.toLowerCase() ||
-            p.categoryId?.toLowerCase() === categoryFilter.toLowerCase()
-        );
-      }
-
-      if (search && search.trim()) {
-        const q = search.toLowerCase().trim();
-        data = data.filter(
-          (p) =>
-            p.title.toLowerCase().includes(q) ||
-            p.slug.toLowerCase().includes(q) ||
-            (p.sku && p.sku.toLowerCase().includes(q))
-        );
-      }
-
-      if (stockFilter && stockFilter !== "all") {
-        if (stockFilter === "in_stock") data = data.filter((p) => p.inStock && (p.stock || p.totalStock || 0) > 0);
-        else if (stockFilter === "low_stock") data = data.filter((p) => (p.stock || p.totalStock || 0) > 0 && (p.stock || p.totalStock || 0) <= (p.lowStockThreshold || 5));
-        else if (stockFilter === "out_of_stock") data = data.filter((p) => !p.inStock || (p.stock || p.totalStock || 0) === 0);
-      }
-
-      setProducts(data);
+      cachedAdminRawProducts = raw;
+      lastAdminProductsFetchTime = Date.now();
+      setProducts(filterProductsList(raw, categoryFilter, stockFilter, search));
     } catch (err) {
       console.error("Failed to fetch products", err);
-      setProducts([]);
-      setError(adminErrorMessage(err));
+      if (!cachedAdminRawProducts) {
+        setProducts([]);
+        setError(adminErrorMessage(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -94,6 +119,9 @@ export default function AdminProductsPage() {
     try {
       await deleteDoc(doc(db, "products", id));
       invalidateCatalogCache();
+      if (cachedAdminRawProducts) {
+        cachedAdminRawProducts = cachedAdminRawProducts.filter((p) => p.id !== id);
+      }
       setProducts((prev) => prev.filter((p) => p.id !== id));
       setSelectedIds((prev) => prev.filter((item) => item !== id));
     } catch (err) {

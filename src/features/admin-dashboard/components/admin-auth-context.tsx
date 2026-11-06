@@ -65,14 +65,39 @@ async function establishSession(user?: FirebaseUserLike | null, emailFallback?: 
   return result.data;
 }
 
+function getCachedAdminProfile(): AdminUserProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem("nxtive_admin_profile");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && parsed.email?.toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+      return parsed as AdminUserProfile;
+    }
+  } catch {}
+  return null;
+}
+
+function persistAdminProfile(profile: AdminUserProfile | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (profile) {
+      sessionStorage.setItem("nxtive_admin_profile", JSON.stringify(profile));
+    } else {
+      sessionStorage.removeItem("nxtive_admin_profile");
+    }
+  } catch {}
+}
+
 async function clearSession() {
+  persistAdminProfile(null);
   const response = await fetch("/api/auth/session", { method: "DELETE", credentials: "same-origin" });
   if (!response.ok) throw new Error("Unable to end the server session. Please try again.");
 }
 
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
-  const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => getCachedAdminProfile());
+  const [loading, setLoading] = useState<boolean>(() => !getCachedAdminProfile());
   const signingIn = useRef(false);
   const router = useRouter();
 
@@ -87,6 +112,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           const email = result.user.email?.toLowerCase();
           if (email === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
             const profile = await establishSession(result.user);
+            persistAdminProfile(profile);
             if (!disposed) {
               setAdminUser(profile);
               router.push("/admin/dashboard");
@@ -106,7 +132,14 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
         const result = await response.json();
         if (response.ok && result.success && result.data) {
+          persistAdminProfile(result.data as AdminUserProfile);
           if (!disposed) setAdminUser(result.data as AdminUserProfile);
+        } else {
+          // If session expired or invalid and no active Firebase auth
+          if (!disposed && !auth.currentUser) {
+            persistAdminProfile(null);
+            setAdminUser(null);
+          }
         }
       } catch {
         // Fall through
@@ -125,8 +158,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           const response = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" });
           const result = await response.json();
           if (response.ok && result.success && result.data) {
+            persistAdminProfile(result.data as AdminUserProfile);
             if (!disposed && current === revision) setAdminUser(result.data as AdminUserProfile);
           } else {
+            persistAdminProfile(null);
             if (!disposed && current === revision) setAdminUser(null);
           }
           return;
@@ -136,8 +171,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         const profile = response.ok && result.data
           ? (result.data as AdminUserProfile)
           : await establishSession(user);
+        persistAdminProfile(profile);
         if (!disposed && current === revision) setAdminUser(profile);
       } catch {
+        persistAdminProfile(null);
         if (!disposed && current === revision) setAdminUser(null);
       } finally {
         if (!disposed && current === revision) setLoading(false);
@@ -156,6 +193,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginAsAdmin = async (email: string, pass: string) => {
     signingIn.current = true;
+    persistAdminProfile(null);
     setAdminUser(null);
     setLoading(true);
 
@@ -184,6 +222,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const profile = await establishSession(firebaseUser, email.trim());
+      persistAdminProfile(profile);
       setAdminUser(profile);
 
       // Ensure logged-in admin is registered in users collection so all logged users appear in user directory
@@ -251,6 +290,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const profile = await establishSession(result.user);
+      persistAdminProfile(profile);
       setAdminUser(profile);
 
       try {

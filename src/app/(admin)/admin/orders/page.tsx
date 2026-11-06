@@ -35,9 +35,13 @@ const STATUS_TABS: { key: string; label: string }[] = [
   { key: "return_requested", label: "Returns" },
 ];
 
+let cachedAdminOrders: Order[] | null = null;
+let lastAdminOrdersFetchTime = 0;
+const ADMIN_ORDERS_CACHE_TTL_MS = 30_000;
+
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<Order[]>(() => cachedAdminOrders || []);
+  const [loading, setLoading] = useState<boolean>(() => !cachedAdminOrders);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
@@ -71,7 +75,7 @@ export default function AdminOrdersPage() {
         verifiedAt: serverTimestamp(),
         verifiedBy: auth.currentUser?.uid || null,
       });
-      loadOrders();
+      loadOrders(true);
     } catch (e) {
       console.error("Failed to update status", e);
     } finally {
@@ -79,8 +83,17 @@ export default function AdminOrdersPage() {
     }
   }
 
-  const loadOrders = async () => {
-    setLoading(true);
+  const loadOrders = async (force = false) => {
+    const now = Date.now();
+    const isDefaultFilter = activeTab === "all" && !search.trim();
+    if (!force && isDefaultFilter && cachedAdminOrders && now - lastAdminOrdersFetchTime < ADMIN_ORDERS_CACHE_TTL_MS) {
+      setOrders(cachedAdminOrders);
+      setLoading(false);
+      return;
+    }
+    if (!cachedAdminOrders) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await getAdminOrders({
@@ -88,11 +101,17 @@ export default function AdminOrdersPage() {
         search: search.trim() ? search.trim() : undefined,
       });
 
+      if (isDefaultFilter) {
+        cachedAdminOrders = data;
+        lastAdminOrdersFetchTime = Date.now();
+      }
       setOrders(data);
     } catch (err) {
       console.error("Failed to load orders", err);
-      setOrders([]);
-      setError(adminErrorMessage(err));
+      if (!cachedAdminOrders) {
+        setOrders([]);
+        setError(adminErrorMessage(err));
+      }
     } finally {
       setLoading(false);
     }

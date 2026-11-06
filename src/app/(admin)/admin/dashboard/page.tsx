@@ -40,30 +40,49 @@ import type { DashboardStats } from "@/features/admin-dashboard/server/admin-dat
 import type { Product } from "@/types/product";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
+let cachedDashboardStats: DashboardStats | null = null;
+let cachedDashboardProducts: Product[] | null = null;
+let lastDashboardFetchTime = 0;
+const DASHBOARD_CACHE_TTL_MS = 60_000;
+
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats | null>(() => cachedDashboardStats);
+  const [products, setProducts] = useState<Product[]>(() => cachedDashboardProducts || []);
+  const [loading, setLoading] = useState<boolean>(() => !cachedDashboardStats);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("Products");
   const [productSearch, setProductSearch] = useState("");
   const [reviewActionLoading, setReviewActionLoading] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = async (force = false) => {
+    const now = Date.now();
+    if (!force && cachedDashboardStats && now - lastDashboardFetchTime < DASHBOARD_CACHE_TTL_MS) {
+      setStats(cachedDashboardStats);
+      setProducts(cachedDashboardProducts || []);
+      setLoading(false);
+      return;
+    }
+    if (!cachedDashboardStats) {
+      setLoading(true);
+    }
     setError(null);
-    setLoading(true);
     try {
       const [dashStats, prods] = await Promise.all([
         getDashboardStats(),
         getAdminProducts(),
       ]);
+      cachedDashboardStats = dashStats;
+      cachedDashboardProducts = prods;
+      lastDashboardFetchTime = Date.now();
       setStats(dashStats);
       setProducts(prods);
     } catch (err) {
       console.error("Failed to load dashboard data", err);
-      setStats(null);
-      setProducts([]);
-      setError(adminErrorMessage(err));
+      if (!cachedDashboardStats) {
+        setStats(null);
+        setProducts([]);
+        setError(adminErrorMessage(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -77,7 +96,7 @@ export default function AdminDashboardPage() {
     setReviewActionLoading(id);
     try {
       await approveReview(id);
-      await loadData();
+      await loadData(true);
     } catch (err) {
       setError(adminErrorMessage(err));
     } finally {
@@ -89,7 +108,7 @@ export default function AdminDashboardPage() {
     setReviewActionLoading(id);
     try {
       await rejectReview(id);
-      await loadData();
+      await loadData(true);
     } catch (err) {
       setError(adminErrorMessage(err));
     } finally {
@@ -162,7 +181,7 @@ export default function AdminDashboardPage() {
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button
-            onClick={loadData}
+            onClick={() => loadData(true)}
             className="admin-btn-secondary admin-btn-sm"
             style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
           >

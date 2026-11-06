@@ -216,10 +216,10 @@ function getCustomerFromUser(id: string, raw: Record<string, unknown>): Customer
   };
 }
 
-async function readCustomers(): Promise<Customer[]> {
+async function readCustomers(existingOrders?: Order[]): Promise<Customer[]> {
   const [users, orders] = await Promise.all([
     readCollection<Record<string, unknown>>("users"),
-    readCollection<Order>("orders"),
+    existingOrders ? Promise.resolve(existingOrders) : readCollection<Order>("orders"),
   ]);
   const aggregates = new Map<string, { ordersCount: number; totalSpent: number }>();
   orders
@@ -256,11 +256,11 @@ function labelForDate(date: Date): string {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   await requireAdmin("dashboard.view");
-  const [orders, products, reviews, customers] = await Promise.all([
-    readCollection<Order>("orders"),
+  const orders = await readCollection<Order>("orders");
+  const [products, reviews, customers] = await Promise.all([
     readCollection<Product>("products"),
     readCollection<Review>("reviews"),
-    readCustomers(),
+    readCustomers(orders),
   ]);
 
   const allOrders = sortNewest(orders).map((order: any) => ({
