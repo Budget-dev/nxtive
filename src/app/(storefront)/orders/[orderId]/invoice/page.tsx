@@ -15,3 +15,4 @@ export default async function StorefrontInvoicePage({
   const { orderId } = await params;
   return <StorefrontInvoiceClient orderId={orderId} />;
 }
+
