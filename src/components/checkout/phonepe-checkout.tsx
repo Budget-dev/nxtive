@@ -6,16 +6,35 @@
 // Flow:
 //   1. Customer taps "Pay with PhonePe" (or "Pay ₹149 Advance for COD") ->
 //      creates Firestore order with formatted NXTIVE order number and displays
-//      a 100% compliant NPCI UPI QR code + deep-links for PhonePe/GPay/Paytm.
+//      a 100% compliant NPCI UPI QR code (official PhonePe merchant standee QR cropped clean)
+//      + deep-links for PhonePe/GPay/Paytm.
 //   2. Customer scans QR or pays in app, pastes transaction ID/UTR -> order marked submitted.
 //   3. Admin verifies transaction in PhonePe Business / bank statement.
 
 import React, { useEffect, useState } from "react";
 import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowRight, CheckCircle2, Copy, ExternalLink, HelpCircle, Loader2, QrCode, ShieldCheck, Smartphone, Banknote } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  HelpCircle,
+  Loader2,
+  QrCode,
+  ShieldCheck,
+  Smartphone,
+  Banknote,
+} from "lucide-react";
 import { db } from "@/lib/firebase";
-import { buildPhonePeLink, buildGenericUpiLink, isMobile } from "@/lib/upi";
+import {
+  buildPhonePeLink,
+  buildGenericUpiLink,
+  isMobile,
+  DEFAULT_VPA,
+  DEFAULT_NAME,
+  DEFAULT_QR_IMAGE,
+} from "@/lib/upi";
 import { generateOrderNumber } from "@/utils/slugify";
 
 export interface PhonePeCheckoutProps {
@@ -33,8 +52,9 @@ export interface PhonePeCheckoutProps {
   onError?: (err: string) => void;
 }
 
-const PAYEE_VPA = process.env.NEXT_PUBLIC_PHONEPE_VPA || "nxtive@ybl";
-const PAYEE_NAME = process.env.NEXT_PUBLIC_PHONEPE_NAME || "NXTIVE Menswear";
+const PAYEE_VPA = process.env.NEXT_PUBLIC_PHONEPE_VPA || DEFAULT_VPA;
+const PAYEE_NAME = process.env.NEXT_PUBLIC_PHONEPE_NAME || DEFAULT_NAME;
+const QR_IMAGE = process.env.NEXT_PUBLIC_PHONEPE_QR_IMAGE || DEFAULT_QR_IMAGE;
 
 export function PhonePeCheckout({
   amount,
@@ -55,10 +75,12 @@ export function PhonePeCheckout({
   const [phonepeLink, setPhonepeLink] = useState<string | null>(null);
   const [genericLink, setGenericLink] = useState<string | null>(null);
   const [step, setStep] = useState<"idle" | "created" | "submitted">("idle");
+  const [qrMode, setQrMode] = useState<"phonepe_standee" | "dynamic">("phonepe_standee");
   const [utr, setUtr] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedVpa, setCopiedVpa] = useState(false);
+  const [copiedAmount, setCopiedAmount] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   const fullOrderValue = totalOrderAmount && totalOrderAmount > 0 ? totalOrderAmount : amount;
@@ -172,9 +194,13 @@ export function PhonePeCheckout({
       setGenericLink(upiLink);
       setStep("created");
 
-      // Mobile: redirect to PhonePe app if available
+      // Mobile: trigger PhonePe app deep-link if available
       if (isMobile()) {
-        window.location.href = ppLink;
+        try {
+          window.location.href = ppLink;
+        } catch {
+          // Ignore redirect errors on mobile
+        }
       }
     } catch (e: any) {
       console.error("PhonePe order creation failed:", e);
@@ -208,6 +234,13 @@ export function PhonePeCheckout({
         paymentStatus: isCod ? "advance_submitted" : "pending_verification",
         statusHistory: [
           {
+            status: "pending",
+            timestamp: new Date().toISOString(),
+            note: isCod
+              ? `Order created with COD (₹${amount} advance booking fee due via UPI; ₹${codBalanceDue} due on delivery).`
+              : "Prepaid PhonePe UPI checkout initiated.",
+          },
+          {
             status: isCod ? "advance_submitted" : "pending_verification",
             timestamp: new Date().toISOString(),
             note: isCod
@@ -234,6 +267,12 @@ export function PhonePeCheckout({
     navigator.clipboard.writeText(PAYEE_VPA);
     setCopiedVpa(true);
     setTimeout(() => setCopiedVpa(false), 2500);
+  };
+
+  const handleCopyAmount = () => {
+    navigator.clipboard.writeText(Number(amount).toFixed(2));
+    setCopiedAmount(true);
+    setTimeout(() => setCopiedAmount(false), 2500);
   };
 
   if (step === "submitted") {
@@ -311,7 +350,7 @@ export function PhonePeCheckout({
                 <div style={{ fontSize: "11.5px", color: "#6B7280" }}>
                   {isCod
                     ? `Pay ₹${amount} now via UPI · Pay remaining ₹${codBalanceDue} in cash on delivery`
-                    : "Direct app redirect on mobile · Scan UPI QR on desktop"}
+                    : `Direct app redirect on mobile · Scan PhonePe QR to pay ${PAYEE_NAME}`}
                 </div>
               </div>
             </div>
@@ -371,7 +410,7 @@ export function PhonePeCheckout({
         </div>
       )}
 
-      {/* Step 2: Order Created - Show Universal UPI QR Code & UTR Form */}
+      {/* Step 2: Order Created - Show Official PhonePe QR & UTR Form */}
       {step === "created" && (
         <div
           style={{
@@ -410,57 +449,184 @@ export function PhonePeCheckout({
             </div>
           )}
 
-          {/* Desktop & Tablet: Universal UPI QR Code (Scannable by PhonePe, GPay, Paytm, BHIM, Camera) */}
-          {genericLink && (
+          {/* PhonePe Merchant QR Code Section */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              padding: "20px",
+              backgroundColor: "#FAF9F6",
+              borderRadius: "14px",
+              border: "1px dashed #D1D5DB",
+              gap: "14px",
+            }}
+          >
+            {/* Mode switch tabs: Official Standee QR vs Auto-Amount Dynamic QR */}
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                textAlign: "center",
-                padding: "20px",
-                backgroundColor: "#FAF9F6",
-                borderRadius: "12px",
-                border: "1px dashed #D1D5DB",
-                gap: "14px",
+                display: "inline-flex",
+                padding: "3px",
+                backgroundColor: "#F3F4F6",
+                borderRadius: "9999px",
+                fontSize: "12px",
+                fontWeight: 700,
+                border: "1px solid #E5E7EB",
               }}
             >
-              <div
+              <button
+                type="button"
+                onClick={() => setQrMode("phonepe_standee")}
                 style={{
-                  padding: "16px",
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "16px",
-                  boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
-                  display: "inline-flex",
+                  padding: "5px 14px",
+                  borderRadius: "9999px",
+                  border: "none",
+                  cursor: "pointer",
+                  backgroundColor: qrMode === "phonepe_standee" ? "#5F259F" : "transparent",
+                  color: qrMode === "phonepe_standee" ? "#FFFFFF" : "#4B5563",
+                  fontWeight: 700,
+                  transition: "all 0.15s ease",
                 }}
               >
-                {/* Standard NPCI upi://pay URI ensures 100% scanning success on any UPI app */}
-                <QRCodeSVG
-                  value={genericLink}
-                  size={210}
-                  level="M"
-                  includeMargin={true}
-                />
-              </div>
-
-              <div>
-                <p style={{ fontSize: "14px", fontWeight: 800, color: "#111110", marginBottom: "4px" }}>
-                  Scan with Any UPI App to Pay
-                </p>
-                <p style={{ fontSize: "12px", color: "#6B7280", maxWidth: "360px", margin: "0 auto" }}>
-                  Open <strong>PhonePe, Google Pay, Paytm, CRED, or BHIM</strong>, scan this QR code, and complete the payment of <strong>₹{Number(amount).toFixed(2)}</strong>.
-                </p>
-              </div>
-
-              {/* Supported apps icons */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#EDE9FE", color: "#5F259F" }}>PhonePe</span>
-                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#E0F2FE", color: "#0369A1" }}>Google Pay</span>
-                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#EFF6FF", color: "#1D4ED8" }}>Paytm</span>
-                <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#ECFDF5", color: "#047857" }}>BHIM / CRED</span>
-              </div>
+                PhonePe Standee QR
+              </button>
+              <button
+                type="button"
+                onClick={() => setQrMode("dynamic")}
+                style={{
+                  padding: "5px 14px",
+                  borderRadius: "9999px",
+                  border: "none",
+                  cursor: "pointer",
+                  backgroundColor: qrMode === "dynamic" ? "#5F259F" : "transparent",
+                  color: qrMode === "dynamic" ? "#FFFFFF" : "#4B5563",
+                  fontWeight: 700,
+                  transition: "all 0.15s ease",
+                }}
+              >
+                Auto-Amount QR (₹{Number(amount).toFixed(2)})
+              </button>
             </div>
-          )}
+
+            {/* QR Code Container */}
+            <div
+              style={{
+                padding: "16px",
+                backgroundColor: "#FFFFFF",
+                borderRadius: "16px",
+                boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
+                display: "inline-flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              {qrMode === "phonepe_standee" ? (
+                /* The clean cropped PhonePe QR requested by user (only QR portion shown) */
+                <div
+                  style={{
+                    width: "210px",
+                    height: "210px",
+                    position: "relative",
+                    overflow: "hidden",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <img
+                    src={QR_IMAGE}
+                    alt="PhonePe UPI QR Code"
+                    width={210}
+                    height={210}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      display: "block",
+                    }}
+                    onError={(e) => {
+                      // Fallback to Sirv URL if local image has issues
+                      const target = e.currentTarget as HTMLImageElement;
+                      if (!target.src.includes("sirv.com")) {
+                        target.src = "https://nxtiveclothing.sirv.com/IMG_0057.JPG.jpeg";
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                /* Dynamic NPCI standard QR with order amount and note */
+                genericLink && (
+                  <QRCodeSVG
+                    value={genericLink}
+                    size={210}
+                    level="M"
+                    includeMargin={true}
+                  />
+                )
+              )}
+            </div>
+
+            <div>
+              <p style={{ fontSize: "14px", fontWeight: 800, color: "#111110", marginBottom: "3px" }}>
+                Scan with PhonePe or Any UPI App
+              </p>
+              <p style={{ fontSize: "12px", color: "#6B7280", maxWidth: "360px", margin: "0 auto" }}>
+                Payee: <strong>{PAYEE_NAME}</strong> · Amount: <strong>₹{Number(amount).toFixed(2)}</strong>
+              </p>
+            </div>
+
+            {/* Quick copy bar */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+              <button
+                type="button"
+                onClick={handleCopyVpa}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "6px 14px",
+                  borderRadius: "6px",
+                  border: "1px solid #D1D5DB",
+                  backgroundColor: "#FFFFFF",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: copiedVpa ? "#16A34A" : "#111110",
+                  cursor: "pointer",
+                }}
+              >
+                <Copy size={12} />
+                <span>{copiedVpa ? "UPI ID Copied!" : `Copy UPI: ${PAYEE_VPA}`}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyAmount}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "6px 14px",
+                  borderRadius: "6px",
+                  border: "1px solid #D1D5DB",
+                  backgroundColor: "#FFFFFF",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: copiedAmount ? "#16A34A" : "#111110",
+                  cursor: "pointer",
+                }}
+              >
+                <Copy size={12} />
+                <span>{copiedAmount ? "Amount Copied!" : `Copy Amount: ₹${Number(amount).toFixed(2)}`}</span>
+              </button>
+            </div>
+
+            {/* Supported apps badges */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#EDE9FE", color: "#5F259F" }}>PhonePe</span>
+              <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#E0F2FE", color: "#0369A1" }}>Google Pay</span>
+              <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#EFF6FF", color: "#1D4ED8" }}>Paytm</span>
+              <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "4px", backgroundColor: "#ECFDF5", color: "#047857" }}>BHIM / CRED</span>
+            </div>
+          </div>
 
           {/* Mobile Direct Tap Links */}
           {isMobileDevice && (
@@ -485,7 +651,7 @@ export function PhonePeCheckout({
                   }}
                 >
                   <Smartphone size={18} />
-                  <span>Tap to Open PhonePe App</span>
+                  <span>Tap to Pay with PhonePe (₹{Number(amount).toFixed(2)})</span>
                   <ExternalLink size={15} />
                 </a>
               )}
@@ -516,31 +682,6 @@ export function PhonePeCheckout({
               )}
             </div>
           )}
-
-          {/* Manual UPI ID Fallback */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid #F3F4F6", paddingTop: "14px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "#4B5563" }}>
-              <span>Payee UPI ID: <strong>{PAYEE_VPA}</strong></span>
-              <button
-                type="button"
-                onClick={handleCopyVpa}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: copiedVpa ? "#16A34A" : "#5F259F",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                <Copy size={13} />
-                <span>{copiedVpa ? "Copied!" : "Copy UPI ID"}</span>
-              </button>
-            </div>
-          </div>
 
           {/* Form: Submit UTR / Transaction ID */}
           <form
