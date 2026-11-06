@@ -5,8 +5,8 @@ import { OrderInvoice } from "@/components/invoice/order-invoice";
 import { AdminDataState } from "../../../_components/admin-data-state";
 
 export const metadata = {
-  title: "Tax Invoice | NXTIVE Operations",
-  description: "Official GST tax invoice and fulfillment bill of supply.",
+  title: "Invoice | NXTIVE Operations",
+  description: "Official retail invoice and fulfillment bill of supply.",
 };
 
 export default async function AdminOrderInvoicePage({

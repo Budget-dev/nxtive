@@ -16,6 +16,7 @@ import {
   AlertCircle,
   ShoppingBag,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { useStore, Order } from "@/components/store-context";
 import { auth } from "@/lib/firebase/client";
@@ -196,25 +197,47 @@ export function OrderDetailClient({ orderId }: Props) {
             <span>Back to All Orders</span>
           </Link>
 
-          <button
-            onClick={handleShareTracking}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "7px 14px",
-              borderRadius: "9999px",
-              backgroundColor: "#FFFFFF",
-              border: "1px solid rgba(0,0,0,0.12)",
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#111110",
-              cursor: "pointer",
-            }}
-          >
-            <Share2 size={13} />
-            <span>{copied ? "Link Copied!" : "Share Tracking"}</span>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Link
+              href={`/orders/${order.id}/invoice`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "7px 14px",
+                borderRadius: "9999px",
+                backgroundColor: "#111110",
+                color: "#FFFFFF",
+                fontSize: "12px",
+                fontWeight: 700,
+                textDecoration: "none",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+              }}
+            >
+              <FileText size={13} />
+              <span>{order.status === "Delivered" ? "Delivered Invoice" : "View Invoice"}</span>
+            </Link>
+
+            <button
+              onClick={handleShareTracking}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "7px 14px",
+                borderRadius: "9999px",
+                backgroundColor: "#FFFFFF",
+                border: "1px solid rgba(0,0,0,0.12)",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#111110",
+                cursor: "pointer",
+              }}
+            >
+              <Share2 size={13} />
+              <span>{copied ? "Link Copied!" : "Share Tracking"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Order Header Card */}
@@ -340,6 +363,84 @@ export function OrderDetailClient({ orderId }: Props) {
               <span style={{ color: "#746E66" }}>
                 Estimated Delivery: <strong>{order.deliveryDateEstimate}</strong>
               </span>
+            </div>
+
+            {/* Invoice Delivery Status Card */}
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "16px 20px",
+                backgroundColor: order.status === "Delivered" ? "#F0FDF4" : "#FFFFFF",
+                borderRadius: "10px",
+                border: order.status === "Delivered" ? "1px solid #BBF7D0" : "1px solid rgba(0,0,0,0.08)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "14px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "10px",
+                    backgroundColor: order.status === "Delivered" ? "#DCFCE7" : "#F3F4F6",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: order.status === "Delivered" ? "#16A34A" : "#111110",
+                    flexShrink: 0,
+                  }}
+                >
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 800, color: "#111110" }}>
+                      Retail Invoice
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: "9999px",
+                        backgroundColor: order.status === "Delivered" ? "#DCFCE7" : "#FEF3C7",
+                        color: order.status === "Delivered" ? "#15803D" : "#92400E",
+                      }}
+                    >
+                      {order.status === "Delivered" ? "✓ Delivered & Final Invoice Ready" : "Invoice Generated"}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: "12px", color: "#6B7280", marginTop: "3px", margin: 0 }}>
+                    {order.status === "Delivered"
+                      ? "Package delivered! Official retail invoice is ready for download, warranty, and records."
+                      : "Generated on placement & enclosed inside your Shiprocket parcel. Digital copy ready below."}
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href={`/orders/${order.id}/invoice`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  padding: "9px 18px",
+                  borderRadius: "9999px",
+                  backgroundColor: "#111110",
+                  color: "#FFFFFF",
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                }}
+              >
+                <Download size={14} />
+                <span>{order.status === "Delivered" ? "Download Invoice" : "View Invoice"}</span>
+              </Link>
             </div>
           </div>
         </div>

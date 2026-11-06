@@ -13,6 +13,7 @@ import {
   CreditCard,
   ShoppingBag,
   ExternalLink,
+  FileText,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 
@@ -500,6 +501,29 @@ function OrderSuccessContent() {
             >
               <Package size={16} />
               <span>Track & View Order</span>
+            </Link>
+          )}
+
+          {(currentOrder || orderId) && (
+            <Link
+              href={`/orders/${currentOrder?.id || orderId}/invoice`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                backgroundColor: "#FFFFFF",
+                color: "#111110",
+                border: "1px solid rgba(0,0,0,0.2)",
+                padding: "13px 24px",
+                borderRadius: "9999px",
+                fontSize: "13.5px",
+                fontWeight: 700,
+                transition: "all 0.2s ease",
+              }}
+              className="btn-pill-outline"
+            >
+              <FileText size={16} />
+              <span>View Invoice</span>
             </Link>
           )}
 

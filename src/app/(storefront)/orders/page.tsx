@@ -13,6 +13,7 @@ import {
   ExternalLink,
   ChevronRight,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { useStore, Order } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
@@ -313,6 +314,27 @@ export default function OrdersPage() {
                         />
                         <span>{order.status}</span>
                       </span>
+
+                      <Link
+                        href={`/orders/${order.id}/invoice`}
+                        title="View & Download Invoice"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          fontSize: "12.5px",
+                          fontWeight: 700,
+                          color: isDelivered ? "#2B9348" : "#111110",
+                          backgroundColor: isDelivered ? "#F0FDF4" : "#FFFFFF",
+                          border: isDelivered ? "1px solid rgba(43, 147, 72, 0.3)" : "1px solid rgba(0,0,0,0.12)",
+                          padding: "6px 12px",
+                          borderRadius: "9999px",
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        <FileText size={13} />
+                        <span>Invoice</span>
+                      </Link>
 
                       <Link
                         href={`/orders/${order.id}`}

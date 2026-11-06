@@ -83,12 +83,10 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
     order?.transactionId ||
     "";
 
-  // GST Calculation (Included in total - 5% Apparel GST standard rate)
-  const gstRate = 0.05;
-  const taxableBase = Math.round((total / (1 + gstRate)) * 100) / 100;
-  const gstAmount = Math.round((total - taxableBase) * 100) / 100;
-  const cgst = Math.round((gstAmount / 2) * 100) / 100;
-  const sgst = Math.round((gstAmount / 2) * 100) / 100;
+  // Delivery status detection
+  const rawStatus = String(order?.status || "").toLowerCase();
+  const isDelivered = rawStatus === "delivered";
+  const trackingNumber = order?.trackingNumber || (order?.id ? `NXT-AWB-${String(order.id).slice(-6).toUpperCase()}` : "");
 
   const handlePrint = () => {
     window.print();
@@ -106,14 +104,14 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <button onClick={handlePrint} className="invoice-action-btn print-btn">
             <Printer size={16} />
-            <span>Print Tax Invoice</span>
+            <span>Print Invoice</span>
           </button>
         </div>
       </div>
 
       {/* Printable Invoice Sheet */}
       <div className="invoice-paper" id="invoice-printable-area">
-        {/* Header: Brand & Tax Invoice Meta */}
+        {/* Header: Brand & Invoice Meta */}
         <div className="invoice-header">
           <div className="brand-column">
             <div className="brand-logo-text">NXTIVE</div>
@@ -121,13 +119,12 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
             <div className="brand-tagline">Contemporary Luxury & Heavyweight Streetwear</div>
             <div className="company-details">
               Registered Office: Bandra West, Mumbai, Maharashtra 400050, India<br />
-              Email: <strong>nxtiveclothing@gmail.com</strong> | Tel: +91 97004 46690<br />
-              GSTIN: <strong>27AABCN9481F1Z2</strong> | PAN: AABCN9481F
+              Email: <strong>nxtiveclothing@gmail.com</strong> | Tel: +91 97004 46690
             </div>
           </div>
 
           <div className="meta-column">
-            <div className="invoice-badge">TAX INVOICE</div>
+            <div className="invoice-badge">RETAIL INVOICE</div>
             <div className="meta-field">
               <span className="meta-label">Invoice No:</span>
               <span className="meta-value-highlight">{invoiceNumber}</span>
@@ -142,7 +139,7 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
             </div>
             <div className="meta-field">
               <span className="meta-label">Place of Supply:</span>
-              <span className="meta-value">{state} (Code: 27)</span>
+              <span className="meta-value">{state}</span>
             </div>
           </div>
         </div>
@@ -204,7 +201,6 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
             <tr>
               <th style={{ width: "40px", textAlign: "center" }}>#</th>
               <th>Item Description & Specs</th>
-              <th style={{ width: "80px", textAlign: "center" }}>HSN Code</th>
               <th style={{ width: "70px", textAlign: "center" }}>Size</th>
               <th style={{ width: "60px", textAlign: "center" }}>Qty</th>
               <th style={{ width: "100px", textAlign: "right" }}>Unit Price</th>
@@ -214,7 +210,7 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", padding: "24px", color: "#666" }}>
+                <td colSpan={6} style={{ textAlign: "center", padding: "24px", color: "#666" }}>
                   Standard Apparel Order ({orderNumber})
                 </td>
               </tr>
@@ -236,7 +232,6 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
                         {color ? ` • Color: ${color}` : ""}
                       </div>
                     </td>
-                    <td style={{ textAlign: "center", color: "#666", fontSize: "12px" }}>6109</td>
                     <td style={{ textAlign: "center", fontWeight: 700 }}>{size}</td>
                     <td style={{ textAlign: "center" }}>{itemQty}</td>
                     <td style={{ textAlign: "right" }}>₹{itemPrice.toLocaleString("en-IN")}</td>
@@ -250,30 +245,34 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
 
         {/* Financial Summary & Words */}
         <div className="financials-row">
-          {/* Left: GST Breakup & Amount in Words */}
+          {/* Left: Fulfillment Status & Amount in Words */}
           <div className="financials-left">
             <div className="words-box">
               <span className="words-label">Invoice Amount in Words:</span>
               <div className="words-text">{amountToWordsINR(total)}</div>
             </div>
 
-            <div className="tax-summary-table">
-              <div className="tax-summary-title">GST Tax Assessment (CGST 2.5% + SGST 2.5%)</div>
-              <div className="tax-row">
-                <span>Taxable Value:</span>
-                <span>₹{taxableBase.toFixed(2)}</span>
+            <div className="fulfillment-summary-table">
+              <div className="fulfillment-summary-title">Delivery & Fulfillment Status</div>
+              <div className="fulfillment-row">
+                <span>Delivery Status:</span>
+                <span className={isDelivered ? "status-tag-delivered" : "status-tag-transit"}>
+                  {isDelivered ? "✓ DELIVERED" : (order?.status || "CONFIRMED").toUpperCase()}
+                </span>
               </div>
-              <div className="tax-row">
-                <span>Central GST (2.5%):</span>
-                <span>₹{cgst.toFixed(2)}</span>
+              <div className="fulfillment-row">
+                <span>Courier Service:</span>
+                <span>Shiprocket Express</span>
               </div>
-              <div className="tax-row">
-                <span>State GST (2.5%):</span>
-                <span>₹{sgst.toFixed(2)}</span>
-              </div>
-              <div className="tax-row tax-total-row">
-                <span>Total Tax Amount (Included):</span>
-                <span>₹{gstAmount.toFixed(2)}</span>
+              {trackingNumber && (
+                <div className="fulfillment-row">
+                  <span>AWB Number:</span>
+                  <span className="font-mono">{trackingNumber}</span>
+                </div>
+              )}
+              <div className="fulfillment-row">
+                <span>Invoice Type:</span>
+                <span>Retail Bill of Supply</span>
               </div>
             </div>
           </div>
@@ -328,7 +327,7 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
             <div className="terms-title">Terms & Conditions:</div>
             <ol className="terms-list">
               <li>Goods once sold can be exchanged or returned within 7 days in unworn condition with tags intact.</li>
-              <li>This is a computer-generated tax invoice and does not require a physical signature under Rule 46 of the CGST Rules, 2017.</li>
+              <li>This is an official computer-generated retail invoice and bill of supply. It does not require a physical signature.</li>
               <li>For returns, exchanges, or inquiries, contact <strong>nxtiveclothing@gmail.com</strong> with this invoice number.</li>
             </ol>
           </div>
@@ -626,14 +625,14 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
           font-style: italic;
         }
 
-        .tax-summary-table {
+        .fulfillment-summary-table {
           background-color: #F9FAFB;
           border: 1px solid #E5E7EB;
           border-radius: 6px;
           padding: 12px 16px;
         }
 
-        .tax-summary-title {
+        .fulfillment-summary-title {
           font-size: 10.5px;
           font-weight: 800;
           color: #6B7280;
@@ -641,20 +640,33 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
           margin-bottom: 8px;
         }
 
-        .tax-row {
+        .fulfillment-row {
           display: flex;
           justify-content: space-between;
           font-size: 11.5px;
           color: #4B5563;
-          margin-bottom: 4px;
+          margin-bottom: 5px;
+          align-items: center;
         }
 
-        .tax-total-row {
-          border-top: 1px dashed #D1D5DB;
-          padding-top: 6px;
-          margin-top: 6px;
-          font-weight: 700;
-          color: #111110;
+        .status-tag-delivered {
+          background-color: #DCFCE7;
+          color: #15803D;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-weight: 800;
+          font-size: 10.5px;
+          letter-spacing: 0.04em;
+        }
+
+        .status-tag-transit {
+          background-color: #FEF3C7;
+          color: #B45309;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-weight: 800;
+          font-size: 10.5px;
+          letter-spacing: 0.04em;
         }
 
         .financials-right {
