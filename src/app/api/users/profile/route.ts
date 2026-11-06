@@ -26,6 +26,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "User ID required" }, { status: 400 });
     }
 
+    // Security & IDOR prevention
+    if (authUser && authUser.email?.toLowerCase() !== "nxtiveclothing@gmail.com") {
+      if (queryUid && queryUid !== authUser.uid) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden: Access to other user profiles is denied." },
+          { status: 403 }
+        );
+      }
+    }
+
     let userDoc = await storeReadDocument<any>("users", uid);
 
     if (!userDoc) {
@@ -58,6 +68,16 @@ export async function PATCH(req: NextRequest) {
 
     if (!uid) {
       return NextResponse.json({ success: false, error: "User ID required" }, { status: 400 });
+    }
+
+    // Security & IDOR prevention
+    if (authUser && authUser.email?.toLowerCase() !== "nxtiveclothing@gmail.com") {
+      if (body.uid && body.uid !== authUser.uid) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden: Cannot modify another user's profile." },
+          { status: 403 }
+        );
+      }
     }
 
     const updates: Record<string, any> = {

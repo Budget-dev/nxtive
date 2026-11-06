@@ -2,11 +2,20 @@ import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
 import { shiprocket } from "@/server/delivery/shiprocket";
+import { tryRequireAdmin } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const admin = await tryRequireAdmin(undefined, req).catch(() => null);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized admin access." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const {
       pickup_location,
@@ -62,3 +71,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

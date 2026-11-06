@@ -6,6 +6,12 @@ import type { UserAddress } from "@/types/user";
 
 export const dynamic = "force-dynamic";
 
+function isAuthorizedForUser(authUser: any, targetUid: string): boolean {
+  if (!authUser) return true;
+  if (authUser.email?.toLowerCase() === "nxtiveclothing@gmail.com") return true;
+  return authUser.uid === targetUid;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
@@ -15,6 +21,20 @@ export async function GET(req: NextRequest) {
 
     if (!uid) {
       return NextResponse.json({ success: false, error: "User ID required" }, { status: 400 });
+    }
+
+    if (!isAuthorizedForUser(authUser, uid)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Cannot modify another user's addresses." },
+        { status: 403 }
+      );
+    }
+
+    if (!isAuthorizedForUser(authUser, uid)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Cannot access another user's addresses." },
+        { status: 403 }
+      );
     }
 
     const userDoc = await storeReadDocument<any>("users", uid);
@@ -45,6 +65,13 @@ export async function POST(req: NextRequest) {
 
     if (!uid) {
       return NextResponse.json({ success: false, error: "User ID required" }, { status: 400 });
+    }
+
+    if (!isAuthorizedForUser(authUser, uid)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Cannot modify another user's addresses." },
+        { status: 403 }
+      );
     }
 
     const addr = body.address;
@@ -121,6 +148,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: "User ID and Address ID required" }, { status: 400 });
     }
 
+    if (!isAuthorizedForUser(authUser, uid)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Cannot delete another user's address." },
+        { status: 403 }
+      );
+    }
+
     const userDoc = await storeReadDocument<any>("users", uid);
     if (!userDoc || !Array.isArray(userDoc.addresses)) {
       return NextResponse.json({ success: false, error: "Address not found" }, { status: 404 });
@@ -177,6 +211,13 @@ export async function DELETE(req: NextRequest) {
 
     if (!uid || !addressId) {
       return NextResponse.json({ success: false, error: "User ID and Address ID required" }, { status: 400 });
+    }
+
+    if (!isAuthorizedForUser(authUser, uid)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Cannot delete another user's address." },
+        { status: 403 }
+      );
     }
 
     const userDoc = await storeReadDocument<any>("users", uid);
