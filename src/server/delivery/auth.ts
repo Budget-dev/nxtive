@@ -19,8 +19,14 @@ export class ShiprocketAuthError extends Error {
  * Tokens are cached in-memory and automatically refreshed upon expiration (7-day cycle).
  */
 export async function getShiprocketAuthToken(forceRefresh = false): Promise<string> {
-  const email = process.env.SHIPROCKET_EMAIL?.trim();
-  const password = process.env.SHIPROCKET_PASSWORD?.trim();
+  const email =
+    process.env.SHIPROCKET_EMAIL?.trim() ||
+    process.env.NEXT_PUBLIC_SHIPROCKET_EMAIL?.trim() ||
+    "hr@budgetdev.in";
+  const password =
+    process.env.SHIPROCKET_PASSWORD?.trim() ||
+    process.env.NEXT_PUBLIC_SHIPROCKET_PASSWORD?.trim() ||
+    "OYoF07Ja^VYXlnGi^Ph8uAETn2Y0ugG1";
 
   // If credentials are not provided, fallback to direct static token if provided
   if (!email || !password) {

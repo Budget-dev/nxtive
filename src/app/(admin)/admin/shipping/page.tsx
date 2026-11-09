@@ -59,15 +59,15 @@ export default function AdminShippingPage() {
   const [pickupError, setPickupError] = useState<string | null>(null);
 
   // Pickup form fields
-  const [pickupLocationName, setPickupLocationName] = useState("Primary");
-  const [pickupContactName, setPickupContactName] = useState("NXTIVE Dispatch Desk");
-  const [pickupEmail, setPickupEmail] = useState("hr@budgetdev.in");
-  const [pickupPhone, setPickupPhone] = useState("9820199882");
-  const [pickupAddress, setPickupAddress] = useState("Unit 14/B, Sun Mill Compound");
-  const [pickupAddress2, setPickupAddress2] = useState("Lower Parel");
-  const [pickupCity, setPickupCity] = useState("Mumbai");
-  const [pickupState, setPickupState] = useState("Maharashtra");
-  const [pickupPincode, setPickupPincode] = useState("400013");
+  const [pickupLocationName, setPickupLocationName] = useState("uppal");
+  const [pickupContactName, setPickupContactName] = useState("sandeepkumar");
+  const [pickupEmail, setPickupEmail] = useState("zakkulasandeep@gmail.com");
+  const [pickupPhone, setPickupPhone] = useState("9700446690");
+  const [pickupAddress, setPickupAddress] = useState("2-2-127/49/1 uppal vijayapuri colony");
+  const [pickupAddress2, setPickupAddress2] = useState("uppal");
+  const [pickupCity, setPickupCity] = useState("hyderabad");
+  const [pickupState, setPickupState] = useState("telangana");
+  const [pickupPincode, setPickupPincode] = useState("500039");
 
   const loadProviders = async () => {
     setLoading(true);

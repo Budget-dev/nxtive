@@ -247,7 +247,7 @@ export class ShiprocketService {
         ? [rawAddresses]
         : [];
 
-      const configuredPickup = process.env.SHIPROCKET_PICKUP_LOCATION || "Primary";
+      const configuredPickup = process.env.SHIPROCKET_PICKUP_LOCATION || "uppal";
       const hasPickupLocation = pickupLocations.length > 0;
 
       // 2. Fetch live available couriers via serviceability check
@@ -297,7 +297,7 @@ export class ShiprocketService {
         connected: false,
         pickupLocations: [],
         hasPickupLocation: false,
-        defaultPickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Primary",
+        defaultPickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "uppal",
         availableCouriers: [],
         pingMs: Date.now() - startTime,
         error: err?.message || "Failed to connect to Shiprocket API.",
