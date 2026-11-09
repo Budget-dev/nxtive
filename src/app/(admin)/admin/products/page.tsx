@@ -117,7 +117,15 @@ export default function AdminProductsPage() {
     setDeletingId(id);
     setShowConfirmModal(null);
     try {
-      await deleteDoc(doc(db, "products", id));
+      try {
+        await deleteDoc(doc(db, "products", id));
+      } catch (clientDelErr) {
+        console.warn("[admin/products] Direct deleteDoc fallback to /api/products:", clientDelErr);
+        const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (!res.ok) {
+          throw clientDelErr;
+        }
+      }
       invalidateCatalogCache();
       if (cachedAdminRawProducts) {
         cachedAdminRawProducts = cachedAdminRawProducts.filter((p) => p.id !== id);
@@ -148,7 +156,19 @@ export default function AdminProductsPage() {
   const handleToggleActive = async (p: Product) => {
     const updated = { ...p, isActive: !p.isActive, updatedAt: new Date().toISOString() };
     try {
-      await setDoc(doc(db, "products", p.id), updated, { merge: true });
+      try {
+        await setDoc(doc(db, "products", p.id), updated, { merge: true });
+      } catch (clientUpdErr) {
+        console.warn("[admin/products] Direct toggle fallback to /api/products:", clientUpdErr);
+        const res = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updated),
+        });
+        if (!res.ok) {
+          throw clientUpdErr;
+        }
+      }
       invalidateCatalogCache();
       setProducts((prev) => prev.map((item) => (item.id === p.id ? updated : item)));
     } catch (err) {

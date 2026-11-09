@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { storeReadCollection } from "@/lib/firebase/firestore-store";
+import { storeReadCollection, storeSetDocument, storeDeleteDocument } from "@/lib/firebase/firestore-store";
 import { normalizeCategory, DEFAULT_CATEGORIES } from "@/lib/catalog";
 import type { Category } from "@/types/product";
 
@@ -29,5 +29,44 @@ export async function GET() {
   } catch (error) {
     console.error("[api/categories] Error fetching categories:", error);
     return NextResponse.json({ success: true, categories: DEFAULT_CATEGORIES });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    if (!body || typeof body !== "object" || !body.id) {
+      return NextResponse.json({ success: false, error: "Invalid category payload" }, { status: 400 });
+    }
+
+    await storeSetDocument("categories", body.id, body);
+
+    return NextResponse.json({ success: true, id: body.id }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error: any) {
+    console.error("[api/categories POST] Error saving category:", error);
+    return NextResponse.json(
+      { success: false, error: error?.message || "Failed to save category" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Category id is required" }, { status: 400 });
+    }
+
+    await storeDeleteDocument("categories", id);
+
+    return NextResponse.json({ success: true, id }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error: any) {
+    console.error("[api/categories DELETE] Error deleting category:", error);
+    return NextResponse.json(
+      { success: false, error: error?.message || "Failed to delete category" },
+      { status: 500 }
+    );
   }
 }

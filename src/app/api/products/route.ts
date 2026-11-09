@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { storeReadCollection, storeSetDocument } from "@/lib/firebase/firestore-store";
+import { storeReadCollection, storeSetDocument, storeDeleteDocument } from "@/lib/firebase/firestore-store";
 import { normalizeProduct } from "@/lib/catalog";
 import type { Product } from "@/types/product";
 
@@ -73,6 +73,33 @@ export async function POST(request: Request) {
     console.error("[api/products POST] Error saving product:", error);
     return NextResponse.json(
       { success: false, error: error?.message || "Failed to save product" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Product id is required" }, { status: 400 });
+    }
+
+    await storeDeleteDocument("products", id);
+
+    return NextResponse.json(
+      { success: true, id },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error("[api/products DELETE] Error deleting product:", error);
+    return NextResponse.json(
+      { success: false, error: error?.message || "Failed to delete product" },
       { status: 500 }
     );
   }

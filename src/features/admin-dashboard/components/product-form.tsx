@@ -91,18 +91,29 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
     setCreatingCategory(true);
     try {
       const catSlug = slugify(trimmed);
-      await setDoc(
-        doc(db, "categories", catSlug),
-        {
-          id: catSlug,
-          name: trimmed,
-          title: trimmed,
-          slug: catSlug,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      const catDoc = {
+        id: catSlug,
+        name: trimmed,
+        title: trimmed,
+        slug: catSlug,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await setDoc(doc(db, "categories", catSlug), catDoc, { merge: true });
+      } catch (catClientErr) {
+        console.warn("[product-form] Direct category setDoc fallback to /api/categories:", catClientErr);
+        const res = await fetch("/api/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(catDoc),
+        });
+        if (!res.ok) {
+          throw catClientErr;
+        }
+      }
 
       setCategoryOptions((prev) => Array.from(new Set([...prev, trimmed])));
       setCategory(trimmed as ProductCategory);
@@ -277,7 +288,20 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         updatedAt: now,
       };
 
-      await setDoc(prodRef, fullDoc, { merge: true });
+      try {
+        await setDoc(prodRef, fullDoc, { merge: true });
+      } catch (clientErr: any) {
+        console.warn("[product-form] Direct setDoc fallback to /api/products:", clientErr);
+        const res = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fullDoc),
+        });
+        const resData = await res.json();
+        if (!res.ok || !resData.success) {
+          throw new Error(resData?.error || clientErr?.message || "Failed to save product.");
+        }
+      }
 
       invalidateCatalogCache();
       setMessage({

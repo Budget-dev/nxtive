@@ -107,10 +107,22 @@ export default function AdminCategoriesPage() {
         isActive: true,
       };
 
-      await setDoc(doc(db, "categories", categoryData.id), {
-        ...categoryData,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      try {
+        await setDoc(doc(db, "categories", categoryData.id), {
+          ...categoryData,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (clientCatErr) {
+        console.warn("[admin/categories] Direct setDoc fallback to /api/categories:", clientCatErr);
+        const res = await fetch("/api/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(categoryData),
+        });
+        if (!res.ok) {
+          throw clientCatErr;
+        }
+      }
 
       invalidateCatalogCache();
 
