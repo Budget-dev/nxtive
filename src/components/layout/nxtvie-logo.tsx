@@ -9,6 +9,7 @@ interface NxtvieLogoProps {
   className?: string;
   style?: React.CSSProperties;
   height?: number;
+  markOnly?: boolean;
 }
 
 export function NxtvieLogo({
@@ -17,6 +18,7 @@ export function NxtvieLogo({
   className = "",
   style,
   height,
+  markOnly = false,
 }: NxtvieLogoProps) {
   const isWhite =
     color === "#FFFFFF" ||
@@ -25,6 +27,34 @@ export function NxtvieLogo({
     color === "white";
 
   const logoHeight = height || Math.max(size, 26);
+
+  if (markOnly) {
+    return (
+      <div
+        className={`nxtive-logo-wrap ${className}`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          lineHeight: 1,
+          userSelect: "none",
+          ...style,
+        }}
+      >
+        <img
+          src={isWhite ? "/images/logo/nxtive-mark-white.png" : "/images/logo/nxtive-mark-black.png"}
+          alt="NXTIVE"
+          height={logoHeight}
+          style={{
+            height: `${logoHeight}px`,
+            width: "auto",
+            maxWidth: "100%",
+            display: "block",
+            objectFit: "contain",
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div

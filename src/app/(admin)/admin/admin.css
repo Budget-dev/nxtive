@@ -911,3 +911,28 @@
   color: #FFFFFF;
   border-color: #121110;
 }
+
+/* Mobile topbar logo */
+.admin-mobile-toggle {
+  display: none;
+}
+
+.admin-mobile-logo {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .admin-mobile-toggle {
+    display: flex !important;
+  }
+  .admin-mobile-logo {
+    display: inline-flex !important;
+    align-items: center;
+  }
+}
+
+.admin-sidebar.collapsed .admin-sidebar-header {
+  padding: 18px 12px;
+  justify-content: center;
+  gap: 8px;
+}

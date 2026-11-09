@@ -9,6 +9,7 @@ import { AdminTopbar } from "./admin-topbar";
 import { auth } from "@/lib/firebase/client";
 import { signOut } from "firebase/auth";
 import Link from "next/link";
+import { NxtvieLogo } from "@/components/layout/nxtvie-logo";
 
 function AdminContentShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -55,6 +56,9 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
           color: "#121110",
         }}
       >
+        <div style={{ marginBottom: "8px" }}>
+          <NxtvieLogo size={28} color="#121110" />
+        </div>
         <div
           style={{
             width: "42px",

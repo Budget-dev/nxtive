@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Settings,
   Database,
+  BookOpen,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
@@ -25,6 +26,7 @@ import {
 import { useAdminAuth } from "./admin-auth-context";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { NxtvieLogo } from "@/components/layout/nxtvie-logo";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -87,10 +89,6 @@ const SIDEBAR_ITEMS: NavSection[] = [
     label: "Customers",
     icon: Users,
     href: "/admin/customers",
-    children: [
-      { label: "All Customers", href: "/admin/customers" },
-      { label: "VIP Segments", href: "/admin/customers?segment=vip" },
-    ],
   },
   {
     id: "reviews",
@@ -155,6 +153,12 @@ const SIDEBAR_ITEMS: NavSection[] = [
       { label: "Collections Overview", href: "/admin/database" },
       { label: "Initialize Collections", href: "/admin/database" },
     ],
+  },
+  {
+    id: "manual",
+    label: "Operations Manual",
+    icon: BookOpen,
+    href: "/admin/manual",
   },
 ];
 
@@ -232,15 +236,17 @@ export function AdminSidebar({
       <aside className={`admin-sidebar ${isOpen ? "open" : ""} ${collapsed ? "collapsed" : ""}`}>
         {/* Brand Header */}
         <div className="admin-sidebar-header">
-          <Link href="/admin/dashboard" className="admin-brand" onClick={onClose}>
-            {/* Geometric diamond logo mark matching reference */}
-            <div className="admin-brand-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polygon points="12 2 2 12 12 22 22 12 12 2" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-              </svg>
-            </div>
-            {!collapsed && <span className="admin-brand-title">NXTIVE</span>}
+          <Link
+            href="/admin/dashboard"
+            className="admin-brand"
+            onClick={onClose}
+            aria-label="NXTIVE Admin Dashboard"
+          >
+            <NxtvieLogo
+              size={collapsed ? 22 : 24}
+              color="#121110"
+              markOnly={collapsed}
+            />
           </Link>
 
           {/* Collapse / Expand Toggle Button (matching `|<<` in reference) */}
@@ -394,11 +400,7 @@ export function AdminSidebar({
             />
             <div className="admin-sidebar-promo-content">
               <div className="admin-sidebar-promo-brand">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polygon points="12 2 2 12 12 22 22 12 12 2" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                </svg>
-                <span>NXTIVE</span>
+                <NxtvieLogo size={18} color="#FFFFFF" />
               </div>
               <div className="admin-sidebar-promo-title">
                 Modern Menswear for New Generations.

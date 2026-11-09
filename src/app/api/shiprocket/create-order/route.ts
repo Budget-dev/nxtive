@@ -29,9 +29,13 @@ export async function POST(req: NextRequest) {
 
     const result = await shiprocket.createShipmentForOrder(orderId, { pickupLocation });
 
+    const message = result.awbNotice
+      ? `Order registered in Shiprocket (Shipment #${result.shipmentId}). Note: ${result.awbNotice}`
+      : "Shiprocket shipment created and consignment AWB assigned.";
+
     return NextResponse.json({
       success: true,
-      message: "Shiprocket shipment created and consignment AWB assigned.",
+      message,
       data: result,
     });
   } catch (err: any) {

@@ -1,0 +1,22 @@
+{
+  "name": "NXTIVE | Homegrown Streetwear & Urban Apparel",
+  "short_name": "NXTIVE",
+  "description": "Premium oversized tees, heavyweight hoodies, and urban essentials designed in India.",
+  "icons": [
+    {
+      "src": "/images/logo/nxtive-mark-black.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/logo/nxtive-mark-black.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0D0C0A",
+  "background_color": "#0D0C0A",
+  "start_url": "/",
+  "display": "standalone"
+}
+

@@ -211,7 +211,7 @@ function getCustomerFromUser(id: string, raw: Record<string, unknown>): Customer
     lastActivity: String(raw.lastActivity ?? raw.updatedAt ?? raw.createdAt ?? new Date().toISOString()),
     addresses,
     avatarUrl: typeof raw.avatarUrl === "string" ? raw.avatarUrl : typeof raw.photoURL === "string" ? raw.photoURL : undefined,
-    segmentTier: (raw.segmentTier as Customer["segmentTier"]) || (isAdminUser ? "VIP" : Number(raw.totalSpent || 0) > 5000 ? "VIP" : Number(raw.ordersCount || 0) > 0 ? "Regular" : "New"),
+    segmentTier: (raw.segmentTier as Customer["segmentTier"]) || (Number(raw.ordersCount || 0) > 0 ? "Regular" : "New"),
     notes: typeof raw.notes === "string" ? raw.notes : isAdminUser ? `Role: ${role || "Admin"}` : undefined,
   };
 }

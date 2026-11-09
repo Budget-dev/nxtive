@@ -38,6 +38,7 @@ export class ShiprocketService {
 
     let awbCode = srOrderResponse.awb_code;
     let courierName = srOrderResponse.courier_name || "Shiprocket Express";
+    let awbNotice: string | null = null;
 
     // 2. If AWB not automatically assigned in creation, assign it via AWB API
     if (!awbCode && srOrderResponse.shipment_id) {
@@ -47,7 +48,8 @@ export class ShiprocketService {
           awbCode = awbRes.response.data.awb_code;
           courierName = awbRes.response.data.courier_name || courierName;
         }
-      } catch (awbErr) {
+      } catch (awbErr: any) {
+        awbNotice = awbErr?.message || "Courier assignment pending wallet recharge.";
         console.warn(`[ShiprocketService]: Automatic AWB generation deferred for shipment ${srOrderResponse.shipment_id}:`, awbErr);
       }
     }
@@ -56,13 +58,17 @@ export class ShiprocketService {
     const finalAwb = awbCode || `SR-${srOrderResponse.shipment_id || srOrderResponse.order_id}`;
     const trackingUrl = tracking.getShiprocketPublicTrackingUrl(finalAwb);
 
+    const historyNote = awbCode
+      ? `Shiprocket consignment created (${courierName}, AWB: ${finalAwb})`
+      : `Shiprocket order #${srOrderResponse.order_id} created (Shipment #${srOrderResponse.shipment_id}). ${awbNotice ? `AWB Notice: ${awbNotice}` : "AWB pending wallet recharge"}`;
+
     const currentHistory = Array.isArray(order.statusHistory) ? order.statusHistory : [];
     const updatedHistory = [
       ...currentHistory,
       {
         status: "shipped",
         timestamp: now,
-        note: `Shiprocket consignment created (${courierName}, AWB: ${finalAwb})`,
+        note: historyNote,
         updatedBy: "system",
       },
     ];
@@ -116,6 +122,7 @@ export class ShiprocketService {
       awbCode: finalAwb,
       courierName,
       trackingUrl,
+      awbNotice,
     };
   }
 

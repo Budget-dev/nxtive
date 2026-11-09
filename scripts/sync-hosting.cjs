@@ -38,7 +38,7 @@ function copyHtmlFiles(dir, relativePath = '') {
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
       copyHtmlFiles(fullPath, rel);
-    } else if (item.endsWith('.html') || item.endsWith('.rsc') || item.endsWith('.meta')) {
+    } else if (item.endsWith('.html') || item.endsWith('.rsc') || item.endsWith('.meta') || item.endsWith('.txt') || item.endsWith('.xml')) {
       const cleanRel = rel.replace(/\([^\)]+\)[\\/]/g, '');
       const destPath = path.join(HOSTING_DIR, cleanRel);
       const parent = path.dirname(destPath);

@@ -218,20 +218,6 @@ export default function AdminCustomersPage() {
                               >
                                 Admin
                               </span>
-                            ) : c.segmentTier === "VIP" ? (
-                              <span
-                                style={{
-                                  marginLeft: "6px",
-                                  fontSize: "10px",
-                                  fontWeight: 800,
-                                  backgroundColor: "#FEF7E0",
-                                  color: "#B06000",
-                                  padding: "1px 6px",
-                                  borderRadius: "4px",
-                                }}
-                              >
-                                VIP
-                              </span>
                             ) : null}
                           </div>
                         </div>

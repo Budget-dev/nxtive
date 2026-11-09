@@ -355,7 +355,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (clean === "NXTIVE20") {
       setCouponCode("NXTIVE20");
       setDiscountRate(0.2);
-      showToast("VIP Coupon NXTIVE20 applied: 20% discount!");
+      showToast("Coupon NXTIVE20 applied: 20% discount!");
       return true;
     }
     showToast("Invalid promo code. Try NEXT10.");

@@ -18,6 +18,7 @@ import {
   User,
   CheckCircle2,
 } from "lucide-react";
+import { NxtvieLogo } from "@/components/layout/nxtvie-logo";
 import { useAdminAuth } from "./admin-auth-context";
 
 interface TopbarProps {
@@ -76,13 +77,21 @@ export function AdminTopbar({ onToggleSidebar }: TopbarProps) {
         {/* Mobile toggle button */}
         <button
           onClick={onToggleSidebar}
-          className="admin-icon-button"
+          className="admin-icon-button admin-mobile-toggle"
           aria-label="Open navigation menu"
-          style={{ display: "none" }}
           id="admin-mobile-menu-btn"
         >
           <Menu size={20} />
         </button>
+
+        {/* Mobile Brand Logo */}
+        <Link
+          href="/admin/dashboard"
+          className="admin-mobile-logo"
+          aria-label="NXTIVE Admin"
+        >
+          <NxtvieLogo size={22} color="#121110" />
+        </Link>
 
         {/* Global Search Bar matching reference image */}
         <form onSubmit={handleGlobalSearch} className="admin-search-wrapper">

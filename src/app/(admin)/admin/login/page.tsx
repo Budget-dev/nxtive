@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAdminAuth } from "@/features/admin-dashboard/components/admin-auth-context";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { NxtvieLogo } from "@/components/layout/nxtvie-logo";
 import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Loader2, ShieldCheck, CheckCircle2 } from "lucide-react";
 
 export default function AdminLoginPage() {
@@ -96,23 +97,10 @@ export default function AdminLoginPage() {
       >
         {/* Brand Header */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div
-            style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "10px",
-              background: "#FFFFFF",
-              margin: "0 auto 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#0A0A0A",
-              fontWeight: 900,
-              fontSize: "1.3rem",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            N
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "18px" }}>
+            <Link href="/" aria-label="NXTIVE Home" style={{ display: "inline-flex" }}>
+              <NxtvieLogo size={32} color="#FFFFFF" />
+            </Link>
           </div>
           <h1
             style={{

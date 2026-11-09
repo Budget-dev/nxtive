@@ -52,7 +52,7 @@ export interface Customer {
   lastActivity: string;
   addresses?: UserAddress[];
   avatarUrl?: string;
-  segmentTier?: "VIP" | "Regular" | "New";
+  segmentTier?: "Regular" | "New";
   notes?: string;
 }
 

@@ -62,9 +62,12 @@ export async function POST(req: NextRequest) {
     if (action === "create_shipment") {
       try {
         const shipmentData = await shiprocket.createShipmentForOrder(orderId);
+        const successMsg = shipmentData.awbNotice
+          ? `Shiprocket order #${shipmentData.shiprocketOrderId} created (Shipment #${shipmentData.shipmentId}). AWB Note: ${shipmentData.awbNotice}`
+          : "Shiprocket consignment created successfully.";
         return NextResponse.json({
           success: true,
-          message: "Shiprocket consignment created successfully.",
+          message: successMsg,
           data: shipmentData,
         });
       } catch (apiErr: any) {

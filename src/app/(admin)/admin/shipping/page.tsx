@@ -482,7 +482,7 @@ export default function AdminShippingPage() {
                 marginTop: "4px",
               }}
             >
-              {srStatus?.hasPickupLocation ? "Registered ('Primary')" : "Action Required"}
+              {srStatus?.hasPickupLocation ? `Registered ('${srStatus?.defaultPickupLocation || "uppal"}')` : "Action Required"}
             </div>
             <div style={{ fontSize: "12px", color: srStatus?.hasPickupLocation ? "#166534" : "#92400E", marginTop: "3px" }}>
               {srStatus?.hasPickupLocation
@@ -614,6 +614,45 @@ export default function AdminShippingPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Wallet Balance Advisory */}
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "12px 16px",
+              borderRadius: "8px",
+              backgroundColor: "#EFF6FF",
+              border: "1px solid #BFDBFE",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "16px" }}>💳</span>
+              <div style={{ fontSize: "12.5px", color: "#1E40AF" }}>
+                <strong>Shiprocket Live AWB Notice:</strong> Generating official carrier AWBs requires a minimum ₹100 prepaid balance in your Shiprocket account wallet. When balance is ₹0, consignments are registered in Shiprocket pending courier assignment.
+              </div>
+            </div>
+            <a
+              href="https://app.shiprocket.in/billing-dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                padding: "5px 12px",
+                borderRadius: "6px",
+                backgroundColor: "#2563EB",
+                color: "#FFFFFF",
+                fontSize: "12px",
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              Recharge Wallet →
+            </a>
           </div>
         </div>
       </div>
