@@ -36,6 +36,11 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
     }
   }, [isAdmin, isAuthorized, loading, isLoginPage, router]);
 
+  // If on login page, render clean login view directly without admin shell or global loading unmount
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
   if (loading) {
     return (
       <div
@@ -66,11 +71,6 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
-  }
-
-  // If on login page, render clean login view without admin shell
-  if (isLoginPage) {
-    return <>{children}</>;
   }
 
   // If signed in with an unauthorized account, show Access Denied

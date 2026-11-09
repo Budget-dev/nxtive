@@ -51,7 +51,11 @@ export function assertSameOrigin(request: Request): void {
   const isLocal = (cleanHost === "localhost" || cleanHost === "127.0.0.1") &&
                   (cleanOriginHost === "localhost" || cleanOriginHost === "127.0.0.1");
 
-  if (!isMatch && !isLocal) {
+  const isAllowedDomainPair =
+    (cleanHost === "nxtive.in" || cleanHost.endsWith(".nxtive.in")) &&
+    (cleanOriginHost === "nxtive.in" || cleanOriginHost.endsWith(".nxtive.in"));
+
+  if (!isMatch && !isLocal && !isAllowedDomainPair) {
     throw new AuthError("Invalid request origin", 403);
   }
 }
