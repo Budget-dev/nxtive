@@ -3,7 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useAdminAuth } from "@/features/admin-dashboard/components/admin-auth-context";
-import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase/client";
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Loader2, ShieldCheck, CheckCircle2 } from "lucide-react";
 
 export default function AdminLoginPage() {
   const { loginAsAdmin, loginWithGoogleAsAdmin } = useAdminAuth();
@@ -11,6 +13,8 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -47,6 +51,7 @@ export default function AdminLoginPage() {
 
   const handleGoogleSignIn = async () => {
     setError(null);
+    setResetSuccess(null);
     setGoogleLoading(true);
     try {
       await loginWithGoogleAsAdmin();
@@ -54,6 +59,20 @@ export default function AdminLoginPage() {
       setError(err?.message || "Google sign-in was cancelled or account is unauthorized.");
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    setResetSuccess(null);
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, "nxtiveclothing@gmail.com");
+      setResetSuccess("Password reset email sent to nxtiveclothing@gmail.com! Check your inbox to choose a new password.");
+    } catch (err: any) {
+      setError(err?.message || "Failed to send password reset email.");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -154,6 +173,27 @@ export default function AdminLoginPage() {
             >
               <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
               <div>{error}</div>
+            </div>
+          )}
+
+          {resetSuccess && (
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(16, 185, 129, 0.12)",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                color: "#34D399",
+                fontSize: "0.82rem",
+                lineHeight: "1.45",
+                marginBottom: "20px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "10px",
+              }}
+            >
+              <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+              <div>{resetSuccess}</div>
             </div>
           )}
 
@@ -280,19 +320,37 @@ export default function AdminLoginPage() {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  color: "#888888",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  marginBottom: "6px",
-                }}
-              >
-                Password
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    color: "#888888",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#D19B68",
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    cursor: resetLoading ? "not-allowed" : "pointer",
+                    padding: 0,
+                    textDecoration: "underline",
+                  }}
+                >
+                  {resetLoading ? "Sending reset..." : "Forgot password?"}
+                </button>
+              </div>
               <div style={{ position: "relative" }}>
                 <Lock
                   size={15}

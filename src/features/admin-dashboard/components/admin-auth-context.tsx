@@ -210,8 +210,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         firebaseUser = result.user;
       } catch (authErr: any) {
         console.warn("Direct Firebase Auth signin notice:", authErr);
-        // If password account doesn't exist yet in Firebase Auth, attempt auto-creation
-        if (authErr?.code === "auth/user-not-found" || authErr?.code === "auth/invalid-credential") {
+        if (authErr?.code === "auth/invalid-credential" || authErr?.code === "auth/wrong-password") {
+          throw new Error("Invalid password for nxtiveclothing@gmail.com. Please enter your correct password, click 'Forgot password?' to set a new password, or use 'Continue with Google'.");
+        }
+        if (authErr?.code === "auth/user-not-found") {
           try {
             const signupRes = await createUserWithEmailAndPassword(auth, email.trim(), pass);
             firebaseUser = signupRes.user;
