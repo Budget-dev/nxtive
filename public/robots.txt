@@ -15,3 +15,4 @@ Disallow: /api/admin
 Disallow: /api/admin/
 
 Sitemap: https://nxtive.in/sitemap.xml
+
