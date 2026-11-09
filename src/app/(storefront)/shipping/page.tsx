@@ -21,12 +21,78 @@ export const metadata: Metadata = {
     title: "Shipping & Delivery Policy | NXTIVE",
     description: "Domestic shipping details, delivery timelines, and courier tracking.",
     url: "https://nxtive.in/shipping",
+    images: [
+      {
+        url: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+        width: 1200,
+        height: 630,
+        alt: "NXTIVE Shipping & Delivery",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Shipping & Delivery Policy | NXTIVE",
+    description: "Domestic shipping details, delivery timelines, and courier tracking.",
+    images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const shippingJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://nxtive.in/shipping#webpage",
+      url: "https://nxtive.in/shipping",
+      name: "Shipping & Delivery Policy | NXTIVE",
+      description: "Domestic delivery timelines, shipping partners, and tracking across India.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Shipping Policy",
+          item: "https://nxtive.in/shipping",
+        },
+      ],
+    },
+  ],
 };
 
 export default function ShippingPolicyPage() {
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(shippingJsonLd) }}
+      />
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
       <div className="container" style={{ maxWidth: "860px" }}>
         {/* Header */}
         <div style={{ marginBottom: "36px" }}>
@@ -203,5 +269,6 @@ export default function ShippingPolicyPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

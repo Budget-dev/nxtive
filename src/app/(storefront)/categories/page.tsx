@@ -41,6 +41,53 @@ export const metadata: Metadata = {
     description: "Explore all official NXTIVE streetwear collections.",
     images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const categoriesJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "CollectionPage",
+      "@id": "https://nxtive.in/categories#webpage",
+      url: "https://nxtive.in/categories",
+      name: "Categories & Collections — NXTIVE Streetwear India",
+      description: "Explore all official NXTIVE streetwear collections: Heavyweight Oversized T-Shirts, Hoodies, Casual Shirts, Cargos & Trousers, Layering Jackets.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Categories",
+          item: "https://nxtive.in/categories",
+        },
+      ],
+    },
+  ],
 };
 
 export const revalidate = 60;
@@ -52,7 +99,12 @@ export default async function CategoriesIndexPage() {
   ]);
   const categories = storedCategories.length > 0 ? storedCategories : categoriesFromProducts(products);
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(categoriesJsonLd) }}
+      />
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
       <div className="container">
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: "48px" }}>
@@ -208,5 +260,6 @@ export default async function CategoriesIndexPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

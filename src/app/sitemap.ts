@@ -97,24 +97,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.65,
     },
-    {
-      url: `${baseUrl}/orders`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/wishlist`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/account`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.5,
-    },
   ];
 
   // Category landing pages (static + dynamic)

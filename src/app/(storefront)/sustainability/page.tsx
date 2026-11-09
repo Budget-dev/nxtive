@@ -30,7 +30,68 @@ export const metadata: Metadata = {
     title: "Sustainability & Conscious Craft | NXTIVE",
     description: "100% GOTS organic cotton, ethical boutique mills, and zero-plastic packaging.",
     url: "https://nxtive.in/sustainability",
+    images: [
+      {
+        url: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+        width: 1200,
+        height: 630,
+        alt: "NXTIVE Conscious Streetwear",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sustainability & Conscious Craft | NXTIVE",
+    description: "100% GOTS organic cotton, ethical boutique mills, and zero-plastic packaging.",
+    images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const sustainabilityJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://nxtive.in/sustainability#webpage",
+      url: "https://nxtive.in/sustainability",
+      name: "Sustainability & Conscious Craft | NXTIVE",
+      description: "100% GOTS organic cotton, closed-loop reactive dyeing, and zero-plastic packaging.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Sustainability",
+          item: "https://nxtive.in/sustainability",
+        },
+      ],
+    },
+  ],
 };
 
 export default function SustainabilityPage() {
@@ -89,7 +150,12 @@ export default function SustainabilityPage() {
   ];
 
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "100vh", paddingBottom: "100px" }}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(sustainabilityJsonLd) }}
+      />
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "100vh", paddingBottom: "100px" }}>
       {/* Hero Header */}
       <section
         style={{
@@ -429,5 +495,6 @@ export default function SustainabilityPage() {
         </div>
       </section>
     </div>
+    </>
   );
 }

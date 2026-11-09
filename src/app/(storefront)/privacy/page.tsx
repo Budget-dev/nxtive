@@ -13,12 +13,78 @@ export const metadata: Metadata = {
     title: "Privacy Policy | NXTIVE",
     description: "Our commitment to protecting your personal information and privacy.",
     url: "https://nxtive.in/privacy",
+    images: [
+      {
+        url: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+        width: 1200,
+        height: 630,
+        alt: "NXTIVE Privacy Policy",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy Policy | NXTIVE",
+    description: "Our commitment to protecting your personal information and privacy.",
+    images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const privacyJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://nxtive.in/privacy#webpage",
+      url: "https://nxtive.in/privacy",
+      name: "Privacy Policy | NXTIVE",
+      description: "How NXTIVE collects, protects, and respects your personal information and transaction data.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Privacy Policy",
+          item: "https://nxtive.in/privacy",
+        },
+      ],
+    },
+  ],
 };
 
 export default function PrivacyPolicyPage() {
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(privacyJsonLd) }}
+      />
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
       <div className="container" style={{ maxWidth: "800px" }}>
         {/* Header */}
         <div style={{ marginBottom: "36px" }}>
@@ -144,5 +210,6 @@ export default function PrivacyPolicyPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

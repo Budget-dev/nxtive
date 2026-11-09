@@ -20,12 +20,78 @@ export const metadata: Metadata = {
     title: "Returns & Exchanges Policy | NXTIVE",
     description: "Easy 7-day doorstep size exchange and return policy across India.",
     url: "https://nxtive.in/returns",
+    images: [
+      {
+        url: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+        width: 1200,
+        height: 630,
+        alt: "NXTIVE Returns & Exchanges",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Returns & Exchanges Policy | NXTIVE",
+    description: "Easy 7-day doorstep size exchange and return policy across India.",
+    images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const returnsJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://nxtive.in/returns#webpage",
+      url: "https://nxtive.in/returns",
+      name: "Returns & Exchanges Policy | NXTIVE",
+      description: "Hassle-free 7-day return and doorstep exchange policy across India.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Returns Policy",
+          item: "https://nxtive.in/returns",
+        },
+      ],
+    },
+  ],
 };
 
 export default function ReturnsPolicyPage() {
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(returnsJsonLd) }}
+      />
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
       <div className="container" style={{ maxWidth: "860px" }}>
         {/* Header */}
         <div style={{ marginBottom: "36px" }}>
@@ -218,5 +284,6 @@ export default function ReturnsPolicyPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

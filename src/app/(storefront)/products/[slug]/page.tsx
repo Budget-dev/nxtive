@@ -71,6 +71,17 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       description,
       images: [primaryImage],
     },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-video-preview": -1,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
+    },
   };
 }
 
@@ -85,32 +96,60 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const productJsonLd = {
     "@context": "https://schema.org",
-    "@type": "Product",
-    name: product.title,
-    image: product.images && product.images.length > 0 ? product.images : [product.image],
-    description:
-      product.description ||
-      `Shop ${product.title} by NXTIVE. Homegrown Indian streetwear.`,
-    sku: product.sku || product.id,
-    brand: {
-      "@type": "Brand",
-      name: "NXTIVE",
-    },
-    offers: {
-      "@type": "Offer",
-      url: `https://nxtive.in/products/${product.slug || product.id}`,
-      priceCurrency: "INR",
-      price: product.price,
-      itemCondition: "https://schema.org/NewCondition",
-      availability:
-        product.inStock !== false
-          ? "https://schema.org/InStock"
-          : "https://schema.org/OutOfStock",
-      seller: {
-        "@type": "Organization",
-        name: "NXTIVE",
+    "@graph": [
+      {
+        "@type": "Product",
+        "@id": `https://nxtive.in/products/${product.slug || product.id}#product`,
+        name: product.title,
+        image: product.images && product.images.length > 0 ? product.images : [product.image],
+        description:
+          product.description ||
+          `Shop ${product.title} by NXTIVE. Homegrown Indian streetwear.`,
+        sku: product.sku || product.id,
+        brand: {
+          "@type": "Brand",
+          name: "NXTIVE",
+        },
+        offers: {
+          "@type": "Offer",
+          url: `https://nxtive.in/products/${product.slug || product.id}`,
+          priceCurrency: "INR",
+          price: product.price,
+          itemCondition: "https://schema.org/NewCondition",
+          availability:
+            product.inStock !== false
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+          seller: {
+            "@type": "Organization",
+            name: "NXTIVE",
+          },
+        },
       },
-    },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: "https://nxtive.in",
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Products",
+            item: "https://nxtive.in/products",
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: product.title,
+            item: `https://nxtive.in/products/${product.slug || product.id}`,
+          },
+        ],
+      },
+    ],
   };
 
   return (

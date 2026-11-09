@@ -13,12 +13,78 @@ export const metadata: Metadata = {
     title: "Terms of Service | NXTIVE",
     description: "Terms and conditions for NXTIVE apparel purchases and services.",
     url: "https://nxtive.in/terms",
+    images: [
+      {
+        url: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+        width: 1200,
+        height: 630,
+        alt: "NXTIVE Terms of Service",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service | NXTIVE",
+    description: "Terms and conditions for NXTIVE apparel purchases and services.",
+    images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const termsJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://nxtive.in/terms#webpage",
+      url: "https://nxtive.in/terms",
+      name: "Terms of Service | NXTIVE",
+      description: "Terms and conditions governing the purchase, browsing, and use of NXTIVE services and products.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Terms of Service",
+          item: "https://nxtive.in/terms",
+        },
+      ],
+    },
+  ],
 };
 
 export default function TermsOfServicePage() {
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(termsJsonLd) }}
+      />
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
       <div className="container" style={{ maxWidth: "800px" }}>
         {/* Header */}
         <div style={{ marginBottom: "36px" }}>
@@ -122,5 +188,6 @@ export default function TermsOfServicePage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

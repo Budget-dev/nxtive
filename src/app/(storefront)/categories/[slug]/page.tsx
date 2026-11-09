@@ -60,6 +60,17 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
       description,
       images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
     },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-video-preview": -1,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
+    },
   };
 }
 
@@ -91,12 +102,60 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   const products = productsForCategory(catalog, normalizedSlug);
 
+  const categoryJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": `https://nxtive.in/categories/${normalizedSlug}#webpage`,
+        url: `https://nxtive.in/categories/${normalizedSlug}`,
+        name: `${categoryMeta.name} | NXTIVE Streetwear India`,
+        description: categoryMeta.tagline,
+        isPartOf: {
+          "@type": "WebSite",
+          "@id": "https://nxtive.in/#website",
+          name: "NXTIVE",
+          url: "https://nxtive.in",
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: "https://nxtive.in",
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Categories",
+            item: "https://nxtive.in/categories",
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: categoryMeta.name,
+            item: `https://nxtive.in/categories/${normalizedSlug}`,
+          },
+        ],
+      },
+    ],
+  };
+
   return (
-    <CategoryViewClient
-      category={categoryMeta}
-      initialProducts={products}
-      allCategories={categories}
-      allProducts={catalog}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(categoryJsonLd) }}
+      />
+      <CategoryViewClient
+        category={categoryMeta}
+        initialProducts={products}
+        allCategories={categories}
+        allProducts={catalog}
+      />
+    </>
   );
 }

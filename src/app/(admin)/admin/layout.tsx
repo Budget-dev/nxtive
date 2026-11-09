@@ -5,6 +5,10 @@ import { AdminLayoutShell } from "@/features/admin-dashboard/components/admin-la
 export const metadata = {
   title: "NXTIVE Operations & Admin Panel",
   description: "Apparel catalog, inventory control, Razorpay orders, and customer management",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

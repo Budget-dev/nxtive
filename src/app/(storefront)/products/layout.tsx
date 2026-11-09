@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Shop All Streetwear | Oversized Tees, Hoodies & Pants",
+  title: "Shop All Streetwear | Oversized Tees, Hoodies & Pants | NXTIVE",
   description:
     "Discover the official NXTIVE streetwear catalog. High-GSM oversized t-shirts, heavyweight hoodies, relaxed shirts, and cargo pants designed and crafted in India.",
   keywords: [
@@ -37,6 +37,53 @@ export const metadata: Metadata = {
       "Explore the official NXTIVE catalog. Oversized tees, heavy fleece hoodies, and urban essentials crafted in India.",
     images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const productsCatalogJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "CollectionPage",
+      "@id": "https://nxtive.in/products#webpage",
+      url: "https://nxtive.in/products",
+      name: "Shop All Streetwear | NXTIVE",
+      description: "Official NXTIVE clothing catalog featuring high-GSM oversized t-shirts, hoodies, and cargo pants.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Products",
+          item: "https://nxtive.in/products",
+        },
+      ],
+    },
+  ],
 };
 
 export default function ProductsLayout({
@@ -44,6 +91,13 @@ export default function ProductsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productsCatalogJsonLd) }}
+      />
+      {children}
+    </>
+  );
 }
-

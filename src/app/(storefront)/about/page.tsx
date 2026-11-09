@@ -33,11 +33,70 @@ export const metadata: Metadata = {
       },
     ],
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const aboutJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "AboutPage",
+      "@id": "https://nxtive.in/about#webpage",
+      url: "https://nxtive.in/about",
+      name: "About Us — Homegrown Indian Streetwear Brand | NXTIVE",
+      description:
+        "Learn about NXTIVE, a homegrown Indian streetwear label founded on architectural tailoring, heavyweight fabrics, and contemporary oversized silhouettes.",
+      isPartOf: {
+        "@type": "WebSite",
+        "@id": "https://nxtive.in/#website",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+      },
+      about: {
+        "@type": "Organization",
+        name: "NXTIVE",
+        url: "https://nxtive.in",
+        logo: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://nxtive.in",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "About Us",
+          item: "https://nxtive.in/about",
+        },
+      ],
+    },
+  ],
 };
 
 export default function AboutPage() {
   return (
-    <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "100vh", paddingBottom: "100px" }}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutJsonLd) }}
+      />
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "100vh", paddingBottom: "100px" }}>
       {/* Hero Section */}
       <section
         style={{
@@ -373,5 +432,6 @@ export default function AboutPage() {
         </div>
       </section>
     </div>
+    </>
   );
 }
