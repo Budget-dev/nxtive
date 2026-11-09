@@ -342,7 +342,7 @@ export function StorefrontHomeClient() {
           setSocialGallery(gallery);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const browseCategories = useMemo(
