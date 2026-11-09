@@ -3,8 +3,17 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — NXTIVE Menswear",
-  description: "Read about how NXTIVE collects, stores, protects, and handles your personal data.",
+  title: "Privacy Policy | NXTIVE Official Store",
+  description:
+    "How NXTIVE collects, protects, and respects your personal information, cookies, and transaction data under Indian data protection standards.",
+  alternates: {
+    canonical: "https://nxtive.in/privacy",
+  },
+  openGraph: {
+    title: "Privacy Policy | NXTIVE",
+    description: "Our commitment to protecting your personal information and privacy.",
+    url: "https://nxtive.in/privacy",
+  },
 };
 
 export default function PrivacyPolicyPage() {

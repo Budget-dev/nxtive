@@ -1,8 +1,8 @@
 import { MetadataRoute } from "next";
-import { fetchStorefrontProducts } from "@/lib/catalog";
+import { fetchStorefrontProducts, fetchStorefrontCategories, DEFAULT_CATEGORIES } from "@/lib/catalog";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://nxtive.com";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://nxtive.in";
   const now = new Date();
 
   // Core static storefront pages
@@ -117,8 +117,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Specific category landing pages
-  const categories = [
+  // Category landing pages (static + dynamic)
+  const defaultSlugs = [
     "t-shirts",
     "shirts",
     "hoodies",
@@ -129,7 +129,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "premium-basics",
   ];
 
-  const categoryPages: MetadataRoute.Sitemap = categories.map((slug) => ({
+  let dynamicCategories: string[] = [];
+  try {
+    const fetchedCategories = await fetchStorefrontCategories();
+    dynamicCategories = fetchedCategories.map((c) => c.slug).filter(Boolean);
+  } catch {
+    dynamicCategories = DEFAULT_CATEGORIES.map((c) => c.slug);
+  }
+
+  const allCategorySlugs = Array.from(new Set([...defaultSlugs, ...dynamicCategories]));
+
+  const categoryPages: MetadataRoute.Sitemap = allCategorySlugs.map((slug) => ({
     url: `${baseUrl}/categories/${slug}`,
     lastModified: now,
     changeFrequency: "weekly",

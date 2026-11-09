@@ -6,8 +6,41 @@ import { categoriesFromProducts, fetchStorefrontCategories, fetchStorefrontProdu
 import { sharpImageSrc } from "@/lib/sharp-image";
 
 export const metadata: Metadata = {
-  title: "Categories & Collections — NXTIVE Menswear",
-  description: "Explore all NXTIVE collections: Men, New Arrivals, Heavyweight Tees, Hoodies, Technical Jackets.",
+  title: "Categories & Collections — NXTIVE Streetwear India",
+  description:
+    "Explore all official NXTIVE streetwear collections: Heavyweight Oversized T-Shirts, Hoodies, Casual Shirts, Cargos & Trousers, Layering Jackets.",
+  keywords: [
+    "NXTIVE categories",
+    "nxtive collections",
+    "nxtive clothing",
+    "oversized tees india",
+    "heavyweight hoodies",
+    "cargos and bottoms",
+    "indian streetwear brands",
+  ],
+  alternates: {
+    canonical: "https://nxtive.in/categories",
+  },
+  openGraph: {
+    title: "Categories & Collections — NXTIVE Streetwear India",
+    description:
+      "Explore all official NXTIVE streetwear collections: Heavyweight Oversized T-Shirts, Hoodies, Shirts, Cargos, and Jackets.",
+    url: "https://nxtive.in/categories",
+    images: [
+      {
+        url: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+        width: 1200,
+        height: 630,
+        alt: "NXTIVE Collections",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Categories & Collections — NXTIVE",
+    description: "Explore all official NXTIVE streetwear collections.",
+    images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
+  },
 };
 
 export const revalidate = 60;

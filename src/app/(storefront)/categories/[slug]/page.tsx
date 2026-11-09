@@ -21,13 +21,44 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     tagline: "Explore premium oversized fits, heavyweight tees, and modern streetwear.",
   };
 
+  const title = `${categoryMeta.name} | NXTIVE Streetwear India`;
+  const description =
+    categoryMeta.tagline ||
+    `Discover the latest drops in ${categoryMeta.name} from NXTIVE. Engineered for form, weight, and timeless drape. Free shipping across India.`;
+  const canonicalUrl = `https://nxtive.in/categories/${normalizedSlug}`;
+
   return {
-    title: `${categoryMeta.name} | NXTIVE Streetwear India`,
-    description:
-      categoryMeta.tagline ||
-      `Discover the latest drops in ${categoryMeta.name} from NXTIVE. Engineered for form, weight, and timeless drape.`,
+    title,
+    description,
+    keywords: [
+      categoryMeta.name,
+      `${categoryMeta.name} NXTIVE`,
+      "NXTIVE clothing",
+      "nxtive in",
+      "homegrown streetwear india",
+      "oversized apparel",
+    ],
     alternates: {
-      canonical: `/categories/${normalizedSlug}`,
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      images: [
+        {
+          url: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+          width: 1200,
+          height: 630,
+          alt: `${categoryMeta.name} by NXTIVE`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
     },
   };
 }

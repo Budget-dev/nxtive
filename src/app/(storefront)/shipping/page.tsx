@@ -4,8 +4,24 @@ import { Metadata } from "next";
 import { Truck, Clock, ShieldCheck, Box, AlertCircle, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Shipping & Delivery Policy — NXTIVE Menswear",
-  description: "Learn about NXTIVE domestic transit times, dispatch schedules, free shipping thresholds, and courier handling.",
+  title: "Shipping & Delivery Policy | NXTIVE",
+  description:
+    "Information on NXTIVE domestic shipping across India, transit timelines (3-5 business days), tracking details, and free shipping on prepaid orders.",
+  keywords: [
+    "NXTIVE shipping policy",
+    "nxtive delivery time",
+    "nxtive track order",
+    "nxtive courier partners",
+    "free shipping streetwear",
+  ],
+  alternates: {
+    canonical: "https://nxtive.in/shipping",
+  },
+  openGraph: {
+    title: "Shipping & Delivery Policy | NXTIVE",
+    description: "Domestic shipping details, delivery timelines, and courier tracking.",
+    url: "https://nxtive.in/shipping",
+  },
 };
 
 export default function ShippingPolicyPage() {

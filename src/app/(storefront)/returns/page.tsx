@@ -4,8 +4,23 @@ import { Metadata } from "next";
 import { RefreshCw, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Truck } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Returns & Exchanges Policy — NXTIVE Menswear",
-  description: "Learn about NXTIVE 7-day domestic returns, free size exchanges, reverse pickups, and refund methods.",
+  title: "Returns & Exchanges Policy (7-Day Doorstep Exchange) | NXTIVE",
+  description:
+    "Official NXTIVE return and exchange policy. Easy 7-day hassle-free size exchanges, reverse pickups across India, and seamless support.",
+  keywords: [
+    "NXTIVE return policy",
+    "nxtive exchange",
+    "nxtive refund process",
+    "streetwear return policy india",
+  ],
+  alternates: {
+    canonical: "https://nxtive.in/returns",
+  },
+  openGraph: {
+    title: "Returns & Exchanges Policy | NXTIVE",
+    description: "Easy 7-day doorstep size exchange and return policy across India.",
+    url: "https://nxtive.in/returns",
+  },
 };
 
 export default function ReturnsPolicyPage() {

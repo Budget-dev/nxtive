@@ -3,9 +3,17 @@ import { Metadata } from "next";
 import { AffiliatesClient } from "./affiliates-client";
 
 export const metadata: Metadata = {
-  title: "Affiliates & Creator Ambassador Program — NXTIVE Menswear",
+  title: "Affiliate & Creator Ambassador Program | NXTIVE",
   description:
-    "Join the NXTIVE creator program. Earn 10%–15% commission on verified sales, receive free seasonal drop gifting, and get access to exclusive lookbooks.",
+    "Join the NXTIVE creator and affiliate ambassador program. Earn commission on verified referrals and receive seasonal product drops.",
+  alternates: {
+    canonical: "https://nxtive.in/affiliates",
+  },
+  openGraph: {
+    title: "Affiliates & Creator Ambassador Program | NXTIVE",
+    description: "Partner with NXTIVE. Earn commissions and access exclusive drops.",
+    url: "https://nxtive.in/affiliates",
+  },
 };
 
 export default function AffiliatesPage() {

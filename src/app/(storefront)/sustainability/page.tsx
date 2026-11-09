@@ -14,9 +14,23 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Sustainability & Conscious Craft — NXTIVE Menswear",
+  title: "Sustainability & Conscious Craft | NXTIVE Streetwear",
   description:
-    "Learn about NXTIVE sustainable practices: 100% GOTS organic cotton, closed-loop dyeing, zero-plastic compostable packaging, and ethical boutique mills.",
+    "Learn about NXTIVE sustainable practices: 100% GOTS organic cotton, closed-loop dyeing, zero-plastic compostable packaging, and ethical boutique mills in India.",
+  keywords: [
+    "NXTIVE sustainability",
+    "sustainable streetwear india",
+    "organic cotton streetwear",
+    "ethical clothing brand india",
+  ],
+  alternates: {
+    canonical: "https://nxtive.in/sustainability",
+  },
+  openGraph: {
+    title: "Sustainability & Conscious Craft | NXTIVE",
+    description: "100% GOTS organic cotton, ethical boutique mills, and zero-plastic packaging.",
+    url: "https://nxtive.in/sustainability",
+  },
 };
 
 export default function SustainabilityPage() {

@@ -3,8 +3,17 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — NXTIVE Menswear",
-  description: "Terms and conditions governing the purchase, browsing, and use of NXTIVE services and products.",
+  title: "Terms of Service | NXTIVE Official Store",
+  description:
+    "Terms and conditions governing the purchase, browsing, and use of NXTIVE services, website, and products.",
+  alternates: {
+    canonical: "https://nxtive.in/terms",
+  },
+  openGraph: {
+    title: "Terms of Service | NXTIVE",
+    description: "Terms and conditions for NXTIVE apparel purchases and services.",
+    url: "https://nxtive.in/terms",
+  },
 };
 
 export default function TermsOfServicePage() {

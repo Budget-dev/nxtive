@@ -5,8 +5,34 @@ import { Metadata } from "next";
 import { ArrowRight, Compass, Shield, Feather, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Our Story — NXTIVE Menswear",
-  description: "Homegrown Indian streetwear brand. Premium oversized fits, breathable cotton, and everyday comfort for new generations.",
+  title: "About Us — Homegrown Indian Streetwear Brand | NXTIVE",
+  description:
+    "Learn about NXTIVE, a homegrown Indian streetwear label founded on architectural tailoring, heavyweight fabrics, and contemporary oversized silhouettes.",
+  keywords: [
+    "About NXTIVE",
+    "nxtive story",
+    "nxtive clothing brand",
+    "homegrown indian streetwear",
+    "indian streetwear label",
+    "nxtive origin",
+  ],
+  alternates: {
+    canonical: "https://nxtive.in/about",
+  },
+  openGraph: {
+    title: "About NXTIVE | Homegrown Streetwear Brand",
+    description:
+      "Architectural tailoring, heavyweight fabrics, and contemporary oversized silhouettes from India.",
+    url: "https://nxtive.in/about",
+    images: [
+      {
+        url: "https://nxtive.in/images/nxtvie/banner-urban-essentials-hd.jpg",
+        width: 1200,
+        height: 630,
+        alt: "NXTIVE Design Studio",
+      },
+    ],
+  },
 };
 
 export default function AboutPage() {
