@@ -122,7 +122,7 @@ export function Footer() {
 
           {/* Column 2: Shop */}
           <div className="footer-menu">
-            <h4
+            <h3
               style={{
                 fontSize: "13px",
                 fontWeight: 700,
@@ -132,7 +132,7 @@ export function Footer() {
               }}
             >
               Shop
-            </h4>
+            </h3>
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
               {["Men", "New Arrivals", "Clothing", "Collections", "Sale"].map((item) => (
                 <li key={item}>
@@ -157,7 +157,7 @@ export function Footer() {
 
           {/* Column 3: Help */}
           <div className="footer-menu">
-            <h4
+            <h3
               style={{
                 fontSize: "13px",
                 fontWeight: 700,
@@ -167,7 +167,7 @@ export function Footer() {
               }}
             >
               Help
-            </h4>
+            </h3>
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
               {[
                 { label: "Track Order", href: "/orders" },
@@ -199,7 +199,7 @@ export function Footer() {
 
           {/* Column 4: About */}
           <div className="footer-menu">
-            <h4
+            <h3
               style={{
                 fontSize: "13px",
                 fontWeight: 700,
@@ -209,7 +209,7 @@ export function Footer() {
               }}
             >
               About
-            </h4>
+            </h3>
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
               {[
                 { label: "Our Story", href: "/about" },
@@ -240,7 +240,7 @@ export function Footer() {
 
           {/* Column 5: Newsletter */}
           <div className="footer-newsletter" style={{ minWidth: "220px" }}>
-            <h4
+            <h3
               style={{
                 fontSize: "13px",
                 fontWeight: 700,
@@ -250,7 +250,7 @@ export function Footer() {
               }}
             >
               Newsletter
-            </h4>
+            </h3>
             <p
               style={{
                 fontSize: "12px",

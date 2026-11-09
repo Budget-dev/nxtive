@@ -736,16 +736,28 @@ export default function HomePage() {
                 onClick={() => setActiveSlide(idx)}
                 aria-label={`Go to slide ${idx + 1}`}
                 style={{
-                  width: isActive ? "24px" : "8px",
-                  height: "8px",
-                  borderRadius: "9999px",
-                  backgroundColor: isActive ? s.accentColor : "rgba(255, 255, 255, 0.45)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: "36px",
+                  minHeight: "44px",
+                  background: "transparent",
                   border: "none",
-                  padding: 0,
+                  padding: "8px 4px",
                   cursor: "pointer",
-                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
-              />
+              >
+                <span
+                  style={{
+                    display: "block",
+                    width: isActive ? "24px" : "8px",
+                    height: "8px",
+                    borderRadius: "9999px",
+                    backgroundColor: isActive ? s.accentColor : "rgba(255, 255, 255, 0.45)",
+                    transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                />
+              </button>
             );
           })}
         </div>
@@ -900,7 +912,7 @@ export default function HomePage() {
                 <div className="category-card-media">
                   <img
                     src={cat.image || "/images/placeholder.jpg"}
-                    alt={cat.name}
+                    alt=""
                     loading="lazy"
                     decoding="async"
                     className="cat-img"
@@ -1100,7 +1112,7 @@ export default function HomePage() {
                       fontSize: "10px",
                       fontWeight: 800,
                       letterSpacing: "0.14em",
-                      color: "#8C867E",
+                      color: "#4A453E",
                       textTransform: "uppercase",
                       borderLeft: "1px solid rgba(0,0,0,0.15)",
                       paddingLeft: "6px",
@@ -1643,7 +1655,7 @@ export default function HomePage() {
           font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.12em;
-          color: #8C8478;
+          color: #555048;
           text-transform: uppercase;
           display: block;
           margin-bottom: 4px;
@@ -1989,7 +2001,7 @@ export default function HomePage() {
         .two-card-original-price {
           font-size: 12.5px;
           font-weight: 500;
-          color: #8C867E;
+          color: #555048;
           text-decoration: line-through;
         }
 
