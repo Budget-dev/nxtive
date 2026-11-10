@@ -39,30 +39,95 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
 
-    const admin = await tryRequireAdmin("orders.view", req);
-    const user = admin || (await requireUser(req));
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    }
+    const admin = await tryRequireAdmin("orders.view", req).catch(() => null);
+    const user = admin || (await requireUser(req).catch(() => null));
 
     let order = await storeReadDocument<Record<string, any>>("orders", orderId);
     if (!order) {
-      // Try search by orderNumber
+      // Try case-insensitive search by id, orderNumber, awb, or trackingNumber
       const all = await storeReadCollection<Record<string, any>>("orders");
-      order = all.find((o) => o.orderNumber === orderId || o.id === orderId) || null;
+      const cleanId = orderId.trim().toLowerCase();
+      order =
+        all.find(
+          (o) =>
+            o.id?.toLowerCase() === cleanId ||
+            o.orderNumber?.toLowerCase() === cleanId ||
+            o.trackingNumber?.toLowerCase() === cleanId ||
+            o.awbCode?.toLowerCase() === cleanId
+        ) || null;
     }
 
     if (!order) {
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
 
-    if (!admin && order.userId !== user.uid && order.shippingAddress?.email?.toLowerCase() !== user.email?.toLowerCase()) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    // Admins receive full order document
+    if (admin) {
+      return NextResponse.json({
+        success: true,
+        data: order,
+      });
     }
+
+    // Authenticated order owner receives full order document
+    const isOwner =
+      user &&
+      ((order.userId && order.userId === user.uid) ||
+        (order.shippingAddress?.email && user.email && order.shippingAddress.email.toLowerCase() === user.email.toLowerCase()));
+
+    if (isOwner) {
+      return NextResponse.json({
+        success: true,
+        data: order,
+      });
+    }
+
+    // Unauthenticated / guest customer tracking by exact orderId / orderNumber / AWB:
+    // Return complete tracking and order summary while sanitizing internal admin/gateway secrets
+    const customerPhone = order.shippingAddress?.phone || "";
+    const customerEmail = order.shippingAddress?.email || "";
+    const maskedPhone = customerPhone.length > 4 ? `******${customerPhone.slice(-4)}` : customerPhone;
+    const maskedEmail = customerEmail.includes("@")
+      ? `${customerEmail.slice(0, 3)}***@${customerEmail.split("@")[1]}`
+      : customerEmail;
+
+    const publicOrder = {
+      id: order.id,
+      orderNumber: order.orderNumber || order.id,
+      items: order.items || [],
+      subtotal: order.subtotal ?? order.amount ?? 0,
+      discount: order.discount ?? 0,
+      shipping: order.shipping ?? 0,
+      total: order.total ?? order.totalAmount ?? order.amount ?? 0,
+      status: order.status || "pending",
+      statusHistory: order.statusHistory || [],
+      paymentMethod: order.paymentMethod || "Online Payment",
+      paymentStatus: order.paymentStatus || "pending",
+      shippingAddress: {
+        fullName: order.shippingAddress?.fullName || order.customerName || "Customer",
+        email: maskedEmail,
+        phone: maskedPhone,
+        street: order.shippingAddress?.street || "",
+        apartment: order.shippingAddress?.apartment || "",
+        city: order.shippingAddress?.city || "",
+        state: order.shippingAddress?.state || "",
+        postalCode: order.shippingAddress?.postalCode || "",
+        country: order.shippingAddress?.country || "India",
+      },
+      deliveryMethod: order.deliveryMethod || "Standard Domestic",
+      deliveryDateEstimate: order.deliveryDateEstimate || "3-5 Business Days",
+      trackingNumber: order.trackingNumber || order.awbCode || "",
+      trackingUrl: order.trackingUrl || (order.awbCode ? `https://shiprocket.co/tracking/${order.awbCode}` : ""),
+      carrier: order.carrier || "Shiprocket Express",
+      awbCode: order.awbCode || order.trackingNumber || "",
+      cancelReason: order.cancelReason || undefined,
+      createdAt: order.createdAt || "",
+      updatedAt: order.updatedAt || "",
+    };
 
     return NextResponse.json({
       success: true,
-      data: order,
+      data: publicOrder,
     });
   } catch (error) {
     if (error instanceof AuthError) {

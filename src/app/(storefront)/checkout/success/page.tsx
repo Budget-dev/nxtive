@@ -581,9 +581,9 @@ function OrderSuccessContent() {
             flexWrap: "wrap",
           }}
         >
-          {currentOrder && (
+          {(currentOrder || orderId || orderNumberParam) && (
             <Link
-              href={`/orders/${currentOrder.id}`}
+              href={`/orders/${currentOrder?.id || orderId || orderNumberParam}`}
               style={{
                 display: "inline-flex",
                 alignItems: "center",

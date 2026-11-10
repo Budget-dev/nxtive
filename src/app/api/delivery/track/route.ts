@@ -23,9 +23,25 @@ export async function GET(req: NextRequest) {
 
     if (orderId) {
       order = await storeReadDocument("orders", orderId);
+      if (!order) {
+        const orders = await storeReadCollection<any>("orders");
+        const cleanId = orderId.trim().toLowerCase();
+        order = orders.find(
+          (o) =>
+            o.id?.toLowerCase() === cleanId ||
+            o.orderNumber?.toLowerCase() === cleanId ||
+            o.trackingNumber?.toLowerCase() === cleanId ||
+            o.awbCode?.toLowerCase() === cleanId
+        );
+      }
     } else if (awb) {
       const orders = await storeReadCollection<any>("orders");
-      order = orders.find((o) => o.awbCode === awb || o.trackingNumber === awb);
+      const cleanAwb = awb.trim().toLowerCase();
+      order = orders.find(
+        (o) =>
+          o.awbCode?.toLowerCase() === cleanAwb ||
+          o.trackingNumber?.toLowerCase() === cleanAwb
+      );
     }
 
     if (!order) {

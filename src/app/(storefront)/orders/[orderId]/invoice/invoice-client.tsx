@@ -6,7 +6,7 @@ import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import { OrderInvoice } from "@/components/invoice/order-invoice";
 import { auth, db } from "@/lib/firebase/client";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 interface Props {
   orderId: string;
@@ -20,14 +20,32 @@ export function StorefrontInvoiceClient({ orderId }: Props) {
 
   useEffect(() => {
     // 1. Check local store orders first for instant 0ms load
+    const cleanTarget = (orderId || "").trim().toLowerCase();
     const matched = orders.find(
-      (o) => o.id.toLowerCase() === orderId.toLowerCase() || (o as any).orderNumber === orderId
+      (o) => o.id.toLowerCase() === cleanTarget || (o as any).orderNumber?.toLowerCase() === cleanTarget
     );
     if (matched) {
       setOrder(matched);
       setLoading(false);
       return;
     }
+
+    // 1b. Check sessionStorage for instant recovery
+    try {
+      const stored = sessionStorage.getItem("last_confirmed_order");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (
+          parsed.id?.toLowerCase() === cleanTarget ||
+          parsed.orderNumber?.toLowerCase() === cleanTarget ||
+          parsed.orderId?.toLowerCase() === cleanTarget
+        ) {
+          setOrder(parsed);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch {}
 
     // 2. Fetch from API or Firestore
     let active = true;
@@ -52,6 +70,14 @@ export function StorefrontInvoiceClient({ orderId }: Props) {
           const snap = await getDoc(doc(db, "orders", orderId));
           if (active && snap.exists()) {
             setOrder({ id: snap.id, ...snap.data() });
+            setLoading(false);
+            return;
+          }
+          const q = query(collection(db, "orders"), where("orderNumber", "==", orderId));
+          const querySnap = await getDocs(q);
+          if (active && !querySnap.empty) {
+            const docFound = querySnap.docs[0];
+            setOrder({ id: docFound.id, ...docFound.data() });
             setLoading(false);
             return;
           }

@@ -14,17 +14,21 @@ import {
   ChevronRight,
   Loader2,
   FileText,
+  Search,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useStore, Order } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
 import { auth } from "@/lib/firebase/client";
 
 export default function OrdersPage() {
+  const router = useRouter();
   const { orders: storeOrders, addToCart } = useStore();
   const { user } = useAuth();
   const [fetchedOrders, setFetchedOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [filter, setFilter] = useState<"all" | "active" | "delivered">("all");
+  const [trackQuery, setTrackQuery] = useState("");
 
   useEffect(() => {
     if (storeOrders.length > 0) return;
@@ -69,7 +73,7 @@ export default function OrdersPage() {
             paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
             shippingAddress: raw.shippingAddress || {},
             deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
-            trackingNumber: raw.trackingNumber || `NXT-AWB-${raw.id?.slice(-6) || "1001"}`,
+            trackingNumber: raw.trackingNumber || raw.awbCode || "",
           }));
           setFetchedOrders(normalized);
         }
@@ -147,6 +151,101 @@ export default function OrdersPage() {
           >
             ← Back to Account
           </Link>
+        </div>
+
+        {/* Quick Track Search */}
+        <div
+          style={{
+            backgroundColor: "#FFFFFF",
+            borderRadius: "14px",
+            padding: "18px 24px",
+            marginBottom: "28px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.03)",
+            border: "1px solid rgba(0,0,0,0.06)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "14px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(147, 96, 55, 0.08)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#936037",
+              }}
+            >
+              <Truck size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: "13.5px", fontWeight: 800, color: "#111110" }}>
+                Track a Specific Order or AWB
+              </div>
+              <div style={{ fontSize: "12px", color: "#6F6961" }}>
+                Have an order number from SMS or email? Track its live journey instantly.
+              </div>
+            </div>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (trackQuery.trim()) {
+                router.push(`/orders/${encodeURIComponent(trackQuery.trim())}`);
+              }
+            }}
+            style={{ display: "flex", gap: "8px", flex: 1, maxWidth: "420px", minWidth: "260px" }}
+          >
+            <div style={{ position: "relative", flex: 1 }}>
+              <Search
+                size={14}
+                style={{
+                  position: "absolute",
+                  left: "14px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#9CA3AF",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Enter Order ID or AWB..."
+                value={trackQuery}
+                onChange={(e) => setTrackQuery(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "9px 14px 9px 36px",
+                  borderRadius: "9999px",
+                  border: "1px solid rgba(0,0,0,0.14)",
+                  fontSize: "12.5px",
+                  outline: "none",
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              style={{
+                backgroundColor: "#111110",
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: "9999px",
+                padding: "9px 20px",
+                fontSize: "12.5px",
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Track Live
+            </button>
+          </form>
         </div>
 
         {/* Filter Pills */}
@@ -426,21 +525,36 @@ export default function OrdersPage() {
                         color: "#746E66",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <Truck size={14} color="#936037" />
-                        <span>
-                          {isDelivered
-                            ? `Delivered on ${order.deliveryDateEstimate}`
-                            : `Estimated delivery: ${order.deliveryDateEstimate}`}
-                        </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Truck size={14} color="#936037" />
+                          <span>
+                            {isDelivered
+                              ? `Delivered on ${order.deliveryDateEstimate}`
+                              : `Estimated delivery: ${order.deliveryDateEstimate}`}
+                          </span>
+                        </div>
+                        {order.trackingNumber && !order.trackingNumber.includes("998811") && !order.trackingNumber.includes("1001") && (
+                          <span style={{ fontSize: "11px", color: "#936037", fontWeight: 700, backgroundColor: "rgba(147, 96, 55, 0.08)", padding: "2px 8px", borderRadius: "9999px" }}>
+                            AWB: {order.trackingNumber}
+                          </span>
+                        )}
                       </div>
 
                       <div style={{ display: "flex", gap: "16px" }}>
                         <Link
                           href={`/orders/${order.id}`}
-                          style={{ fontWeight: 700, color: "#111110", textDecoration: "underline" }}
+                          style={{
+                            fontWeight: 700,
+                            color: "#111110",
+                            textDecoration: "underline",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
                         >
-                          Track Package
+                          <span>Track Package</span>
+                          <ChevronRight size={13} />
                         </Link>
                       </div>
                     </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Package,
   Truck,
@@ -17,90 +18,230 @@ import {
   ShoppingBag,
   Loader2,
   FileText,
+  ExternalLink,
+  Copy,
+  Check,
+  Search,
+  MessageCircle,
+  HelpCircle,
 } from "lucide-react";
-import { useStore, Order } from "@/components/store-context";
-import { auth } from "@/lib/firebase/client";
+import { useStore, normalizeOrder, type Order } from "@/components/store-context";
+import { auth, db } from "@/lib/firebase/client";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 interface Props {
   orderId: string;
 }
 
+interface ExtendedOrder extends Order {
+  orderNumber?: string;
+  rawStatus?: string;
+  carrier?: string;
+  awbCode?: string;
+  trackingUrl?: string;
+  cancelReason?: string;
+  statusHistory?: Array<{ status: string; timestamp: string; note?: string; updatedBy?: string }>;
+}
+
 export function OrderDetailClient({ orderId }: Props) {
+  const router = useRouter();
   const { orders, addToCart, showToast } = useStore();
   const [copied, setCopied] = useState(false);
-  const [fetchedOrder, setFetchedOrder] = useState<Order | null>(null);
-  const [isLoading, setIsLoading] = useState(!orders.some((o) => o.id.toLowerCase() === orderId.toLowerCase()));
+  const [copiedAwb, setCopiedAwb] = useState(false);
+  const [searchOrderId, setSearchOrderId] = useState("");
+  const [fetchedOrder, setFetchedOrder] = useState<ExtendedOrder | null>(null);
+  const [deliveryData, setDeliveryData] = useState<{
+    carrier?: string;
+    awbCode?: string;
+    trackingUrl?: string;
+    timeline?: Array<{
+      key: string;
+      label: string;
+      description: string;
+      timestamp?: string | null;
+      completed: boolean;
+      current: boolean;
+    }>;
+  } | null>(null);
 
-  // Look in existing orders first
-  const existingOrder = orders.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
+  const cleanTargetId = (orderId || "").trim().toLowerCase();
+
+  // 1. Look in existing memory orders first
+  const existingOrder = orders.find(
+    (o) =>
+      o.id.toLowerCase() === cleanTargetId ||
+      (o as any).orderNumber?.toLowerCase() === cleanTargetId ||
+      (o as any).trackingNumber?.toLowerCase() === cleanTargetId
+  );
+
+  const [isLoading, setIsLoading] = useState(!existingOrder);
 
   useEffect(() => {
-    if (existingOrder) {
-      setIsLoading(false);
-      return;
-    }
-
     let isMounted = true;
+
     async function load() {
-      setIsLoading(true);
+      // Step A: Instant recovery from sessionStorage if available
       try {
-        const token = await auth.currentUser?.getIdToken();
-        const res = await fetch(`/api/orders/${orderId}`, {
+        const storedJson = sessionStorage.getItem("last_confirmed_order");
+        if (storedJson) {
+          const parsed = JSON.parse(storedJson);
+          const pId = String(parsed.id || parsed.orderId || "").toLowerCase();
+          const pNum = String(parsed.orderNumber || "").toLowerCase();
+          const pAwb = String(parsed.trackingNumber || parsed.awbCode || "").toLowerCase();
+
+          if (pId === cleanTargetId || pNum === cleanTargetId || pAwb === cleanTargetId) {
+            const normalized = normalizeOrder(parsed) as ExtendedOrder;
+            normalized.orderNumber = parsed.orderNumber || normalized.id;
+            normalized.rawStatus = parsed.status || "pending";
+            normalized.carrier = parsed.carrier || "Shiprocket Express";
+            normalized.awbCode = parsed.awbCode || parsed.trackingNumber || "";
+            normalized.trackingUrl = parsed.trackingUrl || "";
+            normalized.statusHistory = parsed.statusHistory || [];
+            if (isMounted) {
+              setFetchedOrder(normalized);
+              setIsLoading(false);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[order-detail] sessionStorage read notice:", err);
+      }
+
+      // Step B: Fetch from /api/orders/[orderId]
+      try {
+        const token = await auth.currentUser?.getIdToken().catch(() => null);
+        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         });
-        const json = await res.json();
-        if (isMounted && json.success && json.data) {
-          const raw = json.data;
-          const rawStatus = String(raw.status || "pending").toLowerCase();
-          const status: Order["status"] =
-            rawStatus === "delivered"
-              ? "Delivered"
-              : rawStatus === "shipped" || rawStatus === "out_for_delivery"
-              ? "Shipped"
-              : rawStatus === "cancelled" || rawStatus === "refunded"
-              ? "Cancelled"
-              : rawStatus === "processing" || rawStatus === "packed"
-              ? "Processing"
-              : "Order Confirmed";
 
-          setFetchedOrder({
-            id: String(raw.id || orderId),
-            date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
-            items: (raw.items || []).map((item: any) => ({
-              id: String(item.productId || item.id || ""),
-              title: String(item.title || "Item"),
-              price: Number(item.price || 0),
-              quantity: Number(item.quantity || 1),
-              selectedSize: String(item.selectedSize || "M"),
-              selectedColor: item.selectedColor ? String(item.selectedColor) : undefined,
-              image: String(item.image || ""),
-            })),
-            subtotal: Number(raw.subtotal || 0),
-            discount: Number(raw.discount || 0),
-            shipping: Number(raw.shipping || 0),
-            total: Number(raw.total || 0),
-            status,
-            paymentMethod: String(raw.paymentMethod || "Online Payment"),
-            paymentStatus: raw.paymentStatus === "paid" ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending COD",
-            shippingAddress: raw.shippingAddress || {},
-            deliveryDateEstimate: String(raw.deliveryDateEstimate || "3-5 Business Days"),
-            trackingNumber: String(raw.trackingNumber || `NXT-AWB-${raw.id?.slice(-6) || "998811"}`),
-          });
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted && json.success && json.data) {
+            const raw = json.data;
+            const rawStatus = String(raw.status || "pending").toLowerCase();
+            const status: Order["status"] =
+              rawStatus === "delivered"
+                ? "Delivered"
+                : rawStatus === "shipped" || rawStatus === "out_for_delivery"
+                ? "Shipped"
+                : rawStatus === "cancelled" || rawStatus === "refunded"
+                ? "Cancelled"
+                : rawStatus === "processing" || rawStatus === "packed" || rawStatus === "payment_confirmed"
+                ? "Processing"
+                : "Order Confirmed";
+
+            const normalized: ExtendedOrder = {
+              id: String(raw.id || orderId),
+              orderNumber: String(raw.orderNumber || raw.id || orderId),
+              date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+              items: (raw.items || []).map((item: any) => ({
+                id: String(item.productId || item.id || ""),
+                title: String(item.title || "NXTIVE Apparel"),
+                price: Number(item.price || 0),
+                quantity: Number(item.quantity || 1),
+                selectedSize: String(item.selectedSize || "M"),
+                selectedColor: item.selectedColor ? String(item.selectedColor) : undefined,
+                image: String(item.image || "/images/nxtvie/cat-tshirts.jpg"),
+              })),
+              subtotal: Number(raw.subtotal ?? raw.amount ?? 0),
+              discount: Number(raw.discount ?? 0),
+              shipping: Number(raw.shipping ?? 0),
+              total: Number(raw.total ?? raw.totalAmount ?? raw.amount ?? 0),
+              status,
+              rawStatus,
+              carrier: raw.carrier || "Shiprocket Express",
+              awbCode: raw.awbCode || raw.trackingNumber || "",
+              trackingUrl: raw.trackingUrl || "",
+              cancelReason: raw.cancelReason,
+              statusHistory: Array.isArray(raw.statusHistory) ? raw.statusHistory : [],
+              paymentMethod: String(raw.paymentMethod || "Online Payment"),
+              paymentStatus:
+                raw.paymentStatus === "paid" || raw.paymentStatus === "Paid"
+                  ? "Paid"
+                  : raw.paymentStatus === "refunded"
+                  ? "Refunded"
+                  : "Pending COD",
+              shippingAddress: raw.shippingAddress || {},
+              deliveryDateEstimate: String(raw.deliveryDateEstimate || "3-5 Business Days"),
+              trackingNumber: String(raw.trackingNumber || raw.awbCode || ""),
+            };
+
+            setFetchedOrder(normalized);
+            setIsLoading(false);
+          }
+        } else {
+          // Fallback Step C: Direct client Firestore query
+          try {
+            const snap = await getDoc(doc(db, "orders", orderId));
+            if (snap.exists() && isMounted) {
+              const data = snap.data();
+              const normalized = normalizeOrder({ id: snap.id, ...data }) as ExtendedOrder;
+              normalized.orderNumber = data.orderNumber || snap.id;
+              normalized.rawStatus = data.status || "pending";
+              normalized.carrier = data.carrier || "Shiprocket Express";
+              normalized.awbCode = data.awbCode || data.trackingNumber || "";
+              normalized.trackingUrl = data.trackingUrl || "";
+              normalized.statusHistory = data.statusHistory || [];
+              setFetchedOrder(normalized);
+              setIsLoading(false);
+            } else {
+              // Try query by orderNumber
+              const q = query(collection(db, "orders"), where("orderNumber", "==", orderId));
+              const querySnap = await getDocs(q);
+              if (!querySnap.empty && isMounted) {
+                const docFound = querySnap.docs[0];
+                const data = docFound.data();
+                const normalized = normalizeOrder({ id: docFound.id, ...data }) as ExtendedOrder;
+                normalized.orderNumber = data.orderNumber || docFound.id;
+                normalized.rawStatus = data.status || "pending";
+                normalized.carrier = data.carrier || "Shiprocket Express";
+                normalized.awbCode = data.awbCode || data.trackingNumber || "";
+                normalized.trackingUrl = data.trackingUrl || "";
+                normalized.statusHistory = data.statusHistory || [];
+                setFetchedOrder(normalized);
+                setIsLoading(false);
+              }
+            }
+          } catch (firestoreErr) {
+            console.warn("[order-detail] Firestore direct fallback notice:", firestoreErr);
+          }
         }
       } catch (err) {
-        console.warn("[order-detail] Error fetching order:", err);
+        console.warn("[order-detail] Error fetching order from API:", err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
+
+      // Step D: Live Delivery Tracking Telemetry from /api/delivery/track
+      try {
+        const trackRes = await fetch(`/api/delivery/track?orderId=${encodeURIComponent(orderId)}`, {
+          cache: "no-store",
+        });
+        if (trackRes.ok) {
+          const trackJson = await trackRes.json();
+          if (isMounted && trackJson.success && trackJson.data) {
+            setDeliveryData({
+              carrier: trackJson.data.carrier,
+              awbCode: trackJson.data.awbCode,
+              trackingUrl: trackJson.data.trackingUrl,
+              timeline: trackJson.data.timeline,
+            });
+          }
+        }
+      } catch (err) {
+        // Silently continue if carrier telemetry is in transit
+      }
     }
+
     load();
+
     return () => {
       isMounted = false;
     };
-  }, [orderId, existingOrder]);
+  }, [orderId, cleanTargetId]);
 
-  const order = existingOrder || fetchedOrder;
+  const order: ExtendedOrder | null = fetchedOrder || (existingOrder ? (existingOrder as ExtendedOrder) : null);
 
   const handleShareTracking = () => {
     if (typeof window !== "undefined") {
@@ -108,6 +249,15 @@ export function OrderDetailClient({ orderId }: Props) {
       setCopied(true);
       showToast("Tracking link copied to clipboard");
       setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
+  const handleCopyAwb = (awbText: string) => {
+    if (typeof window !== "undefined" && awbText) {
+      navigator.clipboard.writeText(awbText);
+      setCopiedAwb(true);
+      showToast(`AWB ${awbText} copied`);
+      setTimeout(() => setCopiedAwb(false), 2500);
     }
   };
 
@@ -125,12 +275,33 @@ export function OrderDetailClient({ orderId }: Props) {
     );
   };
 
+  const handleSearchOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchOrderId.trim()) {
+      router.push(`/orders/${encodeURIComponent(searchOrderId.trim())}`);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "80vh", padding: "80px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div
+        style={{
+          backgroundColor: "var(--bg-sand)",
+          minHeight: "80vh",
+          padding: "80px 20px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <div style={{ textAlign: "center" }}>
           <Loader2 size={36} className="animate-spin" style={{ margin: "0 auto 16px auto", color: "#111110" }} />
-          <p style={{ fontSize: "14px", color: "#6A645C", fontWeight: 600 }}>Loading order details...</p>
+          <h2 style={{ fontSize: "16px", fontWeight: 800, color: "#111110", marginBottom: "6px" }}>
+            Connecting to NXTIVE Logistics
+          </h2>
+          <p style={{ fontSize: "13px", color: "#6A645C" }}>
+            Retrieving real-time shipment status & package telemetry...
+          </p>
         </div>
       </div>
     );
@@ -140,46 +311,184 @@ export function OrderDetailClient({ orderId }: Props) {
     return (
       <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "80vh", padding: "80px 20px" }}>
         <div className="container" style={{ maxWidth: "560px", textAlign: "center" }}>
-          <AlertCircle size={44} color="#D97706" style={{ margin: "0 auto 16px auto" }} />
-          <h1 style={{ fontSize: "28px", fontWeight: 900, textTransform: "uppercase", color: "#111110" }}>
-             Order Not Found
-          </h1>
-          <p style={{ fontSize: "14px", color: "#6A645C", marginTop: "8px", marginBottom: "28px" }}>
-            We couldn't locate this order in your account. Sign in with the account used at checkout and try again.
-          </p>
-          <Link
-            href="/orders"
+          <div
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              backgroundColor: "#111110",
-              color: "#FFFFFF",
-              padding: "12px 24px",
-              borderRadius: "9999px",
-              fontSize: "13px",
-              fontWeight: 700,
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              padding: "44px 28px",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.04)",
+              border: "1px solid rgba(0,0,0,0.06)",
             }}
           >
-            <ArrowLeft size={15} />
-            <span>View All Orders</span>
-          </Link>
+            <AlertCircle size={44} color="#D97706" style={{ margin: "0 auto 16px auto" }} />
+            <h1
+              style={{
+                fontSize: "24px",
+                fontWeight: 900,
+                textTransform: "uppercase",
+                color: "#111110",
+                marginBottom: "8px",
+              }}
+            >
+              Order Not Found
+            </h1>
+            <p style={{ fontSize: "13.5px", color: "#6A645C", marginBottom: "24px", lineHeight: "1.5" }}>
+              We couldn&apos;t find an order matching <strong style={{ color: "#111110" }}>{orderId}</strong>.
+              Please check your confirmation email/SMS or enter your Order Number below to track.
+            </p>
+
+            {/* Quick search input */}
+            <form onSubmit={handleSearchOrder} style={{ marginBottom: "24px" }}>
+              <div style={{ display: "flex", gap: "8px", maxWidth: "400px", margin: "0 auto" }}>
+                <input
+                  type="text"
+                  placeholder="Enter Order ID or AWB..."
+                  value={searchOrderId}
+                  onChange={(e) => setSearchOrderId(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "11px 16px",
+                    borderRadius: "9999px",
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    fontSize: "13px",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    backgroundColor: "#111110",
+                    color: "#FFFFFF",
+                    border: "none",
+                    borderRadius: "9999px",
+                    padding: "11px 20px",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Track
+                </button>
+              </div>
+            </form>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+              <Link
+                href="/orders"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "#FFFFFF",
+                  color: "#111110",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  padding: "11px 22px",
+                  borderRadius: "9999px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                }}
+              >
+                <ArrowLeft size={15} />
+                <span>All Orders</span>
+              </Link>
+              <Link
+                href="/contact"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "#111110",
+                  color: "#FFFFFF",
+                  padding: "11px 22px",
+                  borderRadius: "9999px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                }}
+              >
+                <HelpCircle size={15} />
+                <span>Contact Support</span>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Define tracking progress steps
+  // Determine actual tracking status milestones
+  const rawStatus = (order.rawStatus || order.status || "pending").toLowerCase();
+  const isCancelled = order.status === "Cancelled" || rawStatus === "cancelled" || rawStatus === "refunded";
+  const isDelivered = order.status === "Delivered" || rawStatus === "delivered";
+  const isOutForDelivery = rawStatus === "out_for_delivery";
+  const isShipped = order.status === "Shipped" || rawStatus === "shipped" || isOutForDelivery || isDelivered;
+  const isPacked =
+    isShipped ||
+    order.status === "Processing" ||
+    rawStatus === "packed" ||
+    rawStatus === "processing" ||
+    rawStatus === "payment_confirmed";
+
+  // Check carrier details: no dummy fallback placeholders
+  const rawAwb = deliveryData?.awbCode || order.awbCode || order.trackingNumber || "";
+  const isDummyAwb = !rawAwb || rawAwb.includes("NXT-AWB-998811") || rawAwb.includes("NXT-AWB-1001");
+  const actualAwb = isDummyAwb ? "" : rawAwb;
+  const carrierName = deliveryData?.carrier || order.carrier || "Shiprocket Express";
+  const carrierTrackingUrl =
+    deliveryData?.trackingUrl ||
+    order.trackingUrl ||
+    (actualAwb ? `https://shiprocket.co/tracking/${encodeURIComponent(actualAwb)}` : "");
+
+  // 5 accurate progression steps
   const steps = [
-    { label: "Order Confirmed", date: order.date, completed: true },
-    { label: "Fulfillment & Pack", date: "Processed", completed: true },
-    { label: "Shipped with Courier", date: "In Transit", completed: order.status === "Shipped" || order.status === "Delivered" },
-    { label: "Delivered", date: order.deliveryDateEstimate, completed: order.status === "Delivered" },
+    {
+      id: "confirmed",
+      label: "Order Confirmed",
+      date: order.date,
+      note: "Payment received & order verified",
+      completed: !isCancelled,
+      current: !isCancelled && !isPacked && !isShipped,
+    },
+    {
+      id: "packed",
+      label: "Quality Check & Pack",
+      date: isPacked ? "Completed" : "In Progress",
+      note: isPacked ? "Sealed in protective apparel bag" : "Queue for inspection",
+      completed: isPacked && !isCancelled,
+      current: !isCancelled && isPacked && !isShipped,
+    },
+    {
+      id: "shipped",
+      label: "Dispatched with Courier",
+      date: isShipped ? (actualAwb ? "In Transit" : "Dispatched") : "Pending Dispatch",
+      note: isShipped ? carrierName : "Awaiting carrier pickup",
+      completed: isShipped && !isCancelled,
+      current: !isCancelled && isShipped && !isOutForDelivery && !isDelivered,
+    },
+    {
+      id: "out_for_delivery",
+      label: "Out for Delivery",
+      date: isDelivered ? "Completed" : isOutForDelivery ? "Today" : "In Transit",
+      note: isOutForDelivery
+        ? "Courier executive on the way"
+        : isDelivered
+        ? "Delivered to recipient"
+        : "Reaching local hub",
+      completed: (isOutForDelivery || isDelivered) && !isCancelled,
+      current: !isCancelled && isOutForDelivery,
+    },
+    {
+      id: "delivered",
+      label: "Delivered",
+      date: isDelivered ? "Delivered" : order.deliveryDateEstimate,
+      note: isDelivered ? "Package received safely" : `Est. ${order.deliveryDateEstimate}`,
+      completed: isDelivered && !isCancelled,
+      current: isDelivered,
+    },
   ];
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
-      <div className="container" style={{ maxWidth: "900px" }}>
+      <div className="container" style={{ maxWidth: "920px" }}>
         {/* Navigation Breadcrumb */}
         <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Link
@@ -204,7 +513,7 @@ export function OrderDetailClient({ orderId }: Props) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "7px 14px",
+                padding: "8px 16px",
                 borderRadius: "9999px",
                 backgroundColor: "#111110",
                 color: "#FFFFFF",
@@ -215,7 +524,7 @@ export function OrderDetailClient({ orderId }: Props) {
               }}
             >
               <FileText size={13} />
-              <span>{order.status === "Delivered" ? "Delivered Invoice" : "View Invoice"}</span>
+              <span>{isDelivered ? "Download Retail Invoice" : "View Invoice"}</span>
             </Link>
 
             <button
@@ -224,7 +533,7 @@ export function OrderDetailClient({ orderId }: Props) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "7px 14px",
+                padding: "8px 16px",
                 borderRadius: "9999px",
                 backgroundColor: "#FFFFFF",
                 border: "1px solid rgba(0,0,0,0.12)",
@@ -240,6 +549,35 @@ export function OrderDetailClient({ orderId }: Props) {
           </div>
         </div>
 
+        {/* Cancelled Banner if applicable */}
+        {isCancelled && (
+          <div
+            style={{
+              backgroundColor: "#FEF2F2",
+              border: "1px solid #FCA5A5",
+              borderRadius: "12px",
+              padding: "20px 24px",
+              marginBottom: "24px",
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+            }}
+          >
+            <AlertCircle size={28} color="#DC2626" style={{ flexShrink: 0 }} />
+            <div>
+              <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#991B1B", margin: 0 }}>
+                Order Cancelled
+              </h3>
+              <p style={{ fontSize: "13px", color: "#B91C1C", margin: "4px 0 0 0" }}>
+                {order.cancelReason || "This order has been cancelled and will not be dispatched."}{" "}
+                {order.paymentStatus === "Refunded"
+                  ? "Refund has been processed to your original payment method."
+                  : "If payment was deducted, refund will credit back within 3-5 business days."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Order Header Card */}
         <div
           className="order-card"
@@ -247,6 +585,9 @@ export function OrderDetailClient({ orderId }: Props) {
             boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
             padding: "28px",
             marginBottom: "24px",
+            backgroundColor: "#FFFFFF",
+            borderRadius: "14px",
+            border: "1px solid rgba(0,0,0,0.06)",
           }}
         >
           <div
@@ -261,11 +602,27 @@ export function OrderDetailClient({ orderId }: Props) {
             }}
           >
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.15em", color: "#936037", textTransform: "uppercase" }}>
-                Order Summary
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  letterSpacing: "0.15em",
+                  color: "#936037",
+                  textTransform: "uppercase",
+                }}
+              >
+                Live Shipment Tracking
               </div>
-              <h1 style={{ fontSize: "28px", fontWeight: 900, textTransform: "uppercase", color: "#111110", marginTop: "2px" }}>
-                Order #{order.id}
+              <h1
+                style={{
+                  fontSize: "26px",
+                  fontWeight: 900,
+                  textTransform: "uppercase",
+                  color: "#111110",
+                  marginTop: "2px",
+                }}
+              >
+                Order #{order.orderNumber || order.id}
               </h1>
               <div style={{ fontSize: "13px", color: "#777169", marginTop: "4px" }}>
                 Placed on {order.date} • Total: <strong>₹{order.total.toLocaleString("en-IN")}</strong>
@@ -279,8 +636,12 @@ export function OrderDetailClient({ orderId }: Props) {
                 gap: "6px",
                 padding: "8px 16px",
                 borderRadius: "9999px",
-                backgroundColor: order.status === "Delivered" ? "rgba(43, 147, 72, 0.1)" : "rgba(217, 119, 6, 0.1)",
-                color: order.status === "Delivered" ? "#2B9348" : "#B45309",
+                backgroundColor: isCancelled
+                  ? "rgba(220, 38, 38, 0.1)"
+                  : isDelivered
+                  ? "rgba(43, 147, 72, 0.1)"
+                  : "rgba(217, 119, 6, 0.1)",
+                color: isCancelled ? "#DC2626" : isDelivered ? "#2B9348" : "#B45309",
                 fontSize: "12.5px",
                 fontWeight: 700,
               }}
@@ -290,159 +651,276 @@ export function OrderDetailClient({ orderId }: Props) {
                   width: "7px",
                   height: "7px",
                   borderRadius: "50%",
-                  backgroundColor: order.status === "Delivered" ? "#2B9348" : "#B45309",
+                  backgroundColor: isCancelled ? "#DC2626" : isDelivered ? "#2B9348" : "#B45309",
                 }}
               />
-              <span>{order.status}</span>
+              <span>
+                {isCancelled
+                  ? "Cancelled"
+                  : isDelivered
+                  ? "Delivered"
+                  : isOutForDelivery
+                  ? "Out for Delivery"
+                  : isShipped
+                  ? "Shipped & In Transit"
+                  : isPacked
+                  ? "Packed & Quality Checked"
+                  : "Order Confirmed"}
+              </span>
             </div>
           </div>
 
           {/* Stepper Timeline */}
-          <div style={{ paddingTop: "28px" }}>
-            <h3 style={{ fontSize: "12px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#78726A", marginBottom: "20px" }}>
-              Shipment Tracking & Progress
-            </h3>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: "12px",
-                position: "relative",
-              }}
-              className="tracking-stepper"
-            >
-              {steps.map((st, idx) => (
-                <div key={st.label} style={{ textAlign: "center", position: "relative" }}>
-                  <div
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      backgroundColor: st.completed ? "#111110" : "#EBE7DF",
-                      color: st.completed ? "#FFFFFF" : "#8A847C",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      margin: "0 auto 10px auto",
-                      fontWeight: 700,
-                      fontSize: "13px",
-                      transition: "all 0.3s ease",
-                    }}
-                  >
-                    {st.completed ? <CheckCircle2 size={18} strokeWidth={2.5} /> : idx + 1}
-                  </div>
-                  <div style={{ fontSize: "12.5px", fontWeight: 700, color: st.completed ? "#111110" : "#8A847C" }}>
-                    {st.label}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#9A948C", marginTop: "2px" }}>
-                    {st.date}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div
-              style={{
-                marginTop: "24px",
-                padding: "14px 18px",
-                backgroundColor: "#FAF8F5",
-                borderRadius: "8px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: "10px",
-                fontSize: "12.5px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#111110" }}>
-                <Truck size={16} color="#936037" />
-                <span>Courier: <strong>Shiprocket Express</strong> (AWB: {order.trackingNumber})</span>
+          {!isCancelled && (
+            <div style={{ paddingTop: "28px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "20px",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "#78726A",
+                    margin: 0,
+                  }}
+                >
+                  Shipment Progress Timeline
+                </h3>
+                <span style={{ fontSize: "12px", color: "#936037", fontWeight: 700 }}>
+                  Estimated Delivery: {order.deliveryDateEstimate}
+                </span>
               </div>
-              <span style={{ color: "#746E66" }}>
-                Estimated Delivery: <strong>{order.deliveryDateEstimate}</strong>
-              </span>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gap: "10px",
+                  position: "relative",
+                }}
+                className="tracking-stepper"
+              >
+                {steps.map((st, idx) => (
+                  <div key={st.id} style={{ textAlign: "center", position: "relative" }}>
+                    <div
+                      style={{
+                        width: "38px",
+                        height: "38px",
+                        borderRadius: "50%",
+                        backgroundColor: st.completed
+                          ? "#111110"
+                          : st.current
+                          ? "#B45309"
+                          : "#EBE7DF",
+                        color: st.completed || st.current ? "#FFFFFF" : "#8A847C",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto 10px auto",
+                        fontWeight: 700,
+                        fontSize: "13px",
+                        boxShadow: st.current ? "0 0 0 4px rgba(180, 83, 9, 0.2)" : "none",
+                        transition: "all 0.3s ease",
+                      }}
+                    >
+                      {st.completed ? (
+                        <CheckCircle2 size={18} strokeWidth={2.5} />
+                      ) : (
+                        idx + 1
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: st.completed || st.current ? "#111110" : "#8A847C",
+                        lineHeight: "1.3",
+                      }}
+                    >
+                      {st.label}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#9A948C", marginTop: "3px" }}>
+                      {st.date}
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#746E66", marginTop: "2px", lineHeight: "1.2" }}>
+                      {st.note}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Logistics & Courier Box */}
+          <div
+            style={{
+              marginTop: "28px",
+              padding: "18px 22px",
+              backgroundColor: "#FAF8F5",
+              borderRadius: "10px",
+              border: "1px solid rgba(0,0,0,0.06)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "14px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "10px",
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#936037",
+                  flexShrink: 0,
+                }}
+              >
+                <Truck size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: "13.5px", fontWeight: 800, color: "#111110" }}>
+                  Courier: <strong>{carrierName}</strong>
+                </div>
+                <div style={{ fontSize: "12px", color: "#6A645C", marginTop: "3px" }}>
+                  {actualAwb ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      AWB Number: <strong style={{ color: "#111110" }}>{actualAwb}</strong>
+                      <button
+                        onClick={() => handleCopyAwb(actualAwb)}
+                        title="Copy AWB Number"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: "2px",
+                          color: "#6A645C",
+                          display: "inline-flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        {copiedAwb ? <Check size={13} color="#2B9348" /> : <Copy size={13} />}
+                      </button>
+                    </span>
+                  ) : (
+                    <span>
+                      Tracking ID will be assigned and notified once dispatched by carrier.
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Invoice Delivery Status Card */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {carrierTrackingUrl && actualAwb ? (
+                <a
+                  href={carrierTrackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    backgroundColor: "#111110",
+                    color: "#FFFFFF",
+                    padding: "9px 18px",
+                    borderRadius: "9999px",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                  }}
+                >
+                  <ExternalLink size={13} />
+                  <span>Track on Courier Portal</span>
+                </a>
+              ) : (
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#936037",
+                    backgroundColor: "rgba(147, 96, 55, 0.08)",
+                    padding: "6px 14px",
+                    borderRadius: "9999px",
+                    fontWeight: 700,
+                  }}
+                >
+                  Dispatch in Progress
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Activity / Milestones History (if telemetry or statusHistory available) */}
+          {order.statusHistory && order.statusHistory.length > 0 && (
             <div
               style={{
                 marginTop: "16px",
                 padding: "16px 20px",
-                backgroundColor: order.status === "Delivered" ? "#F0FDF4" : "#FFFFFF",
+                backgroundColor: "#FFFFFF",
                 borderRadius: "10px",
-                border: order.status === "Delivered" ? "1px solid #BBF7D0" : "1px solid rgba(0,0,0,0.08)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: "14px",
+                border: "1px solid rgba(0,0,0,0.06)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div
-                  style={{
-                    width: "40px",
-                    height: "40px",
-                    borderRadius: "10px",
-                    backgroundColor: order.status === "Delivered" ? "#DCFCE7" : "#F3F4F6",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: order.status === "Delivered" ? "#16A34A" : "#111110",
-                    flexShrink: 0,
-                  }}
-                >
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 800, color: "#111110" }}>
-                      Retail Invoice
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: "9999px",
-                        backgroundColor: order.status === "Delivered" ? "#DCFCE7" : "#FEF3C7",
-                        color: order.status === "Delivered" ? "#15803D" : "#92400E",
-                      }}
-                    >
-                      {order.status === "Delivered" ? "✓ Delivered & Final Invoice Ready" : "Invoice Generated"}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: "12px", color: "#6B7280", marginTop: "3px", margin: 0 }}>
-                    {order.status === "Delivered"
-                      ? "Package delivered! Official retail invoice is ready for download, warranty, and records."
-                      : "Generated on placement & enclosed inside your Shiprocket parcel. Digital copy ready below."}
-                  </p>
-                </div>
-              </div>
-
-              <Link
-                href={`/orders/${order.id}/invoice`}
+              <h4
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "7px",
-                  padding: "9px 18px",
-                  borderRadius: "9999px",
-                  backgroundColor: "#111110",
-                  color: "#FFFFFF",
-                  fontSize: "12.5px",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  color: "#111110",
+                  marginBottom: "12px",
                 }}
               >
-                <Download size={14} />
-                <span>{order.status === "Delivered" ? "Download Invoice" : "View Invoice"}</span>
-              </Link>
+                Shipment Checkpoints
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {order.statusHistory.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "50%",
+                        backgroundColor: "#936037",
+                        marginTop: "5px",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontWeight: 700, color: "#111110", textTransform: "capitalize" }}>
+                        {item.status.replace(/_/g, " ")}:
+                      </span>{" "}
+                      <span style={{ color: "#6A645C" }}>{item.note || "Status updated"}</span>
+                    </div>
+                    <div style={{ color: "#9A948C", fontSize: "11px", whiteSpace: "nowrap" }}>
+                      {item.timestamp ? new Date(item.timestamp).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Two-Column Details */}
@@ -460,6 +938,9 @@ export function OrderDetailClient({ orderId }: Props) {
             style={{
               padding: "28px",
               boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
+              backgroundColor: "#FFFFFF",
+              borderRadius: "14px",
+              border: "1px solid rgba(0,0,0,0.06)",
             }}
           >
             <h3
@@ -472,7 +953,7 @@ export function OrderDetailClient({ orderId }: Props) {
                 marginBottom: "20px",
               }}
             >
-              Items in This Order ({order.items.length})
+              Items in This Shipment ({order.items.length})
             </h3>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -558,6 +1039,9 @@ export function OrderDetailClient({ orderId }: Props) {
               style={{
                 padding: "24px",
                 boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
+                backgroundColor: "#FFFFFF",
+                borderRadius: "14px",
+                border: "1px solid rgba(0,0,0,0.06)",
               }}
             >
               <div
@@ -574,7 +1058,7 @@ export function OrderDetailClient({ orderId }: Props) {
                 }}
               >
                 <MapPin size={15} color="#936037" />
-                <span>Shipping Address</span>
+                <span>Shipping Destination</span>
               </div>
               <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#111110" }}>
                 {order.shippingAddress?.fullName || "Customer"}
@@ -602,6 +1086,9 @@ export function OrderDetailClient({ orderId }: Props) {
               style={{
                 padding: "24px",
                 boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
+                backgroundColor: "#FFFFFF",
+                borderRadius: "14px",
+                border: "1px solid rgba(0,0,0,0.06)",
               }}
             >
               <div
@@ -628,13 +1115,13 @@ export function OrderDetailClient({ orderId }: Props) {
 
               {order.discount > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", color: "#2B9348", marginBottom: "6px" }}>
-                  <span>Discount</span>
+                  <span>Discount Applied</span>
                   <span>-₹{order.discount.toLocaleString("en-IN")}</span>
                 </div>
               )}
 
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", color: "#6A645C", marginBottom: "12px" }}>
-                <span>Delivery Charge</span>
+                <span>Standard Delivery</span>
                 <span>{order.shipping === 0 ? "FREE" : `₹${order.shipping}`}</span>
               </div>
 
@@ -650,7 +1137,7 @@ export function OrderDetailClient({ orderId }: Props) {
                   marginBottom: "16px",
                 }}
               >
-                <span>Total Paid</span>
+                <span>Total Amount</span>
                 <span>₹{order.total.toLocaleString("en-IN")}</span>
               </div>
 
@@ -664,7 +1151,7 @@ export function OrderDetailClient({ orderId }: Props) {
                   lineHeight: "1.4",
                 }}
               >
-                Method: <strong>{order.paymentMethod}</strong>
+                Payment Method: <strong>{order.paymentMethod}</strong>
                 <br />
                 Status:{" "}
                 <span
@@ -677,6 +1164,46 @@ export function OrderDetailClient({ orderId }: Props) {
                 </span>
               </div>
             </div>
+
+            {/* Need Help Box */}
+            <div
+              style={{
+                padding: "18px",
+                backgroundColor: "#FAF8F5",
+                borderRadius: "12px",
+                border: "1px solid rgba(0,0,0,0.06)",
+                textAlign: "center",
+              }}
+            >
+              <h4 style={{ fontSize: "13px", fontWeight: 800, color: "#111110", margin: "0 0 6px 0" }}>
+                Questions About Delivery?
+              </h4>
+              <p style={{ fontSize: "12px", color: "#6A645C", margin: "0 0 14px 0" }}>
+                Our logistics and concierge team is available 24/7 on WhatsApp.
+              </p>
+              <a
+                href={`https://wa.me/919999999999?text=${encodeURIComponent(
+                  `Hi NXTIVE Support, I need help with my Order #${order.orderNumber || order.id}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  backgroundColor: "#25D366",
+                  color: "#FFFFFF",
+                  padding: "8px 18px",
+                  borderRadius: "9999px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                <MessageCircle size={14} />
+                <span>Chat on WhatsApp</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -687,8 +1214,19 @@ export function OrderDetailClient({ orderId }: Props) {
             grid-template-columns: 1fr !important;
           }
           .tracking-stepper {
-            grid-template-columns: 1fr 1fr !important;
-            gap: 20px !important;
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+            text-align: left !important;
+          }
+          .tracking-stepper > div {
+            display: flex !important;
+            align-items: center !important;
+            text-align: left !important;
+            gap: 12px !important;
+          }
+          .tracking-stepper > div > div:first-child {
+            margin: 0 !important;
+            flex-shrink: 0 !important;
           }
         }
       `}</style>
