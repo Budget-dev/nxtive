@@ -4,9 +4,41 @@ import { fetchStorefrontCategories, fetchStorefrontProducts, productsForCategory
 import type { Category } from "@/types/product";
 import { CategoryViewClient } from "./category-view-client";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const dynamic = "auto";
+export const revalidate = 60;
 export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  const [categories, products] = await Promise.all([
+    fetchStorefrontCategories().catch(() => []),
+    fetchStorefrontProducts().catch(() => []),
+  ]);
+
+  const baseSlugs = [
+    "men",
+    "menswear",
+    "new-arrivals",
+    "clothing",
+    "collections",
+    "sale",
+    "t-shirts",
+    "shirts",
+    "hoodies",
+    "bottoms",
+    "jackets",
+    "urban-essentials",
+    "premium-basics",
+    "specialized-fabrics",
+    "accessories",
+  ];
+
+  const dynamicCategorySlugs = (categories || []).map((c) => c.slug).filter(Boolean);
+  const fromProductCats = (products || [])
+    .map((p) => p.category?.toLowerCase().replace(/\s+/g, "-"))
+    .filter(Boolean) as string[];
+  const allSlugs = Array.from(new Set([...baseSlugs, ...dynamicCategorySlugs, ...fromProductCats]));
+  return allSlugs.map((slug) => ({ slug }));
+}
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;

@@ -3,10 +3,24 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchStorefrontProducts, relatedProducts } from "@/lib/catalog";
 import { ProductDetailClient } from "./product-detail-client";
+import { ProductFallbackClient } from "./product-fallback-client";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const dynamic = "auto";
+export const revalidate = 60;
 export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  const products = await fetchStorefrontProducts().catch(() => []);
+  const slugs = new Set<string>();
+  for (const p of products) {
+    if (p.slug) slugs.add(p.slug.toLowerCase());
+    if (p.id) slugs.add(p.id.toLowerCase());
+  }
+  slugs.add("shirt");
+  slugs.add("prod-1793939922857-2s6mie");
+  slugs.add("prod-1793944052304-597glu");
+  return Array.from(slugs).map((slug) => ({ slug }));
+}
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -91,7 +105,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = products.find((item) => item.slug === slug || item.id === slug);
 
   if (!product) {
-    notFound();
+    return <ProductFallbackClient slug={slug} initialProducts={products} />;
   }
 
   const productJsonLd = {

@@ -157,43 +157,43 @@ export function ProductCard({ product }: ProductCardProps) {
         </button>
       </div>
 
-      {/* Title */}
-      <h3
-        style={{
-          fontSize: "13px",
-          fontWeight: 600,
-          color: "#181715",
-          marginBottom: "3px",
-          lineHeight: 1.3,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        <Link href={`/products/${product.slug || product.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+      {/* Title & Price Link */}
+      <Link href={`/products/${product.slug || product.id}`} style={{ color: "inherit", textDecoration: "none", display: "block" }}>
+        <h3
+          style={{
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "#181716",
+            marginBottom: "3px",
+            lineHeight: 1.3,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {product.title}
-        </Link>
-      </h3>
+        </h3>
 
-      {/* Price with Original Price if on sale */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          fontSize: "13.5px",
-          fontWeight: 700,
-          color: "#181715",
-          marginBottom: "8px",
-        }}
-      >
-        <span>₹ {product.price.toLocaleString("en-IN")}</span>
-        {product.originalPrice && product.originalPrice > product.price && (
-          <span style={{ fontSize: "11.5px", fontWeight: 400, color: "#8E8880", textDecoration: "line-through" }}>
-            ₹ {product.originalPrice.toLocaleString("en-IN")}
-          </span>
-        )}
-      </div>
+        {/* Price with Original Price if on sale */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "13.5px",
+            fontWeight: 700,
+            color: "#181716",
+            marginBottom: "8px",
+          }}
+        >
+          <span>₹ {product.price.toLocaleString("en-IN")}</span>
+          {product.originalPrice && product.originalPrice > product.price && (
+            <span style={{ fontSize: "11.5px", fontWeight: 400, color: "#8E8880", textDecoration: "line-through" }}>
+              ₹ {product.originalPrice.toLocaleString("en-IN")}
+            </span>
+          )}
+        </div>
+      </Link>
 
       {/* Bottom Row: Color Swatches + Cart Button */}
       <div

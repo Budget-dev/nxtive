@@ -185,21 +185,21 @@ function TwoCardProduct({ product }: { product: Product }) {
 
       {/* Info Content */}
       <div className="two-card-content">
-        <div className="two-card-meta-row">
-          <h3 className="two-card-title">
-            <Link href={`/products/${product.slug || product.id}`}>
+        <Link href={`/products/${product.slug || product.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+          <div className="two-card-meta-row">
+            <h3 className="two-card-title">
               {product.title}
-            </Link>
-          </h3>
-          <div className="two-card-price-row">
-            <span className="two-card-price">₹ {product.price.toLocaleString("en-IN")}</span>
-            {product.originalPrice && product.originalPrice > product.price && (
-              <span className="two-card-original-price">
-                ₹ {product.originalPrice.toLocaleString("en-IN")}
-              </span>
-            )}
+            </h3>
+            <div className="two-card-price-row">
+              <span className="two-card-price">₹ {product.price.toLocaleString("en-IN")}</span>
+              {product.originalPrice && product.originalPrice > product.price && (
+                <span className="two-card-original-price">
+                  ₹ {product.originalPrice.toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        </Link>
 
         {/* Bottom Bar: Color Swatches + Add To Bag */}
         <div className="two-card-action-bar">

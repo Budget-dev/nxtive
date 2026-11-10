@@ -62,6 +62,19 @@
         ]
       },
       {
+        "source": "**/*.rsc",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "text/x-component; charset=utf-8"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      {
         "source": "/_next/static/**",
         "headers": [
           {
@@ -117,6 +130,14 @@
       {
         "source": "/robots.txt",
         "destination": "/robots.txt"
+      },
+      {
+        "source": "/categories/**",
+        "destination": "/categories.html"
+      },
+      {
+        "source": "/products/**",
+        "destination": "/products.html"
       },
       {
         "source": "**",

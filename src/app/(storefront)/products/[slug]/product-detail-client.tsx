@@ -34,9 +34,10 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   const router = useRouter();
   const { addToCart, toggleWishlist, isInWishlist, showToast, setIsCartOpen } = useStore();
 
-  const gallery = (product.images.length ? product.images : [product.image]).map((image) => sharpImageSrc(image));
+  const rawImages = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || "/images/placeholder.jpg"];
+  const gallery = rawImages.map((image) => sharpImageSrc(image));
   const [selectedImage, setSelectedImage] = useState<string>(gallery[0] || "");
-  const [selectedSize, setSelectedSize] = useState<string>(product.sizes[1] || product.sizes[0] || "M");
+  const [selectedSize, setSelectedSize] = useState<string>(product.sizes?.[1] || product.sizes?.[0] || "M");
   const [selectedColorIdx, setSelectedColorIdx] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
   const [showSizeGuide, setShowSizeGuide] = useState<boolean>(false);

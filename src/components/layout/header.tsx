@@ -403,6 +403,7 @@ export function Header() {
               inset: 0,
               backgroundColor: "rgba(0, 0, 0, 0.45)",
               backdropFilter: "blur(4px)",
+              zIndex: 1,
             }}
           />
 
@@ -411,6 +412,7 @@ export function Header() {
             className="mobile-menu-drawer"
             style={{
               position: "relative",
+              zIndex: 2,
               width: "82%",
               maxWidth: "340px",
               height: "100%",
