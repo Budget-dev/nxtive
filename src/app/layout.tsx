@@ -81,6 +81,15 @@ export const metadata: Metadata = {
     images: ["https://nxtive.in/images/nxtvie/hero-model.jpg"],
     creator: "@nxtiveclothing",
   },
+  category: "apparel",
+  classification: "Ecommerce / Fashion / Streetwear",
+  other: {
+    "google-site-verification": process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-title": "NXTIVE",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+  },
   robots: {
     index: true,
     follow: true,
@@ -97,20 +106,32 @@ export const metadata: Metadata = {
 const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "ClothingStore",
+  "@id": "https://nxtive.in/#organization",
   name: "NXTIVE",
-  alternateName: "NXTIVE Clothing",
+  alternateName: ["NXTIVE Clothing", "NXTIVE Apparel", "NXTIVE India", "nxtive.in"],
   url: "https://nxtive.in",
-  logo: "https://nxtive.in/images/nxtvie/hero-model.jpg",
+  logo: "https://nxtive.in/images/logo/nxtive-mark-black.png",
   image: "https://nxtive.in/images/nxtvie/hero-model.jpg",
   description:
-    "NXTIVE is a homegrown Indian streetwear and apparel brand specializing in premium oversized t-shirts, heavyweight hoodies, and urban tailoring.",
+    "NXTIVE is an official homegrown Indian streetwear brand specializing in premium oversized t-shirts, heavyweight hoodies, relaxed shirts, and cargo bottoms.",
   telephone: "+91 97004 46690",
   email: "nxtiveclothing@gmail.com",
   priceRange: "₹₹",
   currenciesAccepted: "INR",
-  paymentAccepted: "UPI, PhonePe, Credit Card, Debit Card, NetBanking, Cash on Delivery",
+  paymentAccepted: "UPI, PhonePe, Google Pay, Paytm, Credit Card, Debit Card, NetBanking, Cash on Delivery",
+  contactPoint: {
+    "@type": "ContactPoint",
+    telephone: "+91 97004 46690",
+    contactType: "customer service",
+    areaServed: "IN",
+    availableLanguage: ["English", "Hindi"],
+  },
   address: {
     "@type": "PostalAddress",
+    streetAddress: "Uppal",
+    addressLocality: "Hyderabad",
+    addressRegion: "Telangana",
+    postalCode: "500039",
     addressCountry: "IN",
   },
   sameAs: [
@@ -121,14 +142,99 @@ const organizationJsonLd = {
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
+  "@id": "https://nxtive.in/#website",
   name: "NXTIVE",
-  alternateName: "NXTIVE Store",
+  alternateName: ["NXTIVE Store", "NXTIVE Clothing Official", "nxtive.in"],
   url: "https://nxtive.in",
   potentialAction: {
     "@type": "SearchAction",
     target: "https://nxtive.in/products?q={search_term_string}",
     "query-input": "required name=search_term_string",
   },
+};
+
+const siteNavigationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  itemListElement: [
+    {
+      "@type": "SiteNavigationElement",
+      position: 1,
+      name: "Men's Streetwear",
+      description: "Homegrown Indian streetwear, oversized t-shirts, jackets, and cargo pants for men.",
+      url: "https://nxtive.in/categories/men",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 2,
+      name: "Oversized T-Shirts",
+      description: "Heavyweight drop-shoulder boxy tees crafted from 240+ GSM pure combed cotton.",
+      url: "https://nxtive.in/categories/t-shirts",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 3,
+      name: "Heavyweight Hoodies",
+      description: "450 GSM winter fleece hoodies designed for structured drape and comfort.",
+      url: "https://nxtive.in/categories/hoodies",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 4,
+      name: "Relaxed Shirts",
+      description: "Cuban-collar breathable relaxed fit casual streetwear shirts.",
+      url: "https://nxtive.in/categories/shirts",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 5,
+      name: "Cargo Pants & Bottoms",
+      description: "Multi-pocket cargo pants, relaxed trousers, and heavyweight streetwear track pants.",
+      url: "https://nxtive.in/categories/bottoms",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 6,
+      name: "New Arrivals",
+      description: "Explore the latest season drops, limited editions, and contemporary streetwear releases.",
+      url: "https://nxtive.in/categories/new-arrivals",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 7,
+      name: "All Products",
+      description: "Browse the complete NXTIVE clothing catalog with all sizes, colors, and designs.",
+      url: "https://nxtive.in/products",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 8,
+      name: "Size & Fit Guide",
+      description: "Find your ideal fit with our exact inch and centimeter size charts.",
+      url: "https://nxtive.in/size-guide",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 9,
+      name: "Track Your Order",
+      description: "Check live delivery status for your express Shiprocket package.",
+      url: "https://nxtive.in/orders",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 10,
+      name: "About NXTIVE",
+      description: "Our philosophy, Indian streetwear origins, and specialized fabric craftsmanship.",
+      url: "https://nxtive.in/about",
+    },
+    {
+      "@type": "SiteNavigationElement",
+      position: 11,
+      name: "Customer Support & Contact",
+      description: "Reach our concierge support team for orders, sizing, exchanges, and inquiries.",
+      url: "https://nxtive.in/contact",
+    },
+  ],
 };
 
 import { AuthProvider } from "@/features/auth";
@@ -155,6 +261,10 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteNavigationJsonLd) }}
         />
         <script
           dangerouslySetInnerHTML={{

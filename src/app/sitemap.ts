@@ -101,14 +101,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Category landing pages (static + dynamic)
   const defaultSlugs = [
+    "men",
+    "menswear",
+    "new-arrivals",
     "t-shirts",
     "shirts",
     "hoodies",
     "bottoms",
     "jackets",
-    "new-arrivals",
+    "clothing",
+    "collections",
     "urban-essentials",
     "premium-basics",
+    "specialized-fabrics",
+    "sale",
+    "accessories",
   ];
 
   let dynamicCategories: string[] = [];
