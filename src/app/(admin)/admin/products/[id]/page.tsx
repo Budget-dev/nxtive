@@ -1,47 +1,53 @@
-import React from "react";
-import { notFound } from "next/navigation";
-import { getAdminProductById } from "@/features/admin-dashboard/server/actions";
-import { ProductForm } from "@/features/admin-dashboard/components/product-form";
-import { AdminDataState } from "../../_components/admin-data-state";
+import React, { Suspense } from "react";
+import { EditProductClient } from "@/features/admin-dashboard/components/edit-product-client";
+import { fetchStorefrontProducts } from "@/lib/catalog";
 
 export const metadata = {
   title: "Edit Apparel Item | NXTIVE Admin",
 };
 
-export default async function EditProductPage({
+export async function generateStaticParams() {
+  const products = await fetchStorefrontProducts().catch(() => []);
+  const ids = new Set<string>();
+  for (const p of products) {
+    if (p.id) ids.add(p.id);
+  }
+  ids.add("prod-1793939922857-2s6mie");
+  ids.add("prod-1793944052304-597glu");
+  ids.add("prod-1794287175968-hic2x4");
+  ids.add("shirt");
+  ids.add("relaxed-shirt");
+  ids.add("dem");
+  return Array.from(ids).map((id) => ({ id }));
+}
+
+export default async function EditProductPageWithId({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  let product;
-  try {
-    product = await getAdminProductById(id);
-  } catch (error) {
-    return (
-      <AdminDataState
-        title="Product data unavailable"
-        message={error instanceof Error ? error.message : "The product could not be loaded from Firestore."}
-      />
-    );
-  }
-
-  if (!product) {
-    notFound();
-  }
-
   return (
-    <div>
-      <div style={{ marginBottom: "24px" }}>
-        <h2 style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--adm-text)" }}>
-          Edit: {product.title}
-        </h2>
-        <p style={{ fontSize: "0.82rem", color: "var(--adm-text-muted)" }}>
-          Modify apparel details, stock levels, size guide, and retail price.
-        </p>
-      </div>
-
-      <ProductForm initialProduct={product} isEdit={true} />
-    </div>
+    <Suspense
+      fallback={
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 0", textAlign: "center" }}>
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "50%",
+              border: "3px solid #E8E5DF",
+              borderTopColor: "#121110",
+              animation: "spin 0.8s linear infinite",
+              margin: "0 auto 16px",
+            }}
+          />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ fontSize: "14px", fontWeight: 600 }}>Loading edit view...</div>
+        </div>
+      }
+    >
+      <EditProductClient productId={id} />
+    </Suspense>
   );
 }

@@ -61,7 +61,7 @@ copyHtmlFiles(NEXT_SERVER_APP_DIR);
 // has physical .html and .rsc files for static serving without needing Cloud Functions SSR.
 const PRERENDER_PORT = 5193;
 
-async function waitForServer(port, maxAttempts = 30) {
+async function waitForServer(port, maxAttempts = 120) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const ok = await new Promise((resolve) => {
@@ -114,7 +114,9 @@ function killProcessTree(pid) {
 
 async function prerenderDynamicRoutes() {
   console.log(`4. Spawning temporary Next.js server on port ${PRERENDER_PORT} to prerender dynamic routes...`);
-  const server = spawn('npx next start -p ' + PRERENDER_PORT, { shell: true });
+  const server = spawn('npx next start -p ' + PRERENDER_PORT, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  if (server.stdout) server.stdout.on('data', (d) => process.stdout.write(`[next] ${d}`));
+  if (server.stderr) server.stderr.on('data', (d) => process.stderr.write(`[next-err] ${d}`));
 
   const isReady = await waitForServer(PRERENDER_PORT);
   if (!isReady) {
@@ -141,11 +143,29 @@ async function prerenderDynamicRoutes() {
     'accessories',
   ];
 
-  const productSlugs = [
+  const productSlugsSet = new Set([
     'shirt',
+    'relaxed-shirt',
+    'dem',
     'prod-1793939922857-2s6mie',
     'prod-1793944052304-597glu',
-  ];
+    'prod-1794287175968-hic2x4',
+  ]);
+
+  try {
+    const productsJsonPath = path.join(ROOT, '.data', 'firestore', 'products.json');
+    if (fs.existsSync(productsJsonPath)) {
+      const pData = JSON.parse(fs.readFileSync(productsJsonPath, 'utf8'));
+      for (const [id, prod] of Object.entries(pData)) {
+        if (id) productSlugsSet.add(id);
+        if (prod && prod.slug) productSlugsSet.add(prod.slug);
+      }
+    }
+  } catch (err) {
+    console.warn('Could not read .data/firestore/products.json for prerendering:', err.message);
+  }
+
+  const productSlugs = Array.from(productSlugsSet);
 
   console.log(`Prerendering ${categorySlugs.length} categories...`);
   for (const slug of categorySlugs) {
@@ -190,6 +210,45 @@ async function prerenderDynamicRoutes() {
       console.log(`  ✓ /products/${slug} (${htmlRes.statusCode})`);
     } catch (err) {
       console.warn(`  ✗ Failed to prerender /products/${slug}:`, err.message);
+    }
+  }
+
+  console.log(`Prerendering admin edit product routes...`);
+  try {
+    const editUrl = `http://localhost:${PRERENDER_PORT}/admin/products/edit`;
+    const [editHtml, editRsc] = await Promise.all([
+      fetchUrl(editUrl),
+      fetchUrl(editUrl, { RSC: '1' }),
+    ]);
+    if (editHtml.statusCode === 200 && editHtml.body) {
+      saveFile(path.join(HOSTING_DIR, 'admin', 'products', 'edit.html'), editHtml.body);
+    }
+    if (editRsc.statusCode === 200 && editRsc.body) {
+      saveFile(path.join(HOSTING_DIR, 'admin', 'products', 'edit.rsc'), editRsc.body);
+    }
+    console.log(`  ✓ /admin/products/edit (${editHtml.statusCode})`);
+  } catch (err) {
+    console.warn(`  ✗ Failed to prerender /admin/products/edit:`, err.message);
+  }
+
+  for (const slug of productSlugs) {
+    try {
+      const url = `http://localhost:${PRERENDER_PORT}/admin/products/${slug}`;
+      const [htmlRes, rscRes] = await Promise.all([
+        fetchUrl(url),
+        fetchUrl(url, { RSC: '1' }),
+      ]);
+      if (htmlRes.statusCode === 200 && htmlRes.body) {
+        saveFile(path.join(HOSTING_DIR, 'admin', 'products', `${slug}.html`), htmlRes.body);
+        saveFile(path.join(HOSTING_DIR, 'admin', 'products', slug, 'index.html'), htmlRes.body);
+      }
+      if (rscRes.statusCode === 200 && rscRes.body) {
+        saveFile(path.join(HOSTING_DIR, 'admin', 'products', `${slug}.rsc`), rscRes.body);
+        saveFile(path.join(HOSTING_DIR, 'admin', 'products', slug, 'index.rsc'), rscRes.body);
+      }
+      console.log(`  ✓ /admin/products/${slug} (${htmlRes.statusCode})`);
+    } catch (err) {
+      console.warn(`  ✗ Failed to prerender /admin/products/${slug}:`, err.message);
     }
   }
 

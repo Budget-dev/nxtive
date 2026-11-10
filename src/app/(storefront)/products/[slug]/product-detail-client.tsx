@@ -55,6 +55,16 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   const [submittingRev, setSubmittingRev] = useState(false);
 
   React.useEffect(() => {
+    setSelectedImage(gallery[0] || "");
+    setSelectedSize(product.sizes?.[1] || product.sizes?.[0] || "M");
+    setSelectedColorIdx(0);
+    setQuantity(1);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [product.id]);
+
+  React.useEffect(() => {
     router.prefetch("/checkout");
     getPublicApprovedReviews(product.id)
       .then((data) => setApprovedReviews(data))
@@ -518,7 +528,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                   ) : (
                     <>
                       <ShoppingBag size={16} />
-                      <span>Add to Shopping Bag</span>
+                      <span>Add to Shopping Bag — ₹{(product.price * quantity).toLocaleString("en-IN")}</span>
                     </>
                   )}
                 </button>
@@ -575,7 +585,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                   </>
                 ) : (
                   <>
-                    <span>Instant Buy Now</span>
+                    <span>Instant Buy Now • ₹{(product.price * quantity).toLocaleString("en-IN")}</span>
                     <ArrowRight size={15} />
                   </>
                 )}
@@ -1166,7 +1176,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
           }}
         >
           <ShoppingBag size={14} />
-          <span>Add to Bag</span>
+          <span>Add to Bag • ₹{(product.price * quantity).toLocaleString("en-IN")}</span>
         </button>
       </div>
 

@@ -367,7 +367,7 @@ export default function AdminProductsPage() {
                           <div>
                             <div style={{ fontWeight: 700, fontSize: "13.5px", color: "#121110" }}>
                               <Link
-                                href={`/admin/products/${p.id}`}
+                                href={`/admin/products/edit?id=${p.id}`}
                                 style={{ color: "inherit", textDecoration: "none" }}
                               >
                                 {p.title}
@@ -421,7 +421,7 @@ export default function AdminProductsPage() {
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <Link
-                            href={`/admin/products/${p.id}`}
+                            href={`/admin/products/edit?id=${p.id}`}
                             className="admin-btn-secondary admin-btn-sm"
                             title="Edit Product"
                           >

@@ -31,7 +31,7 @@ export function ProductFallbackClient({ slug, initialProducts = [] }: ProductFal
 
   if (matchedProduct) {
     const related = relatedProducts(catalog, matchedProduct.id, 4);
-    return <ProductDetailClient product={matchedProduct} relatedProducts={related} />;
+    return <ProductDetailClient key={matchedProduct.id} product={matchedProduct} relatedProducts={related} />;
   }
 
   if (!ready) {

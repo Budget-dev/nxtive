@@ -85,6 +85,30 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
     }
   }, [paramCategory, isEdit]);
 
+  // Synchronize state if initialProduct is loaded asynchronously
+  useEffect(() => {
+    if (initialProduct) {
+      setTitle(initialProduct.title || "");
+      setSlug(initialProduct.slug || "");
+      if (initialProduct.category) setCategory(initialProduct.category);
+      setBadge(initialProduct.badge || "None");
+      setPrice(initialProduct.price || 0);
+      setOriginalPrice(initialProduct.originalPrice || undefined);
+      setTotalStock(initialProduct.totalStock ?? initialProduct.stock ?? 0);
+      setLowStockThreshold(initialProduct.lowStockThreshold ?? 5);
+      setInStock(initialProduct.inStock ?? true);
+      setFeatured(initialProduct.featured ?? false);
+      setFit(initialProduct.fit || "");
+      setSelectedSizes(initialProduct.sizes || []);
+      setColors(initialProduct.colors || []);
+      setDescription(initialProduct.description || "");
+      setDetailsText(initialProduct.details?.join("\n") || "");
+      setFabricCareText(initialProduct.fabricCare?.join("\n") || "");
+      setMainImage(initialProduct.image || initialProduct.imageUrl || "");
+      setGalleryImages(initialProduct.images || (initialProduct.image ? [initialProduct.image] : []));
+    }
+  }, [initialProduct]);
+
   const handleAddNewCategory = async () => {
     const trimmed = newCategoryName.trim();
     if (!trimmed) return;

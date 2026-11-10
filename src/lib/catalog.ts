@@ -418,3 +418,8 @@ export function relatedProducts(products: Product[], productId: string, limit = 
     .concat(products.filter((product) => product && product.id !== productId && product.category !== current.category))
     .slice(0, limit);
 }
+
+export function getProductHref(product: { id?: string; slug?: string } | null | undefined): string {
+  if (!product) return "/products";
+  return `/products/${encodeURIComponent(product.slug || product.id || "")}`;
+}

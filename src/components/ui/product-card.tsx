@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useStore } from "@/components/store-context";
 import type { Product } from "@/types/product";
 import { sharpImageSrc } from "@/lib/sharp-image";
+import { getProductHref } from "@/lib/catalog";
 
 interface ProductCardProps {
   product: Product;
@@ -59,7 +60,7 @@ export function ProductCard({ product }: ProductCardProps) {
           marginBottom: "10px",
         }}
       >
-        <Link href={`/products/${product.slug || product.id}`} style={{ display: "block", width: "100%", height: "100%" }}>
+        <Link href={getProductHref(product)} style={{ display: "block", width: "100%", height: "100%" }}>
           <img
             src={sharpImageSrc(product.image)}
             alt={product.title}
@@ -158,7 +159,7 @@ export function ProductCard({ product }: ProductCardProps) {
       </div>
 
       {/* Title & Price Link */}
-      <Link href={`/products/${product.slug || product.id}`} style={{ color: "inherit", textDecoration: "none", display: "block" }}>
+      <Link href={getProductHref(product)} style={{ color: "inherit", textDecoration: "none", display: "block" }}>
         <h3
           style={{
             fontSize: "13px",
@@ -241,22 +242,27 @@ export function ProductCard({ product }: ProductCardProps) {
         <button
           type="button"
           onClick={handleAddToCart}
-          aria-label={`Add ${product.title} to bag`}
+          aria-label={`Add ${product.title} to bag for ₹${product.price.toLocaleString("en-IN")}`}
           style={{
-            width: "44px",
-            height: "44px",
-            borderRadius: "5px",
+            height: "36px",
+            padding: "0 10px",
+            borderRadius: "6px",
             backgroundColor: "#111110",
             color: "#FFFFFF",
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
-            justifyContent: "center",
+            gap: "5px",
+            fontSize: "12px",
+            fontWeight: 600,
             transition: "transform 0.15s ease, background-color 0.15s ease",
             cursor: "pointer",
+            border: "none",
+            whiteSpace: "nowrap",
           }}
           className="add-to-cart-btn"
         >
-          <ShoppingBag size={14} />
+          <ShoppingBag size={13} />
+          <span>Add • ₹{product.price.toLocaleString("en-IN")}</span>
         </button>
       </div>
 

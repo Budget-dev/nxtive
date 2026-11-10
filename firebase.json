@@ -132,6 +132,26 @@
         "destination": "/robots.txt"
       },
       {
+        "source": "/admin/products/new",
+        "destination": "/admin/products/new.html"
+      },
+      {
+        "source": "/admin/products/edit",
+        "destination": "/admin/products/edit.html"
+      },
+      {
+        "source": "/admin/products",
+        "destination": "/admin/products.html"
+      },
+      {
+        "source": "/admin/products/**",
+        "destination": "/admin/products/edit.html"
+      },
+      {
+        "source": "/admin/**",
+        "destination": "/admin/dashboard.html"
+      },
+      {
         "source": "/categories/**",
         "destination": "/categories.html"
       },

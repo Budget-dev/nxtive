@@ -17,8 +17,11 @@ export async function generateStaticParams() {
     if (p.id) slugs.add(p.id.toLowerCase());
   }
   slugs.add("shirt");
+  slugs.add("relaxed-shirt");
+  slugs.add("dem");
   slugs.add("prod-1793939922857-2s6mie");
   slugs.add("prod-1793944052304-597glu");
+  slugs.add("prod-1794287175968-hic2x4");
   return Array.from(slugs).map((slug) => ({ slug }));
 }
 
@@ -28,8 +31,15 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const decoded = decodeURIComponent(slug || "").toLowerCase().trim();
   const products = await fetchStorefrontProducts();
-  const product = products.find((item) => item.slug === slug || item.id === slug);
+  const product = products.find(
+    (item) =>
+      item.slug?.toLowerCase().trim() === decoded ||
+      item.id?.toLowerCase().trim() === decoded ||
+      item.slug === slug ||
+      item.id === slug
+  );
 
   if (!product) {
     return {
@@ -101,8 +111,15 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
+  const decoded = decodeURIComponent(slug || "").toLowerCase().trim();
   const products = await fetchStorefrontProducts();
-  const product = products.find((item) => item.slug === slug || item.id === slug);
+  const product = products.find(
+    (item) =>
+      item.slug?.toLowerCase().trim() === decoded ||
+      item.id?.toLowerCase().trim() === decoded ||
+      item.slug === slug ||
+      item.id === slug
+  );
 
   if (!product) {
     return <ProductFallbackClient slug={slug} initialProducts={products} />;
@@ -173,6 +190,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
       />
       <ProductDetailClient
+        key={product.id}
         product={product}
         relatedProducts={relatedProducts(products, product.id, 4)}
       />

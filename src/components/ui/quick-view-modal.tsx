@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Heart, ShoppingBag, Check, ShieldCheck, Truck } from "lucide-react";
+import Link from "next/link";
+import { X, Heart, ShoppingBag, Check, ShieldCheck, Truck, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "@/components/store-context";
 import { sharpImageSrc } from "@/lib/sharp-image";
@@ -152,18 +153,24 @@ export function QuickViewModal() {
               {quickViewProduct.category || "NXTIVE ESSENTIALS"}
             </div>
 
-            <h3
-              className="font-display"
-              style={{
-                fontSize: "30px",
-                letterSpacing: "0.02em",
-                color: "var(--text-dark)",
-                lineHeight: 1.1,
-                marginBottom: "12px",
-              }}
+            <Link
+              href={`/products/${encodeURIComponent(quickViewProduct.slug || quickViewProduct.id)}`}
+              onClick={() => setQuickViewProduct(null)}
+              style={{ textDecoration: "none", color: "inherit", display: "inline-block" }}
             >
-              {quickViewProduct.title}
-            </h3>
+              <h3
+                className="font-display"
+                style={{
+                  fontSize: "30px",
+                  letterSpacing: "0.02em",
+                  color: "var(--text-dark)",
+                  lineHeight: 1.1,
+                  marginBottom: "12px",
+                }}
+              >
+                {quickViewProduct.title}
+              </h3>
+            </Link>
 
             <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "16px" }}>
               <span style={{ fontSize: "24px", fontWeight: 700, color: "var(--text-dark)" }}>
@@ -250,7 +257,7 @@ export function QuickViewModal() {
                 }}
               >
                 <ShoppingBag size={18} />
-                <span>Add to Bag</span>
+                <span>Add to Bag • ₹{quickViewProduct.price.toLocaleString("en-IN")}</span>
               </button>
 
               <button

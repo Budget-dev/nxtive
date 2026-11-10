@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import type { Product, Category } from "@/types/product";
-import { categoriesFromProducts, productsForCategory, DEFAULT_CATEGORIES } from "@/lib/catalog";
+import { categoriesFromProducts, productsForCategory, DEFAULT_CATEGORIES, getProductHref } from "@/lib/catalog";
 import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
 import { DEFAULT_SOCIAL_GALLERY } from "@/constants/social-gallery";
 
@@ -144,7 +144,7 @@ function TwoCardProduct({ product }: { product: Product }) {
     >
       {/* Media Box */}
       <div className="two-card-media-box">
-        <Link href={`/products/${product.slug || product.id}`} className="two-card-img-link">
+        <Link href={getProductHref(product)} className="two-card-img-link">
           <img
             src={product.image}
             alt={product.title}
@@ -153,6 +153,7 @@ function TwoCardProduct({ product }: { product: Product }) {
             className="two-card-img"
           />
         </Link>
+
 
         {/* Badge */}
         {product.badge && (
@@ -185,7 +186,7 @@ function TwoCardProduct({ product }: { product: Product }) {
 
       {/* Info Content */}
       <div className="two-card-content">
-        <Link href={`/products/${product.slug || product.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+        <Link href={getProductHref(product)} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
           <div className="two-card-meta-row">
             <h3 className="two-card-title">
               {product.title}
@@ -232,11 +233,11 @@ function TwoCardProduct({ product }: { product: Product }) {
           <button
             type="button"
             onClick={handleAddToCart}
-            aria-label={`Add ${product.title} to bag`}
+            aria-label={`Add ${product.title} to bag for ₹${product.price.toLocaleString("en-IN")}`}
             className="two-card-add-cart-btn"
           >
             <ShoppingBag size={15} />
-            <span className="add-cart-text">Add to Bag</span>
+            <span className="add-cart-text">Add • ₹{product.price.toLocaleString("en-IN")}</span>
           </button>
         </div>
       </div>
