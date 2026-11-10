@@ -1,9 +1,11 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   CheckCircle2,
   Package,
@@ -15,7 +17,7 @@ import {
   ExternalLink,
   FileText,
 } from "lucide-react";
-import { useStore } from "@/components/store-context";
+import { useStore, normalizeOrder, type Order } from "@/components/store-context";
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
@@ -23,13 +25,102 @@ function OrderSuccessContent() {
   const orderNumberParam = searchParams.get("orderNumber");
   const utr = searchParams.get("utr");
   const method = searchParams.get("method");
-  const { orders } = useStore();
+  const { orders, clearCart } = useStore();
 
-  const currentOrder = orderId ? orders.find((o) => o.id === orderId) : undefined;
+  const [fetchedOrder, setFetchedOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Clear cart when successfully arrived on order confirmation
+  useEffect(() => {
+    try {
+      clearCart();
+    } catch {}
+  }, [clearCart]);
+
+  // Resolve order details:
+  // 1. From StoreContext orders
+  // 2. From sessionStorage last_confirmed_order
+  // 3. Direct Firestore document query
+  useEffect(() => {
+    let active = true;
+
+    async function loadOrder() {
+      // 1. Check StoreContext orders
+      if (orderId) {
+        const memoryOrder = orders.find((o) => o.id === orderId || (o as any).orderNumber === orderNumberParam);
+        if (memoryOrder) {
+          if (active) {
+            setFetchedOrder(memoryOrder);
+            setLoading(false);
+          }
+          return;
+        }
+      }
+
+      // 2. Check sessionStorage
+      try {
+        const storedJson = sessionStorage.getItem("last_confirmed_order");
+        if (storedJson) {
+          const parsed = JSON.parse(storedJson);
+          if (!orderId || parsed.id === orderId || parsed.orderId === orderId || parsed.orderNumber === orderNumberParam) {
+            const normalized = normalizeOrder(parsed);
+            if (active) {
+              setFetchedOrder(normalized);
+              setLoading(false);
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not read last_confirmed_order from sessionStorage:", err);
+      }
+
+      // 3. Check Firestore
+      if (orderId) {
+        try {
+          const snap = await getDoc(doc(db, "orders", orderId));
+          if (snap.exists() && active) {
+            const normalized = normalizeOrder({ id: snap.id, ...snap.data() });
+            setFetchedOrder(normalized);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn("Direct Firestore order query notice:", err);
+        }
+      }
+
+      if (active) {
+        setLoading(false);
+      }
+    }
+
+    loadOrder();
+
+    return () => {
+      active = false;
+    };
+  }, [orderId, orderNumberParam, orders]);
+
+  const currentOrder = fetchedOrder || (orderId ? orders.find((o) => o.id === orderId) : undefined);
   const displayOrderNumber =
     orderNumberParam ||
     (currentOrder as any)?.orderNumber ||
     (orderId?.startsWith("NXT") ? orderId : orderId ? `NXTIVE-${orderId.slice(-6).toUpperCase()}` : "");
+
+  if (loading && !currentOrder && orderId) {
+    return (
+      <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "100px 0", textAlign: "center" }}>
+        <div className="container" style={{ maxWidth: "460px" }}>
+          <div style={{ backgroundColor: "#FFFFFF", padding: "40px", borderRadius: "16px", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" }}>
+            <div style={{ width: "40px", height: "40px", border: "3px solid #E5E7EB", borderTopColor: "#111110", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+            <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#111110" }}>Loading your order confirmation...</h3>
+            <p style={{ fontSize: "13px", color: "#6B7280", marginTop: "6px" }}>Verifying order details for #{displayOrderNumber || orderId}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "60px 0 90px 0" }}>
@@ -82,7 +173,7 @@ function OrderSuccessContent() {
 
           <p style={{ fontSize: "14.5px", color: "#666057", maxWidth: "520px", margin: "0 auto" }}>
             {currentOrder
-              ? <>We've received your request and our fulfillment team is preparing your package. A confirmation has been dispatched to <strong>{currentOrder.shippingAddress.email}</strong>.</>
+              ? <>We've received your request and our fulfillment team is preparing your package.{currentOrder.shippingAddress?.email ? <> A confirmation has been dispatched to <strong>{currentOrder.shippingAddress.email}</strong>.</> : ""}</>
               : "Your order was received. Sign in with the account used at checkout to view the protected order details."}
           </p>
         </div>
@@ -279,16 +370,24 @@ function OrderSuccessContent() {
                     <span>Shipping To</span>
                   </div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#111110" }}>
-                    {currentOrder.shippingAddress.fullName}
+                    {currentOrder.shippingAddress?.fullName || (currentOrder.shippingAddress as any)?.name || "Customer"}
                   </div>
                   <div style={{ fontSize: "12.5px", color: "#6F6961", marginTop: "2px", lineHeight: "1.4" }}>
-                    {currentOrder.shippingAddress.street}
-                    {currentOrder.shippingAddress.apartment ? `, ${currentOrder.shippingAddress.apartment}` : ""}
-                    <br />
-                    {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state} -{" "}
-                    {currentOrder.shippingAddress.postalCode}
-                    <br />
-                    Phone: {currentOrder.shippingAddress.phone}
+                    {currentOrder.shippingAddress?.street || "Standard Address"}
+                    {currentOrder.shippingAddress?.apartment ? `, ${currentOrder.shippingAddress.apartment}` : ""}
+                    {currentOrder.shippingAddress?.city ? (
+                      <>
+                        <br />
+                        {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state} -{" "}
+                        {currentOrder.shippingAddress.postalCode}
+                      </>
+                    ) : null}
+                    {currentOrder.shippingAddress?.phone ? (
+                      <>
+                        <br />
+                        Phone: {currentOrder.shippingAddress.phone}
+                      </>
+                    ) : null}
                   </div>
                 </div>
 

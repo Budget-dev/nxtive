@@ -97,6 +97,7 @@ interface StoreContextType {
     deliveryMethod: string;
     userId?: string;
   }) => Promise<Order>;
+  recordOrder: (order: Order) => void;
   getOrderById: (orderId: string) => Order | undefined;
   totalCartCount: number;
   cartSubtotal: number;
@@ -115,7 +116,33 @@ function toIsoDate(value: unknown): string {
   return new Date().toISOString();
 }
 
-function normalizeOrder(raw: any): Order {
+export function normalizeOrder(raw: any): Order {
+  if (!raw) {
+    return {
+      id: "",
+      date: new Date().toISOString().split("T")[0],
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      shipping: 0,
+      total: 0,
+      status: "Order Confirmed",
+      paymentMethod: "PhonePe UPI",
+      paymentStatus: "Paid",
+      shippingAddress: {
+        fullName: "Customer",
+        email: "",
+        phone: "",
+        street: "",
+        city: "",
+        state: "",
+        postalCode: "",
+        country: "India",
+      },
+      deliveryDateEstimate: "3-5 Business Days",
+      trackingNumber: "",
+    };
+  }
   const rawStatus = String(raw.status || "pending").toLowerCase();
   const status: Order["status"] = rawStatus === "delivered"
     ? "Delivered"
@@ -123,10 +150,17 @@ function normalizeOrder(raw: any): Order {
       ? "Shipped"
       : rawStatus === "cancelled" || rawStatus === "refunded"
         ? "Cancelled"
-        : rawStatus === "processing" || rawStatus === "packed" || rawStatus === "payment_confirmed"
+        : rawStatus === "processing" || rawStatus === "packed" || rawStatus === "payment_confirmed" || rawStatus === "advance_submitted"
           ? "Processing"
           : "Order Confirmed";
-  const createdAt = toIsoDate(raw.createdAt || raw.date);
+  const createdAt = toIsoDate(raw.createdAt || raw.date || raw.submittedAt);
+  const rawMethod = String(raw.paymentMethod || "PhonePe UPI");
+  const isPaid =
+    raw.paymentStatus === "paid" ||
+    raw.paymentStatus === "Paid" ||
+    rawStatus === "payment_confirmed" ||
+    (!rawMethod.toLowerCase().includes("cod") && Boolean(raw.upiTransactionId || raw.paymentTransactionId));
+
   return {
     id: String(raw.id || raw.orderId || ""),
     date: createdAt.split("T")[0],
@@ -134,21 +168,31 @@ function normalizeOrder(raw: any): Order {
       id: String(item.productId || item.id || ""),
       title: String(item.title || "Product"),
       price: Number(item.price || 0),
-      quantity: Number(item.quantity || 0),
-      selectedSize: String(item.selectedSize || ""),
+      quantity: Number(item.quantity || 1),
+      selectedSize: String(item.selectedSize || "M"),
       selectedColor: item.selectedColor ? String(item.selectedColor) : undefined,
-      image: String(item.image || ""),
+      image: String(item.image || "/images/nxtvie/cat-tshirts.jpg"),
     })) : [],
-    subtotal: Number(raw.subtotal || 0),
+    subtotal: Number(raw.subtotal || raw.amount || raw.total || raw.totalAmount || 0),
     discount: Number(raw.discount || 0),
     shipping: Number(raw.shipping || 0),
-    total: Number(raw.total || 0),
+    total: Number(raw.total || raw.totalAmount || raw.amount || 0),
     status,
-    paymentMethod: String(raw.paymentMethod || "Cash on Delivery"),
-    paymentStatus: raw.paymentStatus === "paid" ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending COD",
-    shippingAddress: raw.shippingAddress,
-    deliveryDateEstimate: String(raw.deliveryDateEstimate || ""),
-    trackingNumber: String(raw.trackingNumber || ""),
+    paymentMethod: rawMethod === "cod_partial" ? "Cash on Delivery (Advance Paid)" : rawMethod,
+    paymentStatus: isPaid ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending COD",
+    shippingAddress: {
+      fullName: String(raw.shippingAddress?.fullName || raw.shippingAddress?.name || raw.customerName || raw.userName || "Customer"),
+      email: String(raw.shippingAddress?.email || raw.customerEmail || raw.userEmail || ""),
+      phone: String(raw.shippingAddress?.phone || raw.customerPhone || raw.userPhone || ""),
+      street: String(raw.shippingAddress?.street || raw.address || ""),
+      apartment: raw.shippingAddress?.apartment ? String(raw.shippingAddress.apartment) : undefined,
+      city: String(raw.shippingAddress?.city || raw.city || ""),
+      state: String(raw.shippingAddress?.state || raw.state || ""),
+      postalCode: String(raw.shippingAddress?.postalCode || raw.pincode || raw.postalCode || ""),
+      country: String(raw.shippingAddress?.country || "India"),
+    },
+    deliveryDateEstimate: String(raw.deliveryDateEstimate || "3-5 Business Days"),
+    trackingNumber: String(raw.trackingNumber || raw.orderNumber || raw.id || ""),
   };
 }
 
@@ -448,6 +492,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const recordOrder = (order: Order) => {
+    setOrders((prev) => [order, ...prev.filter((o) => o.id !== order.id)]);
+  };
+
   const getOrderById = (orderId: string): Order | undefined => {
     return orders.find((o) => o.id === orderId);
   };
@@ -477,6 +525,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         applyCoupon,
         removeCoupon,
         placeOrder,
+        recordOrder,
         getOrderById,
         totalCartCount,
         cartSubtotal,

@@ -18,7 +18,7 @@ import {
   User,
   CheckCircle2,
 } from "lucide-react";
-import { useStore } from "@/components/store-context";
+import { useStore, normalizeOrder } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
 import { PhonePeCheckout } from "@/components/checkout/phonepe-checkout";
 
@@ -61,8 +61,11 @@ const INDIAN_STATES = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartSubtotal, discountAmount, shippingFee, clearCart, couponCode } = useStore();
+  const { cart, cartSubtotal, discountAmount, shippingFee, clearCart, couponCode, recordOrder } = useStore();
   const { user, loginWithEmail, signupWithEmail, loginWithGoogle } = useAuth();
+
+  // Order submission state
+  const [isOrderPlaced, setIsOrderPlaced] = useState(false);
 
   // Form states
   const [email, setEmail] = useState(user?.email || "");
@@ -192,8 +195,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleOrderInitiation = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOrderInitiation = (e?: React.FormEvent | React.MouseEvent) => {
+    if (e?.preventDefault) {
+      e.preventDefault();
+    }
 
     // Enforce sign-in popup before placing order
     if (!user) {
@@ -219,6 +224,25 @@ export default function CheckoutPage() {
       paymentSection.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
+
+  if (isOrderPlaced) {
+    return (
+      <div style={{ backgroundColor: "#F5F3ED", minHeight: "100vh", padding: "100px 20px", textAlign: "center" }}>
+        <div style={{ maxWidth: "480px", margin: "0 auto", backgroundColor: "#FFFFFF", padding: "40px", borderRadius: "16px", boxShadow: "0 10px 30px rgba(0,0,0,0.06)" }}>
+          <div style={{ width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "#111110", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <CheckCircle2 size={32} />
+          </div>
+          <h2 style={{ fontSize: "22px", fontWeight: 800, color: "#111110", marginBottom: "8px" }}>
+            Payment Confirmed!
+          </h2>
+          <p style={{ fontSize: "14px", color: "#666", marginBottom: "20px" }}>
+            Finalizing your order and loading your confirmation receipt...
+          </p>
+          <div style={{ width: "32px", height: "32px", border: "3px solid #E5E7EB", borderTopColor: "#111110", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto" }} />
+        </div>
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (
@@ -290,7 +314,7 @@ export default function CheckoutPage() {
 
       {/* Main Checkout Container */}
       <div className="container" style={{ paddingTop: "36px" }}>
-        <form onSubmit={handleOrderInitiation}>
+        <div className="checkout-form-shell">
           <div className="checkout-grid">
             {/* Left: Checkout Steps (Delivery Method Card completely removed) */}
             <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
@@ -653,9 +677,18 @@ export default function CheckoutPage() {
                               country: "India",
                             }}
                             items={cart}
-                            onSuccess={(orderId, utr, orderNumber) => {
+                            onSuccess={(orderId, utr, orderNumber, orderObj) => {
+                              setIsOrderPlaced(true);
+                              if (orderObj) {
+                                try {
+                                  recordOrder(normalizeOrder(orderObj));
+                                  sessionStorage.setItem("last_confirmed_order", JSON.stringify(orderObj));
+                                } catch (err) {
+                                  console.warn("Storage error:", err);
+                                }
+                              }
                               clearCart();
-                              router.push(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=phonepe&utr=${encodeURIComponent(utr)}`);
+                              router.replace(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=phonepe&utr=${encodeURIComponent(utr)}`);
                             }}
                             onError={(msg) => setOrderError(msg)}
                           />
@@ -783,9 +816,18 @@ export default function CheckoutPage() {
                               country: "India",
                             }}
                             items={cart}
-                            onSuccess={(orderId, utr, orderNumber) => {
+                            onSuccess={(orderId, utr, orderNumber, orderObj) => {
+                              setIsOrderPlaced(true);
+                              if (orderObj) {
+                                try {
+                                  recordOrder(normalizeOrder(orderObj));
+                                  sessionStorage.setItem("last_confirmed_order", JSON.stringify(orderObj));
+                                } catch (err) {
+                                  console.warn("Storage error:", err);
+                                }
+                              }
                               clearCart();
-                              router.push(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=cod&utr=${encodeURIComponent(utr)}`);
+                              router.replace(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=cod&utr=${encodeURIComponent(utr)}`);
                             }}
                             onError={(msg) => setOrderError(msg)}
                           />
@@ -949,7 +991,8 @@ export default function CheckoutPage() {
                   </button>
                 ) : (
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleOrderInitiation}
                     style={{
                       width: "100%",
                       padding: "15px 24px",
@@ -1011,7 +1054,7 @@ export default function CheckoutPage() {
               </div>
             </div>
           </div>
-        </form>
+        </div>
       </div>
 
       {/* ─── Sign-In Modal Popup (Required Before Placing Order) ─── */}

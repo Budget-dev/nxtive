@@ -48,7 +48,7 @@ export interface PhonePeCheckoutProps {
   shippingAddress?: any;
   deliveryMethod?: string;
   items?: any[];
-  onSuccess?: (orderId: string, utr: string, orderNumber: string) => void;
+  onSuccess?: (orderId: string, utr: string, orderNumber: string, orderData?: any) => void;
   onError?: (err: string) => void;
 }
 
@@ -130,11 +130,15 @@ export function PhonePeCheckout({
         uid: userId || null,
         userId: userId || null,
         amount: Number(fullOrderValue),
+        subtotal: Number(fullOrderValue),
         total: Number(fullOrderValue),
         totalAmount: Number(fullOrderValue),
+        discount: 0,
+        shipping: 0,
         advanceAmount: isCod ? Number(amount) : Number(fullOrderValue),
         codBalanceDue: isCod ? Number(codBalanceDue) : 0,
         items: (items || []).map((item) => ({
+          id: item.id || item.productId || "",
           productId: item.id || item.productId || "",
           title: item.title || "Item",
           price: Number(item.price || 0),
@@ -145,6 +149,8 @@ export function PhonePeCheckout({
         })),
         shippingAddress: shippingAddress || {},
         deliveryMethod: deliveryMethod || "Standard Domestic (3-5 Days)",
+        deliveryDateEstimate: "3-5 Business Days",
+        trackingNumber: generatedOrderNumber,
         status: "pending",
         paymentMethod: isCod ? "cod_partial" : "phonepe",
         paymentStatus: isCod ? "advance_pending" : "pending_verification",
@@ -212,8 +218,10 @@ export function PhonePeCheckout({
     }
   }
 
-  async function handleSubmitTransaction(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmitTransaction(e?: React.FormEvent | React.MouseEvent) {
+    if (e?.preventDefault) {
+      e.preventDefault();
+    }
     const cleanUtr = utr.trim();
     if (!cleanUtr) {
       setError("Please enter the transaction ID or 12-digit UTR shown in PhonePe / your UPI app after paying.");
@@ -252,9 +260,58 @@ export function PhonePeCheckout({
         updatedAt: serverTimestamp(),
       });
 
+      const confirmedOrder = {
+        id: orderId,
+        orderId,
+        orderNumber: orderNumber || "",
+        date: new Date().toISOString().split("T")[0],
+        createdAt: new Date().toISOString(),
+        items: (items || []).map((item) => ({
+          id: item.id || item.productId || "",
+          productId: item.id || item.productId || "",
+          title: item.title || "Item",
+          price: Number(item.price || 0),
+          quantity: Number(item.quantity || 1),
+          selectedSize: item.selectedSize || "M",
+          selectedColor: item.selectedColor || "",
+          image: item.image || "",
+        })),
+        subtotal: Number(fullOrderValue),
+        discount: 0,
+        shipping: 0,
+        total: Number(fullOrderValue),
+        totalAmount: Number(fullOrderValue),
+        advanceAmount: isCod ? Number(amount) : Number(fullOrderValue),
+        codBalanceDue: isCod ? Number(codBalanceDue) : 0,
+        status: isCod ? "Processing" : "Order Confirmed",
+        paymentMethod: isCod ? "cod_partial" : "PhonePe UPI",
+        paymentStatus: isCod ? "advance_submitted" : "Paid",
+        shippingAddress: {
+          fullName: customerName,
+          name: customerName,
+          email: customerEmail || "",
+          phone: customerPhone,
+          street: (shippingAddress as any)?.street || "",
+          apartment: (shippingAddress as any)?.apartment || "",
+          city: (shippingAddress as any)?.city || "",
+          state: (shippingAddress as any)?.state || "",
+          postalCode: (shippingAddress as any)?.postalCode || "",
+          country: (shippingAddress as any)?.country || "India",
+        },
+        deliveryDateEstimate: "3-5 Business Days",
+        trackingNumber: orderNumber || `NXT-${orderId.slice(-6).toUpperCase()}`,
+        upiTransactionId: cleanUtr,
+      };
+
+      try {
+        sessionStorage.setItem("last_confirmed_order", JSON.stringify(confirmedOrder));
+      } catch (err) {
+        console.warn("sessionStorage write error:", err);
+      }
+
       sessionStorage.removeItem("phonepe_order");
       setStep("submitted");
-      onSuccess?.(orderId, cleanUtr, orderNumber || "");
+      onSuccess?.(orderId, cleanUtr, orderNumber || "", confirmedOrder);
     } catch (e: any) {
       console.error("Failed to submit transaction UTR:", e);
       setError("Couldn't submit your transaction ID. Please check your connection and try again.");
@@ -683,9 +740,8 @@ export function PhonePeCheckout({
             </div>
           )}
 
-          {/* Form: Submit UTR / Transaction ID */}
-          <form
-            onSubmit={handleSubmitTransaction}
+          {/* Action: Submit UTR / Transaction ID */}
+          <div
             style={{
               display: "flex",
               flexDirection: "column",
@@ -730,7 +786,8 @@ export function PhonePeCheckout({
             </div>
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmitTransaction}
               disabled={busy}
               style={{
                 width: "100%",
@@ -754,10 +811,13 @@ export function PhonePeCheckout({
                   <span>Confirming Order...</span>
                 </>
               ) : (
-                <span>Confirm Payment & Submit Order</span>
+                <>
+                  <CheckCircle2 size={16} />
+                  <span>Confirm Order & Submit Payment</span>
+                </>
               )}
             </button>
-          </form>
+          </div>
         </div>
       )}
 
