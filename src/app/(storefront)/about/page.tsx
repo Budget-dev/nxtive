@@ -257,7 +257,7 @@ export default function AboutPage() {
               }}
             >
               <Image
-                src="/images/nxtvie/story-back-print-nxtive.jpg?v=20261023"
+                src="/images/nxtvie/story-back-print-hd.jpg?v=20261110"
                 alt="NXTIVE Garment Back Detail"
                 fill
                 style={{ objectFit: "cover" }}

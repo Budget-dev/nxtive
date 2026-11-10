@@ -1411,8 +1411,8 @@ export function StorefrontHomeClient() {
               }}
             >
               <img
-                src="/images/cinematic/story-nxtive-backprint.jpg"
-                alt="NXTIVE Mindset Philosophy Editorial featuring official brand typography"
+                src="/images/nxtvie/story-back-print-hd.jpg"
+                alt="NXTIVE Menswear Brand Mindset and Architectural Streetwear Backprint"
                 loading="lazy"
                 decoding="async"
                 style={{
