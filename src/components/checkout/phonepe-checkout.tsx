@@ -777,7 +777,7 @@ export function PhonePeCheckout({
                   padding: "12px 14px",
                   borderRadius: "8px",
                   border: "1px solid #D1D5DB",
-                  fontSize: "14px",
+                  fontSize: "16px",
                   fontFamily: "monospace",
                   outline: "none",
                   backgroundColor: "#FAF9F6",

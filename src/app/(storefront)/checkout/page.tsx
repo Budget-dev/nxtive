@@ -109,16 +109,38 @@ export default function CheckoutPage() {
   }, [user]);
 
   const fillFromCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationMessage("Location is not supported by this browser. Please enter your address manually.");
+    if (typeof window === "undefined" || !navigator?.geolocation) {
+      setLocationMessage("Location is not supported on this device. Please enter manually.");
       return;
     }
 
     setLocationLoading(true);
     setLocationMessage(null);
+
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
+          // 1. Try internal reverse geocode endpoint first
+          const internalRes = await fetch(`/api/location/reverse-geocode?lat=${coords.latitude}&lng=${coords.longitude}`, {
+            headers: { Accept: "application/json" },
+          });
+          const internalData = await internalRes.json();
+          if (internalRes.ok && internalData.success && internalData.data) {
+            const d = internalData.data;
+            if (d.street) setStreet(d.street);
+            if (d.city) setCity(d.city);
+            if (d.state) {
+              const matched = INDIAN_STATES.find(
+                (item) => item.toLowerCase() === d.state.toLowerCase() || d.state.toLowerCase().includes(item.toLowerCase())
+              );
+              if (matched) setState(matched);
+            }
+            if (d.postalCode) setPostalCode(String(d.postalCode).replace(/\D/g, "").slice(0, 6));
+            setLocationMessage("Address auto-filled from current location.");
+            return;
+          }
+
+          // 2. OpenStreetMap reverse lookup fallback
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1`,
             { headers: { Accept: "application/json" } }
@@ -141,18 +163,18 @@ export default function CheckoutPage() {
           }
           if (matchedState) setState(matchedState);
           if (address.postcode) setPostalCode(String(address.postcode).replace(/\D/g, "").slice(0, 6));
-          setLocationMessage("Location found. Please review the address before placing your order.");
+          setLocationMessage("Address auto-filled from current location.");
         } catch {
-          setLocationMessage("We could not read this location. Please enter your address manually.");
+          setLocationMessage("Could not auto-fill address. Please enter manually.");
         } finally {
           setLocationLoading(false);
         }
       },
       () => {
         setLocationLoading(false);
-        setLocationMessage("Location permission was not granted. You can still enter the address manually.");
+        setLocationMessage("Location permission was not granted. Please enter manually.");
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
   };
 
@@ -363,7 +385,7 @@ export default function CheckoutPage() {
                         padding: "11px 14px",
                         borderRadius: "8px",
                         border: "1px solid rgba(0,0,0,0.15)",
-                        fontSize: "13.5px",
+                        fontSize: "16px",
                         outline: "none",
                       }}
                     />
@@ -384,7 +406,7 @@ export default function CheckoutPage() {
                         padding: "11px 14px",
                         borderRadius: "8px",
                         border: "1px solid rgba(0,0,0,0.15)",
-                        fontSize: "13.5px",
+                        fontSize: "16px",
                         outline: "none",
                       }}
                     />
@@ -394,47 +416,70 @@ export default function CheckoutPage() {
 
               {/* 2. Shipping Address */}
               <div className="checkout-card">
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "18px", flexWrap: "wrap" }}>
-                  <div>
-                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", marginBottom: "5px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "18px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: 0 }}>
                       2. Shipping Address
                     </h2>
-                    <p style={{ fontSize: "12px", color: "#777", lineHeight: 1.45 }}>
-                      Free insured domestic delivery dispatched via express courier (3-5 business days).
-                    </p>
+                    <button
+                      type="button"
+                      onClick={fillFromCurrentLocation}
+                      disabled={locationLoading}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        minHeight: "36px",
+                        minWidth: "140px",
+                        padding: "6px 14px",
+                        borderRadius: "9999px",
+                        border: "1px solid rgba(17,17,16,0.16)",
+                        backgroundColor: locationLoading ? "#F5F3ED" : "#FFFFFF",
+                        color: "#111110",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: locationLoading ? "wait" : "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      {locationLoading ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Detecting…</span>
+                        </>
+                      ) : (
+                        <>
+                          <LocateFixed size={13} />
+                          <span>Use my location</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={fillFromCurrentLocation}
-                    disabled={locationLoading}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "7px",
-                      minHeight: "38px",
-                      padding: "8px 14px",
-                      borderRadius: "9999px",
-                      border: "1px solid rgba(17,17,16,0.16)",
-                      backgroundColor: "#FFFFFF",
-                      color: "#111110",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      opacity: locationLoading ? 0.65 : 1,
-                    }}
-                  >
-                    <LocateFixed size={14} />
-                    {locationLoading ? "Detecting…" : "Use my location"}
-                  </button>
+                  <p style={{ fontSize: "12px", color: "#777", margin: 0, lineHeight: 1.45 }}>
+                    Free insured domestic delivery dispatched via express courier (3-5 business days).
+                  </p>
+                  {locationMessage && (
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        marginTop: "4px",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        backgroundColor: locationMessage.includes("auto-filled") ? "rgba(43,147,72,0.08)" : "rgba(180,83,9,0.08)",
+                        color: locationMessage.includes("auto-filled") ? "#2B9348" : "#B45309",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      <MapPin size={13} style={{ flexShrink: 0 }} />
+                      <span>{locationMessage}</span>
+                    </div>
+                  )}
                 </div>
-
-                {locationMessage && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "7px", marginBottom: "14px", padding: "10px 12px", borderRadius: "8px", backgroundColor: "rgba(43,147,72,0.08)", color: "#286c3a", fontSize: "12px", lineHeight: 1.4 }}>
-                    <MapPin size={14} style={{ flex: "0 0 auto", marginTop: "1px" }} />
-                    <span>{locationMessage}</span>
-                  </div>
-                )}
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                   <div className="responsive-form-grid-2">
@@ -448,7 +493,7 @@ export default function CheckoutPage() {
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         placeholder="First name"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
+                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
                       />
                     </div>
                     <div>
@@ -461,7 +506,7 @@ export default function CheckoutPage() {
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                         placeholder="Last name"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
+                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
                       />
                     </div>
                   </div>
@@ -476,7 +521,7 @@ export default function CheckoutPage() {
                       value={street}
                       onChange={(e) => setStreet(e.target.value)}
                       placeholder="House / Flat #, Building Name, Street"
-                      style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
+                      style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
                     />
                   </div>
 
@@ -490,7 +535,7 @@ export default function CheckoutPage() {
                         value={apartment}
                         onChange={(e) => setApartment(e.target.value)}
                         placeholder="Flat 402, Wing B"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
+                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
                       />
                     </div>
                     <div>
@@ -503,7 +548,7 @@ export default function CheckoutPage() {
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
                         placeholder="Mumbai"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
+                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
                       />
                     </div>
                   </div>
@@ -516,7 +561,7 @@ export default function CheckoutPage() {
                       <select
                         value={state}
                         onChange={(e) => setState(e.target.value)}
-                        style={{ width: "100%", padding: "11px 10px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13px", outline: "none", backgroundColor: "#FFFFFF" }}
+                        style={{ width: "100%", padding: "11px 10px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none", backgroundColor: "#FFFFFF" }}
                       >
                         {INDIAN_STATES.map((st) => (
                           <option key={st} value={st}>
@@ -537,7 +582,7 @@ export default function CheckoutPage() {
                         onChange={(e) => setPostalCode(e.target.value)}
                         placeholder="400050"
                         maxLength={6}
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "13.5px", outline: "none" }}
+                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
                       />
                     </div>
 
@@ -549,7 +594,7 @@ export default function CheckoutPage() {
                         type="text"
                         disabled
                         value="India"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.1)", fontSize: "13.5px", backgroundColor: "#F7F5F0", color: "#555" }}
+                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.1)", fontSize: "16px", backgroundColor: "#F7F5F0", color: "#555" }}
                       />
                     </div>
                   </div>
@@ -1174,7 +1219,7 @@ export default function CheckoutPage() {
                       padding: "10px 12px",
                       borderRadius: "8px",
                       border: "1px solid rgba(0,0,0,0.15)",
-                      fontSize: "13px",
+                      fontSize: "16px",
                       outline: "none",
                     }}
                   />
@@ -1196,7 +1241,7 @@ export default function CheckoutPage() {
                     padding: "10px 12px",
                     borderRadius: "8px",
                     border: "1px solid rgba(0,0,0,0.15)",
-                    fontSize: "13px",
+                    fontSize: "16px",
                     outline: "none",
                   }}
                 />
@@ -1217,7 +1262,7 @@ export default function CheckoutPage() {
                     padding: "10px 12px",
                     borderRadius: "8px",
                     border: "1px solid rgba(0,0,0,0.15)",
-                    fontSize: "13px",
+                    fontSize: "16px",
                     outline: "none",
                   }}
                 />
