@@ -7,6 +7,8 @@ import { Search, Heart, ShoppingBag, User, Menu, X, ArrowRight, Moon, Sun, Packa
 
 import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
+import { DEFAULT_CATEGORIES } from "@/lib/catalog";
 import { NxtvieLogo } from "./nxtvie-logo";
 
 const THEME_STORAGE_KEY = "nxtvie-theme";
@@ -82,11 +84,37 @@ export function Header() {
     });
   };
 
+  const { categories: storeCategories } = useStorefrontCatalog();
+
+  const mobileCategories = React.useMemo(() => {
+    const source =
+      storeCategories && storeCategories.length > 0
+        ? storeCategories
+        : DEFAULT_CATEGORIES;
+
+    const active = source
+      .filter((cat) => cat.isActive !== false)
+      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+
+    const seen = new Set<string>();
+    const unique: typeof active = [];
+    for (const c of active) {
+      const slug = (c.slug || "").toLowerCase().trim();
+      if (slug && !seen.has(slug)) {
+        seen.add(slug);
+        unique.push(c);
+      }
+    }
+    return unique;
+  }, [storeCategories]);
+
   const navLinks = [
-    { label: "Men", href: "/categories/men" },
-    { label: "New Arrivals", href: "/categories/new-arrivals" },
-    { label: "Clothing", href: "/categories/clothing" },
-    { label: "Collections", href: "/categories/collections" },
+    { label: "All Products", href: "/products" },
+    { label: "T-Shirts", href: "/categories/t-shirts" },
+    { label: "Shirts", href: "/categories/shirts" },
+    { label: "Hoodies", href: "/categories/hoodies" },
+    { label: "Bottoms", href: "/categories/bottoms" },
+    { label: "Jackets", href: "/categories/jackets" },
     { label: "Sale", href: "/categories/sale" },
   ];
 
@@ -488,30 +516,111 @@ export function Header() {
               </span>
             </button>
 
-            {/* Mobile Nav Links */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              {navLinks.map((link) => (
+            {/* Mobile Categories Navigation */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div
+                style={{
+                  paddingBottom: "8px",
+                  marginBottom: "6px",
+                  borderBottom: "1px solid var(--border-light)",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--text-muted, #857F76)",
+                  }}
+                >
+                  Shop By Category
+                </span>
+              </div>
+
+              {/* All Products */}
+              <Link
+                href="/products"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  document.body.style.overflow = "";
+                }}
+                style={{
+                  fontSize: "15.5px",
+                  fontWeight: 600,
+                  color: "var(--text-dark)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 4px",
+                  minHeight: "44px",
+                }}
+              >
+                <span>All Products</span>
+                <ArrowRight size={16} color="#A39D95" />
+              </Link>
+
+              {/* Dynamic Categories */}
+              {mobileCategories.map((cat) => (
                 <Link
-                  key={link.label}
-                  href={link.href}
+                  key={cat.id || cat.slug}
+                  href={`/categories/${cat.slug}`}
                   onClick={() => {
                     setMobileMenuOpen(false);
                     document.body.style.overflow = "";
                   }}
                   style={{
-                    fontSize: "16px",
+                    fontSize: "15.5px",
                     fontWeight: 600,
                     color: "var(--text-dark)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    padding: "8px 4px",
                     minHeight: "44px",
                   }}
                 >
-                  <span>{link.label}</span>
+                  <span>{cat.name}</span>
                   <ArrowRight size={16} color="#A39D95" />
                 </Link>
               ))}
+
+              {/* Sale */}
+              <Link
+                href="/categories/sale"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  document.body.style.overflow = "";
+                }}
+                style={{
+                  fontSize: "15.5px",
+                  fontWeight: 600,
+                  color: "#B3261E",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 4px",
+                  minHeight: "44px",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>Sale</span>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      backgroundColor: "rgba(179, 38, 30, 0.12)",
+                      color: "#B3261E",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    SPECIAL OFFERS
+                  </span>
+                </span>
+                <ArrowRight size={16} color="#B3261E" />
+              </Link>
             </div>
 
             {/* Mobile Bottom Links */}

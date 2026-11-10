@@ -27,21 +27,27 @@ function notifySubscribers() {
   });
 }
 
-// Hydrate from sessionStorage synchronously on module load (client side)
-if (typeof window !== "undefined") {
+let hasHydrated = false;
+
+function initMemoryFromSession() {
+  if (typeof window === "undefined") return;
   try {
-    const storedP = sessionStorage.getItem("nxtive_cache_products");
-    if (storedP) {
-      const parsedP = JSON.parse(storedP);
-      if (Array.isArray(parsedP)) {
-        memoryProducts = parsedP;
+    if (!memoryProducts) {
+      const storedP = sessionStorage.getItem("nxtive_cache_products");
+      if (storedP) {
+        const parsedP = JSON.parse(storedP);
+        if (Array.isArray(parsedP)) {
+          memoryProducts = parsedP;
+        }
       }
     }
-    const storedC = sessionStorage.getItem("nxtive_cache_categories");
-    if (storedC) {
-      const parsedC = JSON.parse(storedC);
-      if (Array.isArray(parsedC) && parsedC.length > 0) {
-        memoryCategories = parsedC;
+    if (!memoryCategories) {
+      const storedC = sessionStorage.getItem("nxtive_cache_categories");
+      if (storedC) {
+        const parsedC = JSON.parse(storedC);
+        if (Array.isArray(parsedC) && parsedC.length > 0) {
+          memoryCategories = parsedC;
+        }
       }
     }
   } catch {}
@@ -132,11 +138,19 @@ function ensureGlobalSubscriptions() {
 }
 
 export function useStorefrontCatalog() {
-  const [products, setProducts] = useState<Product[]>(() => memoryProducts ?? []);
-  const [categories, setCategories] = useState<Category[]>(() => memoryCategories ?? DEFAULT_CATEGORIES);
-  const [ready, setReady] = useState<boolean>(() => memoryProducts !== null);
+  const [products, setProducts] = useState<Product[]>(() =>
+    hasHydrated && memoryProducts ? memoryProducts : []
+  );
+  const [categories, setCategories] = useState<Category[]>(() =>
+    hasHydrated && memoryCategories ? memoryCategories : DEFAULT_CATEGORIES
+  );
+  const [ready, setReady] = useState<boolean>(() =>
+    hasHydrated && memoryProducts !== null
+  );
 
   useEffect(() => {
+    hasHydrated = true;
+    initMemoryFromSession();
     ensureGlobalSubscriptions();
 
     const update = () => {

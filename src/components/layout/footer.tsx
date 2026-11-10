@@ -134,21 +134,29 @@ export function Footer() {
               Shop
             </h3>
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
-              {["Men", "New Arrivals", "Clothing", "Collections", "Sale"].map((item) => (
-                <li key={item}>
+              {[
+                { name: "All Products", href: "/products" },
+                { name: "T-Shirts", href: "/categories/t-shirts" },
+                { name: "Shirts", href: "/categories/shirts" },
+                { name: "Hoodies", href: "/categories/hoodies" },
+                { name: "Bottoms", href: "/categories/bottoms" },
+                { name: "Jackets", href: "/categories/jackets" },
+                { name: "Sale", href: "/categories/sale" },
+              ].map((item) => (
+                <li key={item.name}>
                   <Link
-                      href={`/categories/${item.toLowerCase().replace(/\s+/g, "-")}`}
-                      style={{
-                        fontSize: "12.5px",
-                        color: "#9A948C",
-                        transition: "color 0.2s ease",
-                        display: "flex",
-                        alignItems: "center",
-                        minHeight: "44px",
-                      }}
+                    href={item.href}
+                    style={{
+                      fontSize: "12.5px",
+                      color: "#9A948C",
+                      transition: "color 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      minHeight: "44px",
+                    }}
                     className="footer-link"
                   >
-                    {item}
+                    {item.name}
                   </Link>
                 </li>
               ))}

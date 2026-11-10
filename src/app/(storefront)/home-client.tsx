@@ -358,7 +358,7 @@ export function StorefrontHomeClient() {
       .filter((c): c is (typeof browseCategories)[number] => Boolean(c));
     const others = browseCategories.filter((c) => !primaryOrder.includes(c.slug));
     const merged = [...matched, ...others];
-    return merged.length > 0 ? merged : browseCategories.slice(0, 6);
+    return (merged.length > 0 ? merged : browseCategories).slice(0, 5);
   }, [browseCategories]);
 
   const categorySections = useMemo(() => {
