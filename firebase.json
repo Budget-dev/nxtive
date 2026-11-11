@@ -26,6 +26,13 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "redirects": [
+      {
+        "source": "/categories/sweetshirts",
+        "destination": "/categories/sweatshirts",
+        "type": 301
+      }
+    ],
     "headers": [
       {
         "source": "/sitemap.xml",

@@ -109,9 +109,16 @@ function defaultCategoryImage(slug: string, name: string): string {
 
 export function normalizeCategory(id: string, data: Record<string, unknown>): Category | null {
   if (data.isActive === false) return null;
-  const name = String(data.name || "").trim();
+  let name = String(data.name || "").trim();
   if (!name) return null;
-  const slug = String(data.slug || name.toLowerCase().replace(/\s+/g, "-"));
+  let slug = String(data.slug || name.toLowerCase().replace(/\s+/g, "-")).trim();
+
+  // Fix legacy spelling mistake: "sweetshirts" -> "sweatshirts" / "Sweatshirts"
+  if (slug === "sweetshirts" || name.toLowerCase() === "sweetshirts") {
+    slug = "sweatshirts";
+    name = "Sweatshirts";
+  }
+
   const rawImage = String(data.image || "").trim();
   const image = rawImage || defaultCategoryImage(slug, name);
   const rawTagline = String(data.tagline || "").trim();
@@ -120,7 +127,7 @@ export function normalizeCategory(id: string, data: Record<string, unknown>): Ca
     : "Explore contemporary streetwear engineered for presence and clean aesthetics.");
 
   return {
-    id,
+    id: id === "sweetshirts" ? "sweatshirts" : id,
     slug,
     name,
     title: String(data.title || name),
@@ -262,23 +269,13 @@ export const DEFAULT_CATEGORIES: Category[] = [
     isActive: true,
   },
   {
-    id: "sweetshirts",
-    slug: "sweetshirts",
-    name: "Sweatshirts",
-    title: "Oversized Sweatshirts",
-    tagline: "Heavyweight comfortable oversized hoodies and sweatshirts for Indian winters.",
-    image: "/images/nxtvie/cat-hoodies.jpg",
-    sortOrder: 6,
-    isActive: true,
-  },
-  {
     id: "sweatshirts",
     slug: "sweatshirts",
     name: "Sweatshirts",
     title: "Oversized Sweatshirts",
     tagline: "Heavyweight comfortable oversized hoodies and sweatshirts for Indian winters.",
     image: "/images/nxtvie/cat-hoodies.jpg",
-    sortOrder: 7,
+    sortOrder: 6,
     isActive: true,
   },
 ];
@@ -447,6 +444,33 @@ export function productsForCategory(products: Product[], slug: string): Product[
             return cl === "new-arrivals" || cl === "new";
           }))
     );
+  }
+
+  // Sweatshirts & Hoodies (streetwear outerwear / winter tops)
+  if (normalized === "sweatshirts" || normalized === "sweetshirts") {
+    const directMatches = products.filter((p) => {
+      if (!p) return false;
+      const cat = String(p.category || "").toLowerCase().trim();
+      const catId = String(p.categoryId || "").toLowerCase().trim();
+      return (
+        cat === "sweatshirts" ||
+        cat === "sweatshirt" ||
+        cat === "sweetshirts" ||
+        cat === "sweetshirt" ||
+        catId === "sweatshirts" ||
+        catId === "sweetshirts"
+      );
+    });
+
+    if (directMatches.length > 0) return directMatches;
+
+    // Fallback: If no dedicated sweatshirts are in stock yet, include oversized hoodies (heavyweight winter fleece tops)
+    return products.filter((p) => {
+      if (!p) return false;
+      const cat = String(p.category || "").toLowerCase().trim();
+      const catId = String(p.categoryId || "").toLowerCase().trim();
+      return cat === "hoodies" || cat === "hoodie" || catId === "hoodies";
+    });
   }
 
   // Standard category / collection matching (checks category, categorySlug, categoryId, categoryIdSlug, and collections)

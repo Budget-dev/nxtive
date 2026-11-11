@@ -254,3 +254,4 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Detected
   result.provider = "coordinate_fallback";
   return result;
 }
+

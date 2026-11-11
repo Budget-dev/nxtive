@@ -21,6 +21,15 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "firebase"],
   },
+  async redirects() {
+    return [
+      {
+        source: "/categories/sweetshirts",
+        destination: "/categories/sweatshirts",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

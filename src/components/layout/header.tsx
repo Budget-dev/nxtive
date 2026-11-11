@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Search, Heart, ShoppingBag, User, Menu, X, ArrowRight, Moon, Sun, Package, Truck } from "lucide-react";
 
 import { useStore } from "@/components/store-context";
@@ -15,11 +15,19 @@ const THEME_STORAGE_KEY = "nxtvie-theme";
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const { totalCartCount, wishlist, setIsCartOpen, setIsSearchOpen } = useStore();
   const { user } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const handleMobileNav = (href: string) => {
+    document.body.style.overflow = "";
+    document.body.style.pointerEvents = "";
+    setMobileMenuOpen(false);
+    router.push(href);
+  };
   
   useEffect(() => {
     const handleScroll = () => {
@@ -92,7 +100,23 @@ export function Header() {
         ? storeCategories
         : DEFAULT_CATEGORIES;
 
-    const active = source
+    // Normalize any legacy spelling mistakes (e.g. "sweetshirts" -> "sweatshirts" / "Sweatshirts")
+    const normalized = source.map((c) => {
+      const slug = (c.slug || "").toLowerCase().trim();
+      const name = (c.name || "").trim();
+      if (slug === "sweetshirts" || name.toLowerCase() === "sweetshirts") {
+        return {
+          ...c,
+          id: "sweatshirts",
+          slug: "sweatshirts",
+          name: "Sweatshirts",
+          title: "Oversized Sweatshirts",
+        };
+      }
+      return c;
+    });
+
+    const active = normalized
       .filter((cat) => cat.isActive !== false)
       .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
 
@@ -541,9 +565,9 @@ export function Header() {
               {/* All Products */}
               <Link
                 href="/products"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  document.body.style.overflow = "";
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleMobileNav("/products");
                 }}
                 style={{
                   fontSize: "15.5px",
@@ -565,9 +589,9 @@ export function Header() {
                 <Link
                   key={cat.id || cat.slug}
                   href={`/categories/${cat.slug}`}
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    document.body.style.overflow = "";
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleMobileNav(`/categories/${cat.slug}`);
                   }}
                   style={{
                     fontSize: "15.5px",
@@ -588,9 +612,9 @@ export function Header() {
               {/* Sale */}
               <Link
                 href="/categories/sale"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  document.body.style.overflow = "";
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleMobileNav("/categories/sale");
                 }}
                 style={{
                   fontSize: "15.5px",
@@ -636,9 +660,9 @@ export function Header() {
             >
               <Link
                 href={user ? "/account" : "/login"}
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  document.body.style.overflow = "";
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleMobileNav(user ? "/account" : "/login");
                 }}
                 style={{
                   fontSize: "14px",
@@ -654,9 +678,9 @@ export function Header() {
               </Link>
               <Link
                 href="/orders"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  document.body.style.overflow = "";
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleMobileNav("/orders");
                 }}
                 style={{
                   fontSize: "14px",
@@ -672,9 +696,9 @@ export function Header() {
               </Link>
               <Link
                 href="/orders"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  document.body.style.overflow = "";
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleMobileNav("/orders");
                 }}
                 style={{
                   fontSize: "14px",

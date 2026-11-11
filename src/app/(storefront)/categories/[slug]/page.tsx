@@ -24,6 +24,8 @@ export async function generateStaticParams() {
     "t-shirts",
     "shirts",
     "hoodies",
+    "sweatshirts",
+    "sweetshirts",
     "bottoms",
     "jackets",
     "urban-essentials",
@@ -46,7 +48,8 @@ interface CategoryPageProps {
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const normalizedSlug = slug.toLowerCase();
+  let normalizedSlug = slug.toLowerCase();
+  if (normalizedSlug === "sweetshirts") normalizedSlug = "sweatshirts";
   const categories = await fetchStorefrontCategories();
   const categoryMeta = categories.find((c) => c.slug === normalizedSlug) || {
     name: normalizedSlug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
@@ -108,7 +111,8 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
-  const normalizedSlug = slug.toLowerCase();
+  let normalizedSlug = slug.toLowerCase();
+  if (normalizedSlug === "sweetshirts") normalizedSlug = "sweatshirts";
   const [categories, catalog] = await Promise.all([
     fetchStorefrontCategories(),
     fetchStorefrontProducts(),
