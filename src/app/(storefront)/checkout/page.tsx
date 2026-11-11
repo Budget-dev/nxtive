@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   ShieldCheck,
   Truck,
-  QrCode,
-  Banknote,
   ArrowRight,
   ArrowLeft,
   Loader2,
@@ -20,7 +18,7 @@ import {
 } from "lucide-react";
 import { useStore, normalizeOrder } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
-import { PhonePeCheckout } from "@/components/checkout/phonepe-checkout";
+import { useRazorpayCheckout } from "@/lib/razorpay/use-razorpay-checkout";
 import { reverseGeocode, matchIndianState, sanitizePostalCode } from "@/lib/location";
 
 const INDIAN_STATES = [
@@ -78,7 +76,7 @@ export default function CheckoutPage() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("Maharashtra");
   const [postalCode, setPostalCode] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
+  const { initiatePayment, loading: razorpayLoading, error: razorpayError } = useRazorpayCheckout();
   const [orderError, setOrderError] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
@@ -237,7 +235,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleOrderInitiation = (e?: React.FormEvent | React.MouseEvent) => {
+  const handleRazorpayCheckout = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e?.preventDefault) {
       e.preventDefault();
     }
@@ -250,6 +248,8 @@ export default function CheckoutPage() {
 
     if (!email.trim() || !phone.trim() || !firstName.trim() || !lastName.trim() || !street.trim() || !city.trim() || !postalCode.trim()) {
       setOrderError("Please fill in all required shipping and contact fields.");
+      const shippingSec = document.getElementById("shipping-section");
+      if (shippingSec) shippingSec.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -260,10 +260,40 @@ export default function CheckoutPage() {
 
     setOrderError(null);
 
-    // Scroll smoothly to the payment section
-    const paymentSection = document.getElementById("payment-section");
-    if (paymentSection) {
-      paymentSection.scrollIntoView({ behavior: "smooth", block: "center" });
+    const res = await initiatePayment({
+      items: cart.map((item) => ({
+        id: item.id,
+        title: item.title,
+        price: item.price,
+        quantity: item.quantity,
+        selectedSize: item.selectedSize || "M",
+        selectedColor: item.selectedColor,
+        image: item.image || "",
+      })),
+      shippingAddress: {
+        fullName: `${firstName} ${lastName}`.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        street: street.trim(),
+        apartment: apartment.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        postalCode: postalCode.trim(),
+        country: "India",
+      },
+      deliveryMethod: "standard",
+      couponCode: couponCode || undefined,
+      userId: user.uid,
+    });
+
+    if (res.success && res.orderId) {
+      setIsOrderPlaced(true);
+      clearCart();
+      router.replace(
+        `/checkout/success?orderId=${res.orderId}&paymentId=${encodeURIComponent(res.paymentId || "")}&method=razorpay`
+      );
+    } else if (res.error) {
+      setOrderError(res.error);
     }
   };
 
@@ -621,284 +651,80 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* 3. Payment Method (With COD ₹149 Advance Option) */}
+              {/* 3. Payment Method */}
               <div className="checkout-card" id="payment-section">
                 <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", marginBottom: "18px" }}>
                   3. Payment Method
                 </h2>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  {/* Option A: PhonePe Full Prepaid UPI */}
-                  <div
-                    style={{
-                      borderRadius: "12px",
-                      border: paymentMethod === "phonepe" ? "2px solid #5F259F" : "1px solid rgba(0,0,0,0.12)",
-                      backgroundColor: paymentMethod === "phonepe" ? "#FAF5FF" : "#FFFFFF",
-                      overflow: "hidden",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "16px 20px",
-                        cursor: "pointer",
-                        flexWrap: "wrap",
-                        gap: "10px",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <input
-                          type="radio"
-                          name="paymentOption"
-                          checked={paymentMethod === "phonepe"}
-                          onChange={() => setPaymentMethod("phonepe")}
-                          style={{ accentColor: "#5F259F" }}
-                        />
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <div
-                            style={{
-                              width: "30px",
-                              height: "30px",
-                              borderRadius: "6px",
-                              backgroundColor: "#5F259F",
-                              color: "#FFFFFF",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontWeight: 900,
-                              fontSize: "13px",
-                            }}
-                          >
-                            पे
-                          </div>
-                          <div>
-                            <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110" }}>
-                              PhonePe UPI & QR (100% Prepaid)
-                            </span>
-                            <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
-                              Pay full ₹{finalTotal.toLocaleString("en-IN")} · Fastest priority dispatch
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <span
+                <div
+                  style={{
+                    borderRadius: "12px",
+                    border: "2px solid #111110",
+                    backgroundColor: "#FAF9F6",
+                    overflow: "hidden",
+                    padding: "20px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: "14px" }}>
+                      <div
                         style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          color: "#5F259F",
-                          backgroundColor: "#F3E8FF",
-                          padding: "3px 9px",
-                          borderRadius: "4px",
+                          width: "40px",
+                          height: "40px",
+                          borderRadius: "10px",
+                          backgroundColor: "#111110",
+                          color: "#FFFFFF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
                         }}
                       >
-                        Fastest Dispatch
-                      </span>
-                    </label>
-
-                    {paymentMethod === "phonepe" && (
-                      <div style={{ padding: "16px 20px 20px", borderTop: "1px solid #E9D5FF", backgroundColor: "#FFFFFF" }}>
-                        {!user ? (
-                          <div style={{ textAlign: "center", padding: "16px 10px" }}>
-                            <p style={{ fontSize: "13.5px", color: "#666", marginBottom: "14px" }}>
-                              Please sign in to proceed with secure UPI payment.
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setShowAuthModal(true)}
-                              style={{
-                                padding: "12px 24px",
-                                borderRadius: "9999px",
-                                backgroundColor: "#111110",
-                                color: "#FFFFFF",
-                                fontSize: "13.5px",
-                                fontWeight: 700,
-                                border: "none",
-                                cursor: "pointer",
-                              }}
-                            >
-                              Sign In to Continue
-                            </button>
-                          </div>
-                        ) : (
-                          <PhonePeCheckout
-                            amount={finalTotal}
-                            isCod={false}
-                            customerName={`${firstName} ${lastName}`.trim() || user?.displayName || "NXTIVE Member"}
-                            customerPhone={phone}
-                            customerEmail={email}
-                            userId={user?.uid}
-                            shippingAddress={{
-                              fullName: `${firstName} ${lastName}`.trim(),
-                              email,
-                              phone,
-                              street,
-                              apartment,
-                              city,
-                              state,
-                              postalCode,
-                              country: "India",
-                            }}
-                            items={cart}
-                            onSuccess={(orderId, utr, orderNumber, orderObj) => {
-                              setIsOrderPlaced(true);
-                              if (orderObj) {
-                                try {
-                                  recordOrder(normalizeOrder(orderObj));
-                                  sessionStorage.setItem("last_confirmed_order", JSON.stringify(orderObj));
-                                } catch (err) {
-                                  console.warn("Storage error:", err);
-                                }
-                              }
-                              clearCart();
-                              router.replace(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=phonepe&utr=${encodeURIComponent(utr)}`);
-                            }}
-                            onError={(msg) => setOrderError(msg)}
-                          />
-                        )}
+                        <ShieldCheck size={22} />
                       </div>
-                    )}
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
+                            Razorpay Secure Checkout
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color: "#2B9348",
+                              backgroundColor: "#DCFCE7",
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            100% Secure &amp; Verified
+                          </span>
+                        </div>
+                        <p style={{ fontSize: "13px", color: "#666", marginTop: "6px", marginBottom: "12px", lineHeight: "1.5" }}>
+                          Pay securely with UPI (Google Pay, Paytm, BHIM, Cred), Credit/Debit Cards (Visa, Mastercard, RuPay), NetBanking, and Wallets.
+                        </p>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                            UPI / QR
+                          </span>
+                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                            Credit &amp; Debit Cards
+                          </span>
+                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                            NetBanking (50+ Banks)
+                          </span>
+                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                            Wallets
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Option B: Cash on Delivery with ₹149 Advance */}
-                  <div
-                    style={{
-                      borderRadius: "12px",
-                      border: paymentMethod === "cod" ? "2px solid #111110" : "1px solid rgba(0,0,0,0.12)",
-                      backgroundColor: paymentMethod === "cod" ? "#FAF9F6" : "#FFFFFF",
-                      overflow: "hidden",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "16px 20px",
-                        cursor: "pointer",
-                        flexWrap: "wrap",
-                        gap: "10px",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <input
-                          type="radio"
-                          name="paymentOption"
-                          checked={paymentMethod === "cod"}
-                          onChange={() => setPaymentMethod("cod")}
-                          style={{ accentColor: "#111110" }}
-                        />
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <div
-                            style={{
-                              width: "30px",
-                              height: "30px",
-                              borderRadius: "6px",
-                              backgroundColor: "#111110",
-                              color: "#FFFFFF",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontWeight: 900,
-                              fontSize: "13px",
-                            }}
-                          >
-                            <Banknote size={16} />
-                          </div>
-                          <div>
-                            <span style={{ fontSize: "14px", fontWeight: 700, color: "#111110" }}>
-                              Cash on Delivery (₹149 Advance + Balance on Delivery)
-                            </span>
-                            <span style={{ fontSize: "12px", color: "#666", display: "block" }}>
-                              Pay ₹149 booking fee now via UPI · Pay remaining ₹{Math.max(0, finalTotal - 149).toLocaleString("en-IN")} in cash to courier
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          color: "#92400E",
-                          backgroundColor: "#FEF3C7",
-                          padding: "3px 9px",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        ₹149 Advance Required
-                      </span>
-                    </label>
-
-                    {paymentMethod === "cod" && (
-                      <div style={{ padding: "16px 20px 20px", borderTop: "1px solid #E5E0D5", backgroundColor: "#FFFFFF" }}>
-                        <div style={{ marginBottom: "14px", padding: "12px 14px", borderRadius: "8px", backgroundColor: "#FFFBEB", border: "1px solid #FDE68A", fontSize: "12.5px", color: "#92400E", lineHeight: "1.5" }}>
-                          <strong>How COD Works at NXTIVE:</strong> To prevent courier rejections, a ₹149 commitment fee is paid upfront via UPI. Your remaining balance of <strong>₹{Math.max(0, finalTotal - 149).toLocaleString("en-IN")}</strong> will be collected in cash at your doorstep upon parcel delivery.
-                        </div>
-
-                        {!user ? (
-                          <div style={{ textAlign: "center", padding: "16px 10px" }}>
-                            <p style={{ fontSize: "13.5px", color: "#666", marginBottom: "14px" }}>
-                              Please sign in to confirm your Cash on Delivery order.
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setShowAuthModal(true)}
-                              style={{
-                                padding: "12px 24px",
-                                borderRadius: "9999px",
-                                backgroundColor: "#111110",
-                                color: "#FFFFFF",
-                                fontSize: "13.5px",
-                                fontWeight: 700,
-                                border: "none",
-                                cursor: "pointer",
-                              }}
-                            >
-                              Sign In to Continue
-                            </button>
-                          </div>
-                        ) : (
-                          <PhonePeCheckout
-                            amount={149}
-                            totalOrderAmount={finalTotal}
-                            isCod={true}
-                            customerName={`${firstName} ${lastName}`.trim() || user?.displayName || "NXTIVE Member"}
-                            customerPhone={phone}
-                            customerEmail={email}
-                            userId={user?.uid}
-                            shippingAddress={{
-                              fullName: `${firstName} ${lastName}`.trim(),
-                              email,
-                              phone,
-                              street,
-                              apartment,
-                              city,
-                              state,
-                              postalCode,
-                              country: "India",
-                            }}
-                            items={cart}
-                            onSuccess={(orderId, utr, orderNumber, orderObj) => {
-                              setIsOrderPlaced(true);
-                              if (orderObj) {
-                                try {
-                                  recordOrder(normalizeOrder(orderObj));
-                                  sessionStorage.setItem("last_confirmed_order", JSON.stringify(orderObj));
-                                } catch (err) {
-                                  console.warn("Storage error:", err);
-                                }
-                              }
-                              clearCart();
-                              router.replace(`/checkout/success?orderId=${orderId}&orderNumber=${encodeURIComponent(orderNumber)}&method=cod&utr=${encodeURIComponent(utr)}`);
-                            }}
-                            onError={(msg) => setOrderError(msg)}
-                          />
-                        )}
-                      </div>
-                    )}
+                  <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#666" }}>
+                    <Lock size={13} color="#2B9348" />
+                    <span>Instant order confirmation with express dispatch upon payment completion.</span>
                   </div>
                 </div>
               </div>
@@ -995,18 +821,6 @@ export default function CheckoutPage() {
                     </span>
                   </div>
 
-                  {paymentMethod === "cod" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", backgroundColor: "#FEF3C7", padding: "10px 12px", borderRadius: "8px", marginTop: "4px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#92400E", fontWeight: 700 }}>
-                        <span>Advance Due Now (UPI):</span>
-                        <span>₹149</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#92400E" }}>
-                        <span>Cash Due on Delivery:</span>
-                        <span>₹{Math.max(0, finalTotal - 149).toLocaleString("en-IN")}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Final Total */}
@@ -1021,7 +835,7 @@ export default function CheckoutPage() {
                   }}
                 >
                   <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
-                    {paymentMethod === "cod" ? "Total Order Value" : "Total Due"}
+                    Total Due
                   </span>
                   <span style={{ fontSize: "24px", fontWeight: 900, color: "#111110" }}>
                     ₹{finalTotal.toLocaleString("en-IN")}
@@ -1057,12 +871,13 @@ export default function CheckoutPage() {
                 ) : (
                   <button
                     type="button"
-                    onClick={handleOrderInitiation}
+                    onClick={handleRazorpayCheckout}
+                    disabled={razorpayLoading}
                     style={{
                       width: "100%",
                       padding: "15px 24px",
                       borderRadius: "9999px",
-                      backgroundColor: paymentMethod === "cod" ? "#111110" : "#5F259F",
+                      backgroundColor: "#111110",
                       color: "#FFFFFF",
                       fontSize: "14px",
                       fontWeight: 700,
@@ -1071,19 +886,20 @@ export default function CheckoutPage() {
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "8px",
-                      cursor: "pointer",
+                      cursor: razorpayLoading ? "not-allowed" : "pointer",
+                      opacity: razorpayLoading ? 0.7 : 1,
                       boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
                       border: "none",
                     }}
                   >
-                    {paymentMethod === "cod" ? (
+                    {razorpayLoading ? (
                       <>
-                        <span>Pay ₹149 Advance & Place COD</span>
-                        <ArrowRight size={16} />
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Opening Secure Payment Gateway...</span>
                       </>
                     ) : (
                       <>
-                        <span>Pay ₹{finalTotal.toLocaleString("en-IN")} via PhonePe UPI</span>
+                        <span>Pay ₹{finalTotal.toLocaleString("en-IN")} via Razorpay</span>
                         <ArrowRight size={16} />
                       </>
                     )}

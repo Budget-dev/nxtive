@@ -5,13 +5,13 @@ import { FaqClient } from "./faq-client";
 export const metadata: Metadata = {
   title: "Frequently Asked Questions (FAQ) | NXTIVE Streetwear",
   description:
-    "Find answers to frequently asked questions about NXTIVE streetwear sizing, domestic delivery times (2-4 days), PhonePe/UPI payments, 7-day exchange policy, and fabric care.",
+    "Find answers to frequently asked questions about NXTIVE streetwear sizing, domestic delivery times (2-4 days), Razorpay/UPI payments, 7-day exchange policy, and fabric care.",
   keywords: [
     "NXTIVE FAQ",
     "nxtive delivery time",
     "nxtive returns and exchanges",
     "nxtive sizes",
-    "nxtive phonepe payment",
+    "nxtive razorpay payment",
     "nxtive customer queries",
     "streetwear questions india",
   ],
@@ -134,7 +134,7 @@ const faqJsonLd = {
           name: "How will I receive my refund?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "For prepaid orders via PhonePe UPI, refunds are automatically credited back to your original payment method within 5 to 7 business days following quality inspection. For COD orders, refunds are processed via secure bank transfer (NEFT/IMPS) or instant store credit.",
+            text: "For prepaid orders via Razorpay, refunds are automatically credited back to your original payment method within 5 to 7 business days following quality inspection. For COD orders, refunds are processed via secure bank transfer (NEFT/IMPS) or instant store credit.",
           },
         },
       ],

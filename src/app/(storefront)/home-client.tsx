@@ -865,7 +865,7 @@ export function StorefrontHomeClient() {
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#1E1C1A", display: "block" }}>
                   Secure Checkout
                 </span>
-                <span style={{ fontSize: "10.5px", color: "#6A655D" }}>Direct PhonePe UPI & COD</span>
+                <span style={{ fontSize: "10.5px", color: "#6A655D" }}>Razorpay UPI &amp; Cards</span>
               </div>
             </div>
 

@@ -49,13 +49,6 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [shippingShiprocket, setShippingShiprocket] = useState(false);
-  const [copiedUtr, setCopiedUtr] = useState(false);
-
-  const handleCopyUtr = (utrValue: string) => {
-    navigator.clipboard.writeText(utrValue);
-    setCopiedUtr(true);
-    setTimeout(() => setCopiedUtr(false), 2000);
-  };
 
   const handleShipViaShiprocket = async () => {
     setShippingShiprocket(true);
@@ -88,40 +81,6 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
       setShippingShiprocket(false);
     }
   };
-
-  const handleVerifyPhonePePayment = async () => {
-    setUpdating(true);
-    setMessage(null);
-    try {
-      const res = await updateOrderPaymentStatus(order.id, "paid");
-      if (res.success) {
-        await updateOrderStatus(order.id, "processing", "PhonePe UTR verified by administrator");
-        setOrder((prev: any) => ({
-          ...prev,
-          paymentStatus: "paid",
-          status: "processing",
-          statusHistory: [
-            ...(prev.statusHistory || []),
-            {
-              status: "processing",
-              timestamp: new Date().toISOString(),
-              note: "PhonePe UTR verified by administrator",
-              updatedBy: "admin",
-            },
-          ],
-        }));
-        setSelectedStatus("processing");
-        setMessage({ type: "success", text: "PhonePe payment verified! Order moved to Processing." });
-      } else {
-        setMessage({ type: "error", text: res.error || "Failed to verify payment." });
-      }
-    } catch (err: any) {
-      setMessage({ type: "error", text: err?.message || "Failed to verify payment." });
-    } finally {
-      setUpdating(false);
-    }
-  };
-
 
   const handleUpdateStatus = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -597,41 +556,9 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                 <span style={{ fontWeight: 600, color: "var(--adm-text)" }}>{order.paymentMethod}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-              {((order as any).upiTransactionId || (order as any).paymentTransactionId || order.paymentMethod?.toLowerCase().includes("phonepe")) ? (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--adm-text-muted)" }}>PhonePe UTR / Txn:</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontFamily: "var(--adm-font-mono)", fontWeight: 700, color: "#5F259F", backgroundColor: "#FAF5FF", padding: "2px 8px", borderRadius: "4px" }}>
-                      {(order as any).upiTransactionId || (order as any).paymentTransactionId || "Not submitted"}
-                    </span>
-                    {((order as any).upiTransactionId || (order as any).paymentTransactionId) && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopyUtr((order as any).upiTransactionId || (order as any).paymentTransactionId)}
-                        style={{
-                          background: "none",
-                          border: "1px solid #5F259F",
-                          borderRadius: "4px",
-                          padding: "2px 6px",
-                          color: "#5F259F",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "3px",
-                          fontSize: "10px",
-                        }}
-                      >
-                        {copiedUtr ? <Check size={11} /> : <Copy size={11} />}
-                        <span>{copiedUtr ? "Copied" : "Copy"}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
                 <span style={{ color: "var(--adm-text-muted)" }}>Razorpay Order ID:</span>
-              )}
                 <span style={{ fontFamily: "var(--adm-font-mono)", color: "var(--adm-gold)" }}>
-                  {order.razorpayOrderId || "N/A (Cash on Delivery)"}
+                  {order.razorpayOrderId || "N/A"}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -662,28 +589,6 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
               >
                 <span style={{ fontSize: "11.5px", color: "var(--adm-text-muted)" }}>Update Payment:</span>
                 <div style={{ display: "flex", gap: "6px" }}>
-                  {((order as any).upiTransactionId || (order as any).paymentTransactionId || order.paymentMethod?.toLowerCase().includes("phonepe")) && order.paymentStatus !== "paid" && (
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={handleVerifyPhonePePayment}
-                      style={{
-                        padding: "5px 12px",
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        borderRadius: "5px",
-                        border: "1px solid #16A34A",
-                        backgroundColor: "#16A34A",
-                        color: "#FFFFFF",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      ✓ Verify PhonePe Payment
-                    </button>
-                  )}
                   {order.paymentStatus !== "paid" && (
                     <button
                       type="button"

@@ -250,7 +250,7 @@ export default function PaymentSettingsPage() {
                  checked={settings.supportedMethods.upi}
                  onChange={(e) => setSettings({ ...settings, supportedMethods: { ...settings.supportedMethods, upi: e.target.checked } })}
               />
-              <span><strong>UPI Intent &amp; QR:</strong> GPay, PhonePe, Paytm, BHIM</span>
+              <span><strong>UPI Intent &amp; QR:</strong> Google Pay, Paytm, BHIM, Cred, and all UPI apps</span>
             </label>
 
             <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "13.5px" }}>

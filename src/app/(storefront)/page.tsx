@@ -109,7 +109,7 @@ const homeJsonLd = {
       email: "nxtiveclothing@gmail.com",
       priceRange: "₹₹",
       currenciesAccepted: "INR",
-      paymentAccepted: "UPI, PhonePe, Google Pay, Paytm, Credit Card, Debit Card, NetBanking, Cash on Delivery",
+      paymentAccepted: "UPI, Razorpay, Google Pay, Paytm, Credit Card, Debit Card, NetBanking",
       contactPoint: {
         "@type": "ContactPoint",
         telephone: "+91 97004 46690",

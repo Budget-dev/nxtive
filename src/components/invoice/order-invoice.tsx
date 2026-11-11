@@ -169,7 +169,7 @@ export function OrderInvoice({ order, backUrl = "/admin/orders", isAdmin = true 
             <div className="payment-row">
               <span className="pay-label">Payment Method:</span>
               <span className="pay-value">
-                {isCod ? "Cash on Delivery (₹149 Advance Paid)" : "PhonePe / UPI (Prepaid)"}
+                {isCod ? "Cash on Delivery" : (order.paymentMethod || "Razorpay / UPI (Prepaid)")}
               </span>
             </div>
             <div className="payment-row">

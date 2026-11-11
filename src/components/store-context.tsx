@@ -127,7 +127,7 @@ export function normalizeOrder(raw: any): Order {
       shipping: 0,
       total: 0,
       status: "Order Confirmed",
-      paymentMethod: "PhonePe UPI",
+      paymentMethod: "Razorpay",
       paymentStatus: "Paid",
       shippingAddress: {
         fullName: "Customer",
@@ -154,7 +154,7 @@ export function normalizeOrder(raw: any): Order {
           ? "Processing"
           : "Order Confirmed";
   const createdAt = toIsoDate(raw.createdAt || raw.date || raw.submittedAt);
-  const rawMethod = String(raw.paymentMethod || "PhonePe UPI");
+  const rawMethod = String(raw.paymentMethod || "Razorpay");
   const isPaid =
     raw.paymentStatus === "paid" ||
     raw.paymentStatus === "Paid" ||

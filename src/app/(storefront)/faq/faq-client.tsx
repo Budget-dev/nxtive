@@ -80,7 +80,7 @@ const FAQ_DATA: FAQItem[] = [
     category: "returns",
     question: "How will I receive my refund?",
     answer:
-      "For prepaid orders via PhonePe UPI, refunds are automatically credited back to your original payment method within 5 to 7 business days following quality inspection. For COD orders, refunds are processed via secure bank transfer (NEFT/IMPS) or instant store credit.",
+      "For prepaid orders via Razorpay, refunds are automatically credited back to your original payment method within 5 to 7 business days following quality inspection. For COD orders, refunds are processed via secure bank transfer (NEFT/IMPS) or instant store credit.",
   },
 
   // Fabric Care

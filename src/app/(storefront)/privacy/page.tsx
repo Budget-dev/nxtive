@@ -153,7 +153,7 @@ export default function PrivacyPolicyPage() {
                 <strong>Account Credentials:</strong> Secure authentication tokens handled via Google Cloud Firebase Auth. We never store raw passwords.
               </li>
               <li>
-                <strong>Transaction & Payment Details:</strong> UPI IDs and payment references processed securely via RBI-licensed payment partners (PhonePe UPI). Full banking credentials are never stored on our servers.
+                <strong>Transaction & Payment Details:</strong> UPI IDs and payment references processed securely via RBI-licensed payment partners (Razorpay). Full banking credentials are never stored on our servers.
               </li>
               <li>
                 <strong>Browsing & Technical Data:</strong> IP address, device type, browser metadata, and interaction events utilized to optimize page load speeds and visual experience.
@@ -179,7 +179,7 @@ export default function PrivacyPolicyPage() {
               4. Third-Party Disclosures
             </h2>
             <p>
-              We do not sell, rent, or monetize your personal data. We only share necessary data with trusted logistics and infrastructure partners (e.g. Delhivery, BlueDart, PhonePe, Google Firebase) strictly to process your orders and maintain website security.
+              We do not sell, rent, or monetize your personal data. We only share necessary data with trusted logistics and infrastructure partners (e.g. Delhivery, BlueDart, Razorpay, Google Firebase) strictly to process your orders and maintain website security.
             </p>
           </section>
 

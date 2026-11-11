@@ -151,7 +151,7 @@ export default function AdminManualPage() {
               marginBottom: "20px",
             }}
           >
-            Complete operational guide for order dispatch, PhonePe UPI verification, Shiprocket automated logistics, product inventory control, and customer management.
+            Complete operational guide for order dispatch, Razorpay payment management, Shiprocket automated logistics, product inventory control, and customer management.
           </p>
 
           {/* Quick Jump Search Bar */}
@@ -168,7 +168,7 @@ export default function AdminManualPage() {
             />
             <input
               type="text"
-              placeholder="Search topics (e.g. shiprocket, phonepe, utr, awb, cod, pickup, return)..."
+              placeholder="Search topics (e.g. shiprocket, razorpay, awb, cod, pickup, return)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -220,7 +220,7 @@ export default function AdminManualPage() {
         {[
           { id: "all", label: "All Handbook Topics", icon: Layers },
           { id: "shiprocket", label: "Shiprocket & Logistics", icon: Truck },
-          { id: "payments", label: "Payments & PhonePe UPI", icon: CreditCard },
+          { id: "payments", label: "Payments & Razorpay", icon: CreditCard },
           { id: "orders", label: "Orders & Invoicing", icon: Package },
           { id: "products", label: "Products & Stock", icon: ShoppingBag },
           { id: "coupons", label: "Coupons & Discounts", icon: Ticket },
@@ -537,19 +537,17 @@ export default function AdminManualPage() {
           )}
 
         {/* ══════════════════════════════════════════════════════════════════
-            MODULE 2: PAYMENTS & VERIFICATION ENGINE (PHONEPE UPI / COD)
+            MODULE 2: PAYMENTS & RAZORPAY GATEWAY AUTOMATION
         ══════════════════════════════════════════════════════════════════ */}
         {(activeTab === "all" || activeTab === "payments") &&
-          matchesSearch("Payment PhonePe UPI QR UTR COD Cash On Delivery Razorpay Refund Verification", [
+          matchesSearch("Payment Razorpay UPI Cards NetBanking Wallets Refund Verification", [
             "payment",
-            "phonepe",
-            "upi",
-            "utr",
-            "cod",
             "razorpay",
+            "upi",
+            "cards",
+            "cod",
             "refund",
             "verification",
-            "qr",
           ]) && (
             <div
               className="admin-card"
@@ -579,7 +577,7 @@ export default function AdminManualPage() {
                       width: "44px",
                       height: "44px",
                       borderRadius: "10px",
-                      backgroundColor: "#5F259F",
+                      backgroundColor: "#0C2340",
                       color: "#FFFFFF",
                       display: "flex",
                       alignItems: "center",
@@ -595,19 +593,19 @@ export default function AdminManualPage() {
                       </h2>
                       <span
                         style={{
-                          backgroundColor: "#FEF3C7",
-                          color: "#92400E",
+                          backgroundColor: "#DCFCE7",
+                          color: "#15803D",
                           fontSize: "11px",
                           fontWeight: 700,
                           padding: "2px 8px",
                           borderRadius: "4px",
                         }}
                       >
-                        PhonePe UPI &amp; COD Active
+                        Razorpay Automated
                       </span>
                     </div>
                     <p style={{ fontSize: "13px", color: "#6B7280", margin: "2px 0 0 0" }}>
-                      Direct zero-fee UPI scanning, 12-digit UTR validation, partial COD advances, and order settlement.
+                      Instant automated online payment processing via Razorpay (UPI, Cards, NetBanking) with real-time webhook confirmation.
                     </p>
                   </div>
                 </div>
@@ -639,40 +637,40 @@ export default function AdminManualPage() {
                   marginBottom: "24px",
                 }}
               >
-                {/* Method 1: PhonePe Direct UPI */}
+                {/* Method 1: Razorpay Gateway */}
                 <div
                   style={{
                     padding: "20px",
                     borderRadius: "12px",
-                    backgroundColor: "#FAF5FF",
-                    border: "1px solid #E9D5FF",
+                    backgroundColor: "#F0F9FF",
+                    border: "1px solid #BAE6FD",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <QrCode size={18} color="#7E22CE" />
-                      <h4 style={{ fontSize: "15px", fontWeight: 800, color: "#581C87", margin: 0 }}>
-                        PhonePe Direct UPI (Primary)
+                      <CreditCard size={18} color="#0284C7" />
+                      <h4 style={{ fontSize: "15px", fontWeight: 800, color: "#0369A1", margin: 0 }}>
+                        Razorpay Gateway (Automated)
                       </h4>
                     </div>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "#15803D", backgroundColor: "#DCFCE7", padding: "2px 8px", borderRadius: "4px" }}>
-                      0% Gateway Fee
+                      Instant Verification
                     </span>
                   </div>
 
-                  <p style={{ fontSize: "12.5px", color: "#6B21A8", lineHeight: 1.5, marginBottom: "12px" }}>
-                    Customers scan the PhonePe merchant QR code or pay to VPA: <code style={{ backgroundColor: "#F3E8FF", padding: "2px 6px", borderRadius: "4px" }}>9700446690-2@ybl</code> (PREM SANDEEP ZAKKULA) and submit their 12-digit Bank Reference / UTR Number.
+                  <p style={{ fontSize: "12.5px", color: "#0369A1", lineHeight: 1.5, marginBottom: "12px" }}>
+                    Customers complete payment via Razorpay modal using UPI (Google Pay, Paytm, BHIM, Cred), Debit/Credit Cards, NetBanking, or Wallets.
                   </p>
 
-                  <div style={{ backgroundColor: "#FFFFFF", padding: "12px", borderRadius: "8px", border: "1px solid #E9D5FF" }}>
+                  <div style={{ backgroundColor: "#FFFFFF", padding: "12px", borderRadius: "8px", border: "1px solid #BAE6FD" }}>
                     <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                      Admin Verification Checklist:
+                      Automated Verification Checklist:
                     </div>
                     <ul style={{ margin: 0, paddingLeft: "16px", fontSize: "12px", color: "#4B5563", lineHeight: 1.6 }}>
-                      <li>Open your PhonePe Business / Merchant app or SMS bank alerts.</li>
-                      <li>Match the 12-digit UTR submitted by the customer with the received credit.</li>
-                      <li>In Order Details, verify the exact amount matches the order total.</li>
-                      <li>Click <strong>Verify &amp; Confirm Order</strong> to mark payment status as <em>Paid</em>.</li>
+                      <li>Razorpay cryptographically signs each transaction callback.</li>
+                      <li>Our server verifies HMAC-SHA256 signature and records <code>razorpayPaymentId</code>.</li>
+                      <li>Webhook listeners automatically update Firestore order status to <strong>processing</strong>.</li>
+                      <li>No manual UTR reconciliation needed—orders move straight to fulfillment.</li>
                     </ul>
                   </div>
                 </div>
