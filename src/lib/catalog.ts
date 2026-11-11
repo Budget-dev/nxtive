@@ -69,21 +69,63 @@ export function normalizeProduct(id: string, data: Record<string, unknown>): Pro
     inStock: data.inStock !== false,
     featured: Boolean(data.featured),
     sku: data.sku ? String(data.sku) : undefined,
+    variants: Array.isArray(data.variants)
+      ? (data.variants as any[])
+        .filter((v) => v && typeof v === "object")
+        .map((v) => ({
+          sku: String(v.sku || ""),
+          size: String(v.size || ""),
+          color: String(v.color || ""),
+          stock: Number(v.stock || 0),
+          price: v.price != null && v.price !== "" ? Number(v.price) : undefined,
+        }))
+      : [],
     isActive: true,
   };
+}
+
+function defaultCategoryImage(slug: string, name: string): string {
+  const s = `${slug} ${name}`.toLowerCase();
+  if (s.includes("sweat") || s.includes("sweet") || s.includes("hoodie") || s.includes("pullover")) {
+    return "/images/nxtvie/cat-hoodies.jpg";
+  }
+  if (s.includes("jacket") || s.includes("layer") || s.includes("bomber") || s.includes("outerwear")) {
+    return "/images/nxtvie/promo-jackets-hd.jpg";
+  }
+  if (s.includes("t-shirt") || s.includes("tee") || s.includes("top")) {
+    return "/images/nxtvie/cat-tshirts.jpg";
+  }
+  if (s.includes("shirt")) {
+    return "/images/nxtvie/cat-shirts.jpg";
+  }
+  if (s.includes("bottom") || s.includes("pant") || s.includes("cargo") || s.includes("jean") || s.includes("trouser")) {
+    return "/images/nxtvie/cat-bottoms.jpg";
+  }
+  if (s.includes("accessor")) {
+    return "/images/nxtvie/cat-accessories.jpg";
+  }
+  return "/images/nxtvie/hero-model.jpg";
 }
 
 export function normalizeCategory(id: string, data: Record<string, unknown>): Category | null {
   if (data.isActive === false) return null;
   const name = String(data.name || "").trim();
   if (!name) return null;
+  const slug = String(data.slug || name.toLowerCase().replace(/\s+/g, "-"));
+  const rawImage = String(data.image || "").trim();
+  const image = rawImage || defaultCategoryImage(slug, name);
+  const rawTagline = String(data.tagline || "").trim();
+  const tagline = rawTagline || (slug.includes("sweat") || slug.includes("sweet")
+    ? "Heavyweight comfortable oversized hoodies and sweatshirts for Indian winters."
+    : "Explore contemporary streetwear engineered for presence and clean aesthetics.");
+
   return {
     id,
-    slug: String(data.slug || name.toLowerCase().replace(/\s+/g, "-")),
+    slug,
     name,
     title: String(data.title || name),
-    tagline: String(data.tagline || ""),
-    image: String(data.image || ""),
+    tagline,
+    image,
     sortOrder: typeof data.sortOrder === "number" ? data.sortOrder : undefined,
     isActive: true,
   };
@@ -217,6 +259,26 @@ export const DEFAULT_CATEGORIES: Category[] = [
     tagline: "Streetwear jackets, bombers, and windcheaters for cool evenings.",
     image: "/images/nxtvie/promo-jackets-hd.jpg",
     sortOrder: 5,
+    isActive: true,
+  },
+  {
+    id: "sweetshirts",
+    slug: "sweetshirts",
+    name: "Sweatshirts",
+    title: "Oversized Sweatshirts",
+    tagline: "Heavyweight comfortable oversized hoodies and sweatshirts for Indian winters.",
+    image: "/images/nxtvie/cat-hoodies.jpg",
+    sortOrder: 6,
+    isActive: true,
+  },
+  {
+    id: "sweatshirts",
+    slug: "sweatshirts",
+    name: "Sweatshirts",
+    title: "Oversized Sweatshirts",
+    tagline: "Heavyweight comfortable oversized hoodies and sweatshirts for Indian winters.",
+    image: "/images/nxtvie/cat-hoodies.jpg",
+    sortOrder: 7,
     isActive: true,
   },
 ];

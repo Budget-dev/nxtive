@@ -24,15 +24,41 @@ import { sharpImageSrc } from "@/lib/sharp-image";
 import { ProductCard } from "@/components/ui/product-card";
 import { getPublicApprovedReviews, submitCustomerReview } from "@/features/admin-dashboard/server/actions";
 import type { Review } from "@/types/review";
+import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
+import { relatedProducts as getRelatedProducts } from "@/lib/catalog";
 
 interface ProductDetailClientProps {
   product: Product;
   relatedProducts: Product[];
 }
 
-export function ProductDetailClient({ product, relatedProducts }: ProductDetailClientProps) {
+export function ProductDetailClient({
+  product: initialProduct,
+  relatedProducts: initialRelatedProducts,
+}: ProductDetailClientProps) {
   const router = useRouter();
   const { addToCart, toggleWishlist, isInWishlist, showToast, setIsCartOpen } = useStore();
+
+  // Real-time Firestore catalog synchronization ensures PDP always displays latest price and stock
+  const { products: liveCatalog, ready } = useStorefrontCatalog();
+  const product: Product = React.useMemo(() => {
+    if (ready && Array.isArray(liveCatalog) && liveCatalog.length > 0) {
+      const match = liveCatalog.find(
+        (p) =>
+          p.id === initialProduct.id ||
+          (p.slug && initialProduct.slug && p.slug.toLowerCase().trim() === initialProduct.slug.toLowerCase().trim())
+      );
+      if (match) return match;
+    }
+    return initialProduct;
+  }, [ready, liveCatalog, initialProduct]);
+
+  const relatedProducts: Product[] = React.useMemo(() => {
+    if (ready && Array.isArray(liveCatalog) && liveCatalog.length > 0) {
+      return getRelatedProducts(liveCatalog, product.id, 4);
+    }
+    return initialRelatedProducts;
+  }, [ready, liveCatalog, product.id, initialRelatedProducts]);
 
   const rawImages = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || "/images/placeholder.jpg"];
   const gallery = rawImages.map((image) => sharpImageSrc(image));
@@ -101,13 +127,22 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   const inWishlist = isInWishlist(product.id);
   const activeColor = product.colors[selectedColorIdx]?.name || "Original";
 
-  const discountPercent = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  // Dynamic price resolving: checks variant override first, otherwise falls back to base product price
+  const selectedVariant = product.variants?.find(
+    (v) =>
+      v.size === selectedSize &&
+      (v.color?.toLowerCase() === activeColor?.toLowerCase() || !activeColor)
+  );
+  const currentPrice = selectedVariant?.price ?? product.price;
+  const currentOriginalPrice = product.originalPrice ?? null;
+
+  const discountPercent = currentOriginalPrice && currentOriginalPrice > currentPrice
+    ? Math.round(((currentOriginalPrice - currentPrice) / currentOriginalPrice) * 100)
     : 0;
 
   const handleAddToCart = () => {
     setIsAdding(true);
-    addToCart(product, selectedSize, activeColor, quantity);
+    addToCart({ ...product, price: currentPrice }, selectedSize, activeColor, quantity);
     setTimeout(() => {
       setIsAdding(false);
     }, 600);
@@ -116,7 +151,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
   const handleBuyNow = () => {
     setIsBuyingNow(true);
     setIsCartOpen(false);
-    addToCart(product, selectedSize, activeColor, quantity, false);
+    addToCart({ ...product, price: currentPrice }, selectedSize, activeColor, quantity, false);
     router.push("/checkout");
   };
 
@@ -331,9 +366,9 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
               }}
             >
               <span style={{ fontSize: "28px", fontWeight: 900, color: "#111110" }}>
-                ₹{product.price.toLocaleString("en-IN")}
+                ₹{currentPrice.toLocaleString("en-IN")}
               </span>
-              {product.originalPrice && (
+              {currentOriginalPrice && currentOriginalPrice > currentPrice && (
                 <>
                   <span
                     style={{
@@ -342,7 +377,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                       textDecoration: "line-through",
                     }}
                   >
-                    ₹{product.originalPrice.toLocaleString("en-IN")}
+                    ₹{currentOriginalPrice.toLocaleString("en-IN")}
                   </span>
                   <span
                     style={{
@@ -528,7 +563,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                   ) : (
                     <>
                       <ShoppingBag size={16} />
-                      <span>Add to Shopping Bag — ₹{(product.price * quantity).toLocaleString("en-IN")}</span>
+                      <span>Add to Shopping Bag — ₹{(currentPrice * quantity).toLocaleString("en-IN")}</span>
                     </>
                   )}
                 </button>
@@ -585,7 +620,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
                   </>
                 ) : (
                   <>
-                    <span>Instant Buy Now • ₹{(product.price * quantity).toLocaleString("en-IN")}</span>
+                    <span>Instant Buy Now • ₹{(currentPrice * quantity).toLocaleString("en-IN")}</span>
                     <ArrowRight size={15} />
                   </>
                 )}
@@ -1152,7 +1187,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
               {product.title}
             </div>
             <div style={{ fontSize: "12px", fontWeight: 800, color: "#111110" }}>
-              ₹{product.price.toLocaleString("en-IN")}{" "}
+              ₹{currentPrice.toLocaleString("en-IN")}{" "}
               <span style={{ fontSize: "11px", fontWeight: 500, color: "#777" }}>• Size: {selectedSize}</span>
             </div>
           </div>
@@ -1176,7 +1211,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
           }}
         >
           <ShoppingBag size={14} />
-          <span>Add to Bag • ₹{(product.price * quantity).toLocaleString("en-IN")}</span>
+          <span>Add to Bag • ₹{(currentPrice * quantity).toLocaleString("en-IN")}</span>
         </button>
       </div>
 

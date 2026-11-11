@@ -135,6 +135,8 @@ async function prerenderDynamicRoutes() {
     't-shirts',
     'shirts',
     'hoodies',
+    'sweatshirts',
+    'sweetshirts',
     'bottoms',
     'jackets',
     'urban-essentials',

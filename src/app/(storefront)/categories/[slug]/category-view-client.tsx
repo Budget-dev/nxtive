@@ -133,9 +133,14 @@ export function CategoryViewClient({
         }}
       >
         {/* Background Image with Cinematic Vignette Overlay */}
-        {category.image ? (
+        {category.image || category.slug?.includes("sweat") || category.slug?.includes("sweet") || category.slug?.includes("hoodie") ? (
           <img
-            src={sharpImageSrc(category.image)}
+            src={sharpImageSrc(
+              category.image ||
+                (category.slug?.includes("sweat") || category.slug?.includes("sweet") || category.slug?.includes("hoodie")
+                  ? "/images/nxtvie/cat-hoodies.jpg"
+                  : "/images/nxtvie/hero-model.jpg")
+            )}
             alt={category.name}
             style={{
               position: "absolute",

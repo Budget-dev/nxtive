@@ -34,6 +34,7 @@ import {
 import { useAuth } from "@/features/auth";
 import { useStore, Order } from "@/components/store-context";
 import type { UserAddress } from "@/types/user";
+import { reverseGeocode, matchIndianState, sanitizePostalCode } from "@/lib/location";
 
 const INDIAN_STATES = [
   "Maharashtra",
@@ -176,64 +177,72 @@ function AccountContent() {
     setGeoLoading(true);
     setGeoNotice({ text: "Acquiring GPS location from device...", type: "info" });
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setGeoNotice({ text: "Resolving address via Google Maps Geocoding...", type: "info" });
+    const onGeoSuccess = async (coords: GeolocationCoordinates) => {
+      setGeoNotice({ text: "Resolving address...", type: "info" });
 
-        try {
-          const res = await fetch("/api/location/reverse-geocode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ latitude, longitude }),
-          });
-
-          const json = await res.json();
-          if (json.success && json.address) {
-            const addr = json.address;
-            setAddrStreet(addr.street || "");
-            if (addr.apartment || addr.area) {
-              setAddrApartment(addr.apartment || addr.area || "");
-            }
-            if (addr.city) setAddrCity(addr.city);
-            if (addr.state) {
-              const matchedState = INDIAN_STATES.find(
-                (s) =>
-                  s.toLowerCase() === addr.state.toLowerCase() ||
-                  addr.state.toLowerCase().includes(s.toLowerCase())
-              );
-              if (matchedState) setAddrState(matchedState);
-            }
-            if (addr.postalCode) {
-              setAddrPostalCode(addr.postalCode.replace(/\D/g, "").slice(0, 6));
-            }
-
-            setGeoNotice({
-              text: `Address resolved: ${addr.city}, ${addr.state}. Please review before saving.`,
-              type: "success",
-            });
-            showToast("Address auto-detected from device GPS");
-          } else {
-            throw new Error(json.error || "Unable to reverse geocode");
-          }
-        } catch (err: any) {
-          console.warn("[auto-fetch-address] Reverse geocode error:", err);
-          setGeoNotice({
-            text: "Could not read precise address from GPS. Please fill in fields manually.",
-            type: "error",
-          });
-        } finally {
-          setGeoLoading(false);
+      try {
+        const addr = await reverseGeocode(coords.latitude, coords.longitude);
+        if (addr.street) setAddrStreet(addr.street);
+        if (addr.apartment || addr.area) {
+          setAddrApartment(addr.apartment || addr.area || "");
         }
-      },
-      (geoErr) => {
+        if (addr.city) setAddrCity(addr.city);
+        if (addr.state) {
+          const matchedState =
+            matchIndianState(addr.state) ||
+            INDIAN_STATES.find(
+              (s) =>
+                s.toLowerCase() === addr.state!.toLowerCase() ||
+                addr.state!.toLowerCase().includes(s.toLowerCase())
+            );
+          if (matchedState) setAddrState(matchedState);
+        }
+        if (addr.postalCode) {
+          const cleanPin = sanitizePostalCode(addr.postalCode);
+          if (cleanPin) setAddrPostalCode(cleanPin);
+        }
+
+        const cityState = [addr.city, addr.state].filter(Boolean).join(", ");
+        setGeoNotice({
+          text: `Address resolved${cityState ? ": " + cityState : ""}. Please review before saving.`,
+          type: "success",
+        });
+        showToast("Address auto-detected from device GPS");
+      } catch (err: any) {
+        console.warn("[auto-fetch-address] Reverse geocode error:", err);
+        setGeoNotice({
+          text: "Could not read precise address from GPS. Please fill in fields manually.",
+          type: "error",
+        });
+      } finally {
         setGeoLoading(false);
-        let msg = "Location permission denied. Please enter address manually.";
-        if (geoErr.code === geoErr.TIMEOUT) msg = "Location request timed out. Please try again or enter manually.";
-        else if (geoErr.code === geoErr.POSITION_UNAVAILABLE) msg = "Device location unavailable. Please enter manually.";
-        setGeoNotice({ text: msg, type: "error" });
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      }
+    };
+
+    const onGeoError = (geoErr: GeolocationPositionError) => {
+      if (geoErr.code === geoErr.TIMEOUT || geoErr.code === geoErr.POSITION_UNAVAILABLE) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => onGeoSuccess(pos.coords),
+          () => {
+            setGeoLoading(false);
+            setGeoNotice({ text: "Location request timed out. Please enter manually.", type: "error" });
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+        );
+        return;
+      }
+
+      setGeoLoading(false);
+      let msg = "Location permission denied. Please enter address manually.";
+      if (geoErr.code === geoErr.TIMEOUT) msg = "Location request timed out. Please try again or enter manually.";
+      else if (geoErr.code === geoErr.POSITION_UNAVAILABLE) msg = "Device location unavailable. Please enter manually.";
+      setGeoNotice({ text: msg, type: "error" });
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => onGeoSuccess(pos.coords),
+      onGeoError,
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   };
 

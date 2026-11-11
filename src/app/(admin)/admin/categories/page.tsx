@@ -14,6 +14,8 @@ const PRESET_IMAGES = [
   { label: "T-Shirts", url: "/images/nxtvie/cat-tshirts.jpg" },
   { label: "Shirts", url: "/images/nxtvie/cat-shirts.jpg" },
   { label: "Hoodies", url: "/images/nxtvie/cat-hoodies.jpg" },
+  { label: "Sweatshirts", url: "/images/nxtvie/cat-hoodies.jpg" },
+  { label: "Jackets", url: "/images/nxtvie/promo-jackets-hd.jpg" },
   { label: "Bottoms", url: "/images/nxtvie/cat-bottoms.jpg" },
   { label: "Lookbook 1", url: "/images/nxtvie/gallery-1.jpg" },
   { label: "Lookbook 2", url: "/images/nxtvie/gallery-2.jpg" },

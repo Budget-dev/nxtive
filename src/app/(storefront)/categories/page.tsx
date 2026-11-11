@@ -154,6 +154,13 @@ export default async function CategoriesIndexPage() {
         >
           {categories.map((category) => {
             const count = productsForCategory(products, category.slug).length;
+            const bannerImage =
+              category.image ||
+              (category.slug.includes("sweat") || category.slug.includes("sweet") || category.slug.includes("hoodie")
+                ? "/images/nxtvie/cat-hoodies.jpg"
+                : category.slug.includes("jacket")
+                ? "/images/nxtvie/promo-jackets-hd.jpg"
+                : "/images/nxtvie/hero-model.jpg");
 
             return (
               <Link
@@ -174,20 +181,18 @@ export default async function CategoriesIndexPage() {
                 }}
                 className="category-card-hover"
               >
-                {category.image ? (
-                  <img
-                    src={sharpImageSrc(category.image)}
-                    alt={category.title}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      objectPosition: "center 18%",
-                    }}
-                  />
-                ) : null}
+                <img
+                  src={sharpImageSrc(bannerImage)}
+                  alt={category.title || category.name}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center 18%",
+                  }}
+                />
 
                 <div
                   style={{

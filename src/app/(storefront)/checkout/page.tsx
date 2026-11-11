@@ -21,6 +21,7 @@ import {
 import { useStore, normalizeOrder } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
 import { PhonePeCheckout } from "@/components/checkout/phonepe-checkout";
+import { reverseGeocode, matchIndianState, sanitizePostalCode } from "@/lib/location";
 
 const INDIAN_STATES = [
   "Maharashtra",
@@ -117,64 +118,83 @@ export default function CheckoutPage() {
     setLocationLoading(true);
     setLocationMessage(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          // 1. Try internal reverse geocode endpoint first
-          const internalRes = await fetch(`/api/location/reverse-geocode?lat=${coords.latitude}&lng=${coords.longitude}`, {
-            headers: { Accept: "application/json" },
-          });
-          const internalData = await internalRes.json();
-          if (internalRes.ok && internalData.success && internalData.data) {
-            const d = internalData.data;
-            if (d.street) setStreet(d.street);
-            if (d.city) setCity(d.city);
-            if (d.state) {
-              const matched = INDIAN_STATES.find(
-                (item) => item.toLowerCase() === d.state.toLowerCase() || d.state.toLowerCase().includes(item.toLowerCase())
-              );
-              if (matched) setState(matched);
-            }
-            if (d.postalCode) setPostalCode(String(d.postalCode).replace(/\D/g, "").slice(0, 6));
-            setLocationMessage("Address auto-filled from current location.");
-            return;
-          }
+    const onGeoSuccess = async (coords: GeolocationCoordinates) => {
+      try {
+        const addr = await reverseGeocode(coords.latitude, coords.longitude);
+        let filledCount = 0;
 
-          // 2. OpenStreetMap reverse lookup fallback
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1`,
-            { headers: { Accept: "application/json" } }
-          );
-          if (!response.ok) throw new Error("Unable to look up this location.");
-
-          const result = await response.json();
-          const address = result.address || {};
-          const streetParts = [address.house_number, address.road || address.pedestrian, address.neighbourhood || address.suburb]
-            .filter(Boolean)
-            .join(", ");
-          const detectedState = address.state || "";
-          const matchedState = INDIAN_STATES.find(
-            (item) => item.toLowerCase() === detectedState.toLowerCase() || detectedState.toLowerCase().includes(item.toLowerCase())
-          );
-
-          if (streetParts) setStreet(streetParts);
-          if (address.city || address.town || address.village || address.municipality) {
-            setCity(address.city || address.town || address.village || address.municipality);
-          }
-          if (matchedState) setState(matchedState);
-          if (address.postcode) setPostalCode(String(address.postcode).replace(/\D/g, "").slice(0, 6));
-          setLocationMessage("Address auto-filled from current location.");
-        } catch {
-          setLocationMessage("Could not auto-fill address. Please enter manually.");
-        } finally {
-          setLocationLoading(false);
+        if (addr.street) {
+          setStreet(addr.street);
+          filledCount++;
         }
-      },
-      () => {
+        if (addr.area && !addr.street) {
+          setStreet(addr.area);
+          filledCount++;
+        }
+        if (addr.city) {
+          setCity(addr.city);
+          filledCount++;
+        }
+        if (addr.state) {
+          const matchedState =
+            matchIndianState(addr.state) ||
+            INDIAN_STATES.find(
+              (item) =>
+                item.toLowerCase() === addr.state!.toLowerCase() ||
+                addr.state!.toLowerCase().includes(item.toLowerCase())
+            );
+          if (matchedState) {
+            setState(matchedState);
+            filledCount++;
+          }
+        }
+        if (addr.postalCode) {
+          const cleanPin = sanitizePostalCode(addr.postalCode);
+          if (cleanPin) {
+            setPostalCode(cleanPin);
+            filledCount++;
+          }
+        }
+
+        if (filledCount > 0) {
+          setLocationMessage("Address auto-filled from current location.");
+        } else {
+          setLocationMessage("Location detected. Please review street details.");
+        }
+      } catch (err) {
+        console.warn("[checkout] Geocoding error:", err);
+        setLocationMessage("Could not auto-fill address. Please enter manually.");
+      } finally {
         setLocationLoading(false);
+      }
+    };
+
+    const onGeoError = (err: GeolocationPositionError) => {
+      // If high accuracy timed out or failed, retry once with low accuracy (cell/Wi-Fi triangulation)
+      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => onGeoSuccess(coords),
+          () => {
+            setLocationLoading(false);
+            setLocationMessage("Could not detect location. Please enter manually.");
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+        );
+        return;
+      }
+
+      setLocationLoading(false);
+      if (err.code === err.PERMISSION_DENIED) {
         setLocationMessage("Location permission was not granted. Please enter manually.");
-      },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+      } else {
+        setLocationMessage("Could not auto-fill address. Please enter manually.");
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => onGeoSuccess(coords),
+      onGeoError,
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
   };
 

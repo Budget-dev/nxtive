@@ -126,6 +126,7 @@ async function handleReverseGeocode(lat: number, lng: number) {
             success: true,
             provider: "google_maps",
             address: parsedAddress,
+            data: parsedAddress,
           });
         }
       } catch (err) {
@@ -133,69 +134,108 @@ async function handleReverseGeocode(lat: number, lng: number) {
       }
     }
 
-    // 2. Resilient fallback (Nominatim / coordinate reverse lookup)
+    // 2. High-speed, multi-tier fallback (Photon / BigDataCloud)
     try {
-      const fallbackUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
-      const fallbackRes = await fetch(fallbackUrl, {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "NXTIVE-Ecommerce/1.0",
-        },
-        signal: AbortSignal.timeout(3000),
-      });
+      const photonRes = await fetch(
+        `https://photon.komoot.io/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`,
+        {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(4000),
+        }
+      );
+      if (photonRes.ok) {
+        const pData = await photonRes.json();
+        const props = pData?.features?.[0]?.properties;
+        if (props) {
+          const streetParts = [props.name, props.street, props.locality].filter(Boolean).join(", ");
+          const city = props.city || props.town || props.village || props.county || "Mumbai";
+          const state = props.state || "Maharashtra";
+          const postalCode = (props.postcode || "").toString().replace(/\D/g, "").slice(0, 6);
 
-      if (fallbackRes.ok) {
-        const json = await fallbackRes.json();
-        const addr = json.address || {};
+          const parsedAddress: GeocodeAddressResult = {
+            street: streetParts || props.street || "Detected Location",
+            apartment: props.locality || "",
+            area: props.district || props.locality || "",
+            city,
+            state,
+            postalCode: postalCode || "400001",
+            country: props.country || "India",
+            formattedAddress: `${streetParts}, ${city}, ${state} ${postalCode}`,
+          };
 
-        const streetParts = [
-          addr.house_number,
-          addr.building,
-          addr.road || addr.pedestrian || addr.suburb,
-        ]
-          .filter(Boolean)
-          .join(", ");
+          return NextResponse.json({
+            success: true,
+            provider: "photon",
+            address: parsedAddress,
+            data: parsedAddress,
+          });
+        }
+      }
+    } catch (photonErr) {
+      console.warn("[reverse-geocode] Photon error, trying BigDataCloud:", photonErr);
+    }
 
-        const area = [addr.neighbourhood, addr.residential, addr.suburb].filter(Boolean).join(", ");
-        const city = addr.city || addr.town || addr.municipality || addr.village || addr.county || "Mumbai";
-        const state = addr.state || "Maharashtra";
-        const postcode = (addr.postcode || "").toString().replace(/\D/g, "").slice(0, 6);
+    // 3. BigDataCloud Fallback
+    try {
+      const bdcRes = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lng)}&localityLanguage=en`,
+        {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(4000),
+        }
+      );
+      if (bdcRes.ok) {
+        const bdc = await bdcRes.json();
+        const city = bdc.city || bdc.locality || "Mumbai";
+        const state = bdc.principalSubdivision || "Maharashtra";
+        let postalCode = (bdc.postcode || "").toString().replace(/\D/g, "").slice(0, 6);
+        if (!postalCode && Array.isArray(bdc?.localityInfo?.informative)) {
+          for (const item of bdc.localityInfo.informative) {
+            if (/^\d{6}$/.test(item?.name)) {
+              postalCode = item.name.slice(0, 6);
+              break;
+            }
+          }
+        }
 
         const parsedAddress: GeocodeAddressResult = {
-          street: streetParts || addr.road || "Detected Location",
-          apartment: addr.house_name || area,
-          area,
+          street: city ? `${city} Area` : "Detected Location",
+          apartment: "",
+          area: bdc.locality || "",
           city,
           state,
-          postalCode: postcode || "400001",
-          country: addr.country || "India",
-          formattedAddress: json.display_name || `${streetParts}, ${city}, ${state} ${postcode}`,
+          postalCode: postalCode || "400001",
+          country: bdc.countryName || "India",
+          formattedAddress: `${city}, ${state} ${postalCode}`,
         };
 
         return NextResponse.json({
           success: true,
-          provider: "fallback_nominatim",
+          provider: "bigdatacloud",
           address: parsedAddress,
-          note: apiKey ? undefined : "Set GOOGLE_MAPS_API_KEY in .env.local for production Google Maps Geocoding",
+          data: parsedAddress,
         });
       }
-    } catch (fallbackErr) {
-      console.warn("[reverse-geocode] Fallback geocode error:", fallbackErr);
+    } catch (bdcErr) {
+      console.warn("[reverse-geocode] BigDataCloud error:", bdcErr);
     }
 
-    // 3. Fallback based on known coordinates
+    // 4. Fallback based on known coordinates
+    const fallbackAddress: GeocodeAddressResult = {
+      street: "Detected GPS Location",
+      area: "",
+      city: "Mumbai",
+      state: "Maharashtra",
+      postalCode: "400001",
+      country: "India",
+      formattedAddress: `Coordinates: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+    };
+
     return NextResponse.json({
       success: true,
-      provider: "approximate",
-      address: {
-        street: "Device GPS Location",
-        area: "Detected Area",
-        city: "Mumbai",
-        state: "Maharashtra",
-        postalCode: "400001",
-        country: "India",
-        formattedAddress: `Coordinates: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      },
+      provider: "coordinate_fallback",
+      address: fallbackAddress,
+      data: fallbackAddress,
     });
   } catch (error: any) {
     console.error("[reverse-geocode] Exception:", error);
