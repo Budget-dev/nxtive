@@ -254,6 +254,33 @@ async function prerenderDynamicRoutes() {
     }
   }
 
+  console.log(`Prerendering storefront orders routes...`);
+  const orderRoutes = [
+    { url: `http://localhost:${PRERENDER_PORT}/orders/track`, rel: path.join('orders', 'track') },
+    { url: `http://localhost:${PRERENDER_PORT}/orders/invoice`, rel: path.join('orders', 'invoice') },
+    { url: `http://localhost:${PRERENDER_PORT}/orders`, rel: path.join('orders', 'index') },
+  ];
+
+  for (const route of orderRoutes) {
+    try {
+      const [htmlRes, rscRes] = await Promise.all([
+        fetchUrl(route.url),
+        fetchUrl(route.url, { RSC: '1' }),
+      ]);
+      if (htmlRes.statusCode === 200 && htmlRes.body) {
+        saveFile(path.join(HOSTING_DIR, `${route.rel}.html`), htmlRes.body);
+        saveFile(path.join(HOSTING_DIR, route.rel, 'index.html'), htmlRes.body);
+      }
+      if (rscRes.statusCode === 200 && rscRes.body) {
+        saveFile(path.join(HOSTING_DIR, `${route.rel}.rsc`), rscRes.body);
+        saveFile(path.join(HOSTING_DIR, route.rel, 'index.rsc'), rscRes.body);
+      }
+      console.log(`  ✓ ${route.url} (${htmlRes.statusCode})`);
+    } catch (err) {
+      console.warn(`  ✗ Failed to prerender ${route.url}:`, err.message);
+    }
+  }
+
   if (server.pid) killProcessTree(server.pid);
   console.log('Temporary Next.js server shut down.');
 }

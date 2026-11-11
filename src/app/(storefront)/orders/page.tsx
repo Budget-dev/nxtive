@@ -19,7 +19,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useStore, Order } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
-import { auth } from "@/lib/firebase/client";
+import { auth, db } from "@/lib/firebase/client";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -35,47 +36,184 @@ export default function OrdersPage() {
     let mounted = true;
     async function load() {
       setLoadingOrders(true);
+
+      // 1. Direct Firestore query for current user or session order (zero server dependency)
       try {
-        const token = await auth.currentUser?.getIdToken();
+        const uid = auth.currentUser?.uid || user?.uid;
+        const email = auth.currentUser?.email || user?.email;
+        const collectedOrders: Order[] = [];
+
+        // Check sessionStorage for instant guest order recovery
+        try {
+          const stored = sessionStorage.getItem("last_confirmed_order");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && (parsed.id || parsed.orderNumber)) {
+              collectedOrders.push({
+                id: String(parsed.id || parsed.orderNumber),
+                date: (parsed.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+                items: (parsed.items || []).map((i: any) => ({
+                  id: String(i.productId || i.id || ""),
+                  title: String(i.title || "Item"),
+                  price: Number(i.price || 0),
+                  quantity: Number(i.quantity || 1),
+                  selectedSize: String(i.selectedSize || "M"),
+                  selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
+                  image: String(i.image || ""),
+                })),
+                subtotal: Number(parsed.subtotal || 0),
+                discount: Number(parsed.discount || 0),
+                shipping: Number(parsed.shipping || 0),
+                total: Number(parsed.total || parsed.totalAmount || parsed.amount || 0),
+                status: parsed.status === "delivered" ? "Delivered" : "Processing",
+                paymentMethod: parsed.paymentMethod || "Online Payment",
+                paymentStatus: parsed.paymentStatus || "Paid",
+                shippingAddress: parsed.shippingAddress || {},
+                deliveryDateEstimate: parsed.deliveryDateEstimate || "3-5 Business Days",
+                trackingNumber: parsed.trackingNumber || parsed.awbCode || "",
+              });
+            }
+          }
+        } catch {}
+
+        if (uid) {
+          const qUid = query(collection(db, "orders"), where("userId", "==", uid));
+          const snap = await getDocs(qUid);
+          snap.forEach((doc: any) => {
+            const raw = doc.data();
+            if (!collectedOrders.some((o) => o.id === doc.id)) {
+              collectedOrders.push({
+                id: doc.id,
+                date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+                items: (raw.items || []).map((i: any) => ({
+                  id: String(i.productId || i.id || ""),
+                  title: String(i.title || "Item"),
+                  price: Number(i.price || 0),
+                  quantity: Number(i.quantity || 1),
+                  selectedSize: String(i.selectedSize || "M"),
+                  selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
+                  image: String(i.image || ""),
+                })),
+                subtotal: Number(raw.subtotal || 0),
+                discount: Number(raw.discount || 0),
+                shipping: Number(raw.shipping || 0),
+                total: Number(raw.total || raw.totalAmount || raw.amount || 0),
+                status:
+                  raw.status === "Delivered" || raw.status === "delivered"
+                    ? "Delivered"
+                    : raw.status === "shipped" || raw.status === "out_for_delivery"
+                      ? "Shipped"
+                      : raw.status === "cancelled"
+                        ? "Cancelled"
+                        : raw.status === "processing"
+                          ? "Processing"
+                          : "Order Confirmed",
+                paymentMethod: raw.paymentMethod || "Online Payment",
+                paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
+                shippingAddress: raw.shippingAddress || {},
+                deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
+                trackingNumber: raw.trackingNumber || raw.awbCode || "",
+              });
+            }
+          });
+        }
+
+        if (email) {
+          const qEmail = query(collection(db, "orders"), where("customerEmail", "==", email));
+          const snapEmail = await getDocs(qEmail);
+          snapEmail.forEach((doc: any) => {
+            const raw = doc.data();
+            if (!collectedOrders.some((o) => o.id === doc.id)) {
+              collectedOrders.push({
+                id: doc.id,
+                date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+                items: (raw.items || []).map((i: any) => ({
+                  id: String(i.productId || i.id || ""),
+                  title: String(i.title || "Item"),
+                  price: Number(i.price || 0),
+                  quantity: Number(i.quantity || 1),
+                  selectedSize: String(i.selectedSize || "M"),
+                  selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
+                  image: String(i.image || ""),
+                })),
+                subtotal: Number(raw.subtotal || 0),
+                discount: Number(raw.discount || 0),
+                shipping: Number(raw.shipping || 0),
+                total: Number(raw.total || raw.totalAmount || raw.amount || 0),
+                status:
+                  raw.status === "Delivered" || raw.status === "delivered"
+                    ? "Delivered"
+                    : raw.status === "shipped" || raw.status === "out_for_delivery"
+                      ? "Shipped"
+                      : raw.status === "cancelled"
+                        ? "Cancelled"
+                        : raw.status === "processing"
+                          ? "Processing"
+                          : "Order Confirmed",
+                paymentMethod: raw.paymentMethod || "Online Payment",
+                paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
+                shippingAddress: raw.shippingAddress || {},
+                deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
+                trackingNumber: raw.trackingNumber || raw.awbCode || "",
+              });
+            }
+          });
+        }
+
+        if (collectedOrders.length > 0 && mounted) {
+          setFetchedOrders(collectedOrders);
+          setLoadingOrders(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Direct Firestore read notice:", err);
+      }
+
+      // 2. Fallback to /api/orders with safe JSON parsing
+      try {
+        const token = await auth.currentUser?.getIdToken().catch(() => null);
         const res = await fetch("/api/orders?page=1&pageSize=50", {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         });
-        const json = await res.json();
-        if (mounted && json.success && Array.isArray(json.data?.items)) {
-          const normalized: Order[] = json.data.items.map((raw: any) => ({
-            id: String(raw.id || ""),
-            date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
-            items: (raw.items || []).map((i: any) => ({
-              id: String(i.productId || i.id || ""),
-              title: String(i.title || "Item"),
-              price: Number(i.price || 0),
-              quantity: Number(i.quantity || 1),
-              selectedSize: String(i.selectedSize || "M"),
-              selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
-              image: String(i.image || ""),
-            })),
-            subtotal: Number(raw.subtotal || 0),
-            discount: Number(raw.discount || 0),
-            shipping: Number(raw.shipping || 0),
-            total: Number(raw.total || 0),
-            status:
-              raw.status === "Delivered" || raw.status === "delivered"
-                ? "Delivered"
-                : raw.status === "shipped" || raw.status === "out_for_delivery"
-                  ? "Shipped"
-                  : raw.status === "cancelled"
-                    ? "Cancelled"
-                    : raw.status === "processing"
-                      ? "Processing"
-                      : "Order Confirmed",
-            paymentMethod: raw.paymentMethod || "Online Payment",
-            paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
-            shippingAddress: raw.shippingAddress || {},
-            deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
-            trackingNumber: raw.trackingNumber || raw.awbCode || "",
-          }));
-          setFetchedOrders(normalized);
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
+          const json = await res.json();
+          if (mounted && json.success && Array.isArray(json.data?.items)) {
+            const normalized: Order[] = json.data.items.map((raw: any) => ({
+              id: String(raw.id || ""),
+              date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+              items: (raw.items || []).map((i: any) => ({
+                id: String(i.productId || i.id || ""),
+                title: String(i.title || "Item"),
+                price: Number(i.price || 0),
+                quantity: Number(i.quantity || 1),
+                selectedSize: String(i.selectedSize || "M"),
+                selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
+                image: String(i.image || ""),
+              })),
+              subtotal: Number(raw.subtotal || 0),
+              discount: Number(raw.discount || 0),
+              shipping: Number(raw.shipping || 0),
+              total: Number(raw.total || 0),
+              status:
+                raw.status === "Delivered" || raw.status === "delivered"
+                  ? "Delivered"
+                  : raw.status === "shipped" || raw.status === "out_for_delivery"
+                    ? "Shipped"
+                    : raw.status === "cancelled"
+                      ? "Cancelled"
+                      : raw.status === "processing"
+                        ? "Processing"
+                        : "Order Confirmed",
+              paymentMethod: raw.paymentMethod || "Online Payment",
+              paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
+              shippingAddress: raw.shippingAddress || {},
+              deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
+              trackingNumber: raw.trackingNumber || raw.awbCode || "",
+            }));
+            setFetchedOrders(normalized);
+          }
         }
       } catch (e) {
         console.warn("Failed to load orders on orders page:", e);
@@ -87,7 +225,7 @@ export default function OrdersPage() {
     return () => {
       mounted = false;
     };
-  }, [storeOrders.length]);
+  }, [storeOrders.length, user?.uid, user?.email]);
 
   const orders = storeOrders.length > 0 ? storeOrders : fetchedOrders;
 
@@ -198,7 +336,7 @@ export default function OrdersPage() {
             onSubmit={(e) => {
               e.preventDefault();
               if (trackQuery.trim()) {
-                router.push(`/orders/${encodeURIComponent(trackQuery.trim())}`);
+                router.push(`/orders/track?orderId=${encodeURIComponent(trackQuery.trim())}`);
               }
             }}
             style={{ display: "flex", gap: "8px", flex: 1, maxWidth: "420px", minWidth: "260px" }}
@@ -415,7 +553,7 @@ export default function OrdersPage() {
                       </span>
 
                       <Link
-                        href={`/orders/${order.id}/invoice`}
+                        href={`/orders/invoice?orderId=${encodeURIComponent(order.id)}`}
                         title="View & Download Invoice"
                         style={{
                           display: "inline-flex",
@@ -436,7 +574,7 @@ export default function OrdersPage() {
                       </Link>
 
                       <Link
-                        href={`/orders/${order.id}`}
+                        href={`/orders/track?orderId=${encodeURIComponent(order.id)}`}
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
@@ -486,6 +624,13 @@ export default function OrdersPage() {
                                 src={item.image || "/images/nxtvie/cat-tshirts.jpg"}
                                 alt={item.title}
                                 fill
+                                unoptimized
+                                onError={(e) => {
+                                  const target = e.currentTarget as HTMLImageElement;
+                                  if (!target.src.includes("/images/nxtvie/cat-tshirts.jpg")) {
+                                    target.src = "/images/nxtvie/cat-tshirts.jpg";
+                                  }
+                                }}
                                 style={{ objectFit: "cover" }}
                                 sizes="52px"
                               />
@@ -543,7 +688,7 @@ export default function OrdersPage() {
 
                       <div style={{ display: "flex", gap: "16px" }}>
                         <Link
-                          href={`/orders/${order.id}`}
+                          href={`/orders/track?orderId=${encodeURIComponent(order.id)}`}
                           style={{
                             fontWeight: 700,
                             color: "#111110",

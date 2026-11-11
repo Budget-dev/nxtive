@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Package,
   Truck,
@@ -30,7 +30,7 @@ import { auth, db } from "@/lib/firebase/client";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 interface Props {
-  orderId: string;
+  orderId?: string;
 }
 
 interface ExtendedOrder extends Order {
@@ -43,8 +43,10 @@ interface ExtendedOrder extends Order {
   statusHistory?: Array<{ status: string; timestamp: string; note?: string; updatedBy?: string }>;
 }
 
-export function OrderDetailClient({ orderId }: Props) {
+export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { orders, addToCart, showToast } = useStore();
   const [copied, setCopied] = useState(false);
   const [copiedAwb, setCopiedAwb] = useState(false);
@@ -64,14 +66,26 @@ export function OrderDetailClient({ orderId }: Props) {
     }>;
   } | null>(null);
 
-  const cleanTargetId = (orderId || "").trim().toLowerCase();
+  // Extract orderId from props, search params, or pathname:
+  // e.g. /orders/2vFGeJT54Cxz8ZI7JlrO or /orders/track?orderId=2vFGeJT54Cxz8ZI7JlrO
+  const resolvedOrderId = (
+    (initialOrderId && initialOrderId !== "track" && initialOrderId !== "orders")
+      ? initialOrderId
+      : (searchParams?.get("orderId") || searchParams?.get("id")) ||
+        (pathname && pathname.startsWith("/orders/") && !pathname.endsWith("/orders") && !pathname.endsWith("/track")
+          ? pathname.split("/orders/")[1]?.split("/")[0]?.split("?")[0]
+          : "") ||
+        ""
+  ).trim();
+
+  const cleanTargetId = (resolvedOrderId || "").trim().toLowerCase();
 
   // 1. Look in existing memory orders first
   const existingOrder = orders.find(
     (o) =>
-      o.id.toLowerCase() === cleanTargetId ||
-      (o as any).orderNumber?.toLowerCase() === cleanTargetId ||
-      (o as any).trackingNumber?.toLowerCase() === cleanTargetId
+      (cleanTargetId && o.id.toLowerCase() === cleanTargetId) ||
+      (cleanTargetId && (o as any).orderNumber?.toLowerCase() === cleanTargetId) ||
+      (cleanTargetId && (o as any).trackingNumber?.toLowerCase() === cleanTargetId)
   );
 
   const [isLoading, setIsLoading] = useState(!existingOrder);
@@ -89,14 +103,14 @@ export function OrderDetailClient({ orderId }: Props) {
           const pNum = String(parsed.orderNumber || "").toLowerCase();
           const pAwb = String(parsed.trackingNumber || parsed.awbCode || "").toLowerCase();
 
-          if (pId === cleanTargetId || pNum === cleanTargetId || pAwb === cleanTargetId) {
+          if (!cleanTargetId || pId === cleanTargetId || pNum === cleanTargetId || pAwb === cleanTargetId) {
             const normalized = normalizeOrder(parsed) as ExtendedOrder;
             normalized.orderNumber = parsed.orderNumber || normalized.id;
             normalized.rawStatus = parsed.status || "pending";
             normalized.carrier = parsed.carrier || "Shiprocket Express";
             normalized.awbCode = parsed.awbCode || parsed.trackingNumber || "";
             normalized.trackingUrl = parsed.trackingUrl || "";
-            normalized.statusHistory = parsed.statusHistory || [];
+            normalized.statusHistory = Array.isArray(parsed.statusHistory) ? parsed.statusHistory : [];
             if (isMounted) {
               setFetchedOrder(normalized);
               setIsLoading(false);
@@ -107,15 +121,90 @@ export function OrderDetailClient({ orderId }: Props) {
         console.warn("[order-detail] sessionStorage read notice:", err);
       }
 
-      // Step B: Fetch from /api/orders/[orderId]
+      // If no ID is specified and we have orders in context, use the latest one
+      if (!cleanTargetId && orders.length > 0) {
+        if (isMounted) {
+          setFetchedOrder(orders[0] as ExtendedOrder);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (!resolvedOrderId) {
+        if (isMounted) setIsLoading(false);
+        return;
+      }
+
+      // Step B: Direct client Firestore document and orderNumber query (fastest, real-time, zero server dependency)
+      try {
+        let snap = await getDoc(doc(db, "orders", resolvedOrderId));
+        if (!snap.exists() && cleanTargetId !== resolvedOrderId) {
+          snap = await getDoc(doc(db, "orders", cleanTargetId));
+        }
+
+        if (snap.exists() && isMounted) {
+          const data = snap.data();
+          const normalized = normalizeOrder({ id: snap.id, ...data }) as ExtendedOrder;
+          normalized.orderNumber = data.orderNumber || snap.id;
+          normalized.rawStatus = data.status || "pending";
+          normalized.carrier = data.carrier || "Shiprocket Express";
+          normalized.awbCode = data.awbCode || data.trackingNumber || "";
+          normalized.trackingUrl = data.trackingUrl || "";
+          normalized.statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
+          setFetchedOrder(normalized);
+          setIsLoading(false);
+          return;
+        }
+
+        // Search by orderNumber
+        const qNum = query(collection(db, "orders"), where("orderNumber", "==", resolvedOrderId));
+        const numSnap = await getDocs(qNum);
+        if (!numSnap.empty && isMounted) {
+          const docFound = numSnap.docs[0];
+          const data = docFound.data();
+          const normalized = normalizeOrder({ id: docFound.id, ...data }) as ExtendedOrder;
+          normalized.orderNumber = data.orderNumber || docFound.id;
+          normalized.rawStatus = data.status || "pending";
+          normalized.carrier = data.carrier || "Shiprocket Express";
+          normalized.awbCode = data.awbCode || data.trackingNumber || "";
+          normalized.trackingUrl = data.trackingUrl || "";
+          normalized.statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
+          setFetchedOrder(normalized);
+          setIsLoading(false);
+          return;
+        }
+
+        // Search by trackingNumber
+        const qTrack = query(collection(db, "orders"), where("trackingNumber", "==", resolvedOrderId));
+        const trackSnap = await getDocs(qTrack);
+        if (!trackSnap.empty && isMounted) {
+          const docFound = trackSnap.docs[0];
+          const data = docFound.data();
+          const normalized = normalizeOrder({ id: docFound.id, ...data }) as ExtendedOrder;
+          normalized.orderNumber = data.orderNumber || docFound.id;
+          normalized.rawStatus = data.status || "pending";
+          normalized.carrier = data.carrier || "Shiprocket Express";
+          normalized.awbCode = data.awbCode || data.trackingNumber || "";
+          normalized.trackingUrl = data.trackingUrl || "";
+          normalized.statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
+          setFetchedOrder(normalized);
+          setIsLoading(false);
+          return;
+        }
+      } catch (firestoreErr) {
+        console.warn("[order-detail] Firestore direct lookup error:", firestoreErr);
+      }
+
+      // Step C: Fallback to /api/orders/[orderId] (safely checking for json content-type)
       try {
         const token = await auth.currentUser?.getIdToken().catch(() => null);
-        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+        const res = await fetch(`/api/orders/${encodeURIComponent(resolvedOrderId)}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         });
 
-        if (res.ok) {
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
           const json = await res.json();
           if (isMounted && json.success && json.data) {
             const raw = json.data;
@@ -132,8 +221,8 @@ export function OrderDetailClient({ orderId }: Props) {
                 : "Order Confirmed";
 
             const normalized: ExtendedOrder = {
-              id: String(raw.id || orderId),
-              orderNumber: String(raw.orderNumber || raw.id || orderId),
+              id: String(raw.id || resolvedOrderId),
+              orderNumber: String(raw.orderNumber || raw.id || resolvedOrderId),
               date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
               items: (raw.items || []).map((item: any) => ({
                 id: String(item.productId || item.id || ""),
@@ -170,42 +259,6 @@ export function OrderDetailClient({ orderId }: Props) {
             setFetchedOrder(normalized);
             setIsLoading(false);
           }
-        } else {
-          // Fallback Step C: Direct client Firestore query
-          try {
-            const snap = await getDoc(doc(db, "orders", orderId));
-            if (snap.exists() && isMounted) {
-              const data = snap.data();
-              const normalized = normalizeOrder({ id: snap.id, ...data }) as ExtendedOrder;
-              normalized.orderNumber = data.orderNumber || snap.id;
-              normalized.rawStatus = data.status || "pending";
-              normalized.carrier = data.carrier || "Shiprocket Express";
-              normalized.awbCode = data.awbCode || data.trackingNumber || "";
-              normalized.trackingUrl = data.trackingUrl || "";
-              normalized.statusHistory = data.statusHistory || [];
-              setFetchedOrder(normalized);
-              setIsLoading(false);
-            } else {
-              // Try query by orderNumber
-              const q = query(collection(db, "orders"), where("orderNumber", "==", orderId));
-              const querySnap = await getDocs(q);
-              if (!querySnap.empty && isMounted) {
-                const docFound = querySnap.docs[0];
-                const data = docFound.data();
-                const normalized = normalizeOrder({ id: docFound.id, ...data }) as ExtendedOrder;
-                normalized.orderNumber = data.orderNumber || docFound.id;
-                normalized.rawStatus = data.status || "pending";
-                normalized.carrier = data.carrier || "Shiprocket Express";
-                normalized.awbCode = data.awbCode || data.trackingNumber || "";
-                normalized.trackingUrl = data.trackingUrl || "";
-                normalized.statusHistory = data.statusHistory || [];
-                setFetchedOrder(normalized);
-                setIsLoading(false);
-              }
-            }
-          } catch (firestoreErr) {
-            console.warn("[order-detail] Firestore direct fallback notice:", firestoreErr);
-          }
         }
       } catch (err) {
         console.warn("[order-detail] Error fetching order from API:", err);
@@ -213,12 +266,13 @@ export function OrderDetailClient({ orderId }: Props) {
         if (isMounted) setIsLoading(false);
       }
 
-      // Step D: Live Delivery Tracking Telemetry from /api/delivery/track
+      // Step D: Live Delivery Tracking Telemetry from /api/delivery/track (safe)
       try {
-        const trackRes = await fetch(`/api/delivery/track?orderId=${encodeURIComponent(orderId)}`, {
+        const trackRes = await fetch(`/api/delivery/track?orderId=${encodeURIComponent(resolvedOrderId)}`, {
           cache: "no-store",
         });
-        if (trackRes.ok) {
+        const contentType = trackRes.headers.get("content-type") || "";
+        if (trackRes.ok && contentType.includes("application/json")) {
           const trackJson = await trackRes.json();
           if (isMounted && trackJson.success && trackJson.data) {
             setDeliveryData({
@@ -239,7 +293,7 @@ export function OrderDetailClient({ orderId }: Props) {
     return () => {
       isMounted = false;
     };
-  }, [orderId, cleanTargetId]);
+  }, [resolvedOrderId, cleanTargetId]);
 
   const order: ExtendedOrder | null = fetchedOrder || (existingOrder ? (existingOrder as ExtendedOrder) : null);
 
@@ -278,7 +332,7 @@ export function OrderDetailClient({ orderId }: Props) {
   const handleSearchOrder = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchOrderId.trim()) {
-      router.push(`/orders/${encodeURIComponent(searchOrderId.trim())}`);
+      router.push(`/orders/track?orderId=${encodeURIComponent(searchOrderId.trim())}`);
     }
   };
 
@@ -333,7 +387,8 @@ export function OrderDetailClient({ orderId }: Props) {
               Order Not Found
             </h1>
             <p style={{ fontSize: "13.5px", color: "#6A645C", marginBottom: "24px", lineHeight: "1.5" }}>
-              We couldn&apos;t find an order matching <strong style={{ color: "#111110" }}>{orderId}</strong>.
+              We couldn&apos;t find an order matching{" "}
+              <strong style={{ color: "#111110" }}>{resolvedOrderId || initialOrderId || "your inquiry"}</strong>.
               Please check your confirmation email/SMS or enter your Order Number below to track.
             </p>
 
@@ -985,6 +1040,13 @@ export function OrderDetailClient({ orderId }: Props) {
                         src={item.image || "/images/nxtvie/cat-tshirts.jpg"}
                         alt={item.title}
                         fill
+                        unoptimized
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          if (!target.src.includes("/images/nxtvie/cat-tshirts.jpg")) {
+                            target.src = "/images/nxtvie/cat-tshirts.jpg";
+                          }
+                        }}
                         style={{ objectFit: "cover" }}
                         sizes="64px"
                       />

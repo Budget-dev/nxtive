@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams, usePathname } from "next/navigation";
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import { OrderInvoice } from "@/components/invoice/order-invoice";
@@ -9,20 +10,33 @@ import { auth, db } from "@/lib/firebase/client";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 interface Props {
-  orderId: string;
+  orderId?: string;
 }
 
-export function StorefrontInvoiceClient({ orderId }: Props) {
+export function StorefrontInvoiceClient({ orderId: initialOrderId }: Props = {}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { orders } = useStore();
   const [order, setOrder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const resolvedOrderId = (
+    (initialOrderId && initialOrderId !== "invoice" && initialOrderId !== "orders")
+      ? initialOrderId
+      : (searchParams?.get("orderId") || searchParams?.get("id")) ||
+        pathname?.replace(/\/invoice\/?$/, "").split("/orders/")[1]?.split("/")[0]?.split("?")[0] ||
+        ""
+  ).trim();
+
+  const cleanTarget = (resolvedOrderId || "").trim().toLowerCase();
+
   useEffect(() => {
     // 1. Check local store orders first for instant 0ms load
-    const cleanTarget = (orderId || "").trim().toLowerCase();
     const matched = orders.find(
-      (o) => o.id.toLowerCase() === cleanTarget || (o as any).orderNumber?.toLowerCase() === cleanTarget
+      (o) =>
+        (cleanTarget && o.id.toLowerCase() === cleanTarget) ||
+        (cleanTarget && (o as any).orderNumber?.toLowerCase() === cleanTarget)
     );
     if (matched) {
       setOrder(matched);
@@ -36,6 +50,7 @@ export function StorefrontInvoiceClient({ orderId }: Props) {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (
+          !cleanTarget ||
           parsed.id?.toLowerCase() === cleanTarget ||
           parsed.orderNumber?.toLowerCase() === cleanTarget ||
           parsed.orderId?.toLowerCase() === cleanTarget
@@ -47,53 +62,71 @@ export function StorefrontInvoiceClient({ orderId }: Props) {
       }
     } catch {}
 
-    // 2. Fetch from API or Firestore
+    // If no orderId is provided but orders exist, use the most recent
+    if (!cleanTarget && orders.length > 0) {
+      setOrder(orders[0]);
+      setLoading(false);
+      return;
+    }
+
+    if (!resolvedOrderId) {
+      setError("No order ID was provided for this invoice.");
+      setLoading(false);
+      return;
+    }
+
     let active = true;
     async function fetchOrder() {
       setLoading(true);
       setError(null);
+
+      // 2. Direct Firestore read (fast, real-time, zero server dependency)
       try {
-        const token = await auth.currentUser?.getIdToken();
-        const res = await fetch(`/api/orders/${orderId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          cache: "no-store",
-        });
-        const json = await res.json();
-        if (active && json.success && json.data) {
-          setOrder(json.data);
+        let snap = await getDoc(doc(db, "orders", resolvedOrderId));
+        if (!snap.exists() && cleanTarget !== resolvedOrderId) {
+          snap = await getDoc(doc(db, "orders", cleanTarget));
+        }
+        if (active && snap.exists()) {
+          setOrder({ id: snap.id, ...snap.data() });
           setLoading(false);
           return;
         }
 
-        // 3. Fallback to direct Firestore read
-        try {
-          const snap = await getDoc(doc(db, "orders", orderId));
-          if (active && snap.exists()) {
-            setOrder({ id: snap.id, ...snap.data() });
-            setLoading(false);
-            return;
-          }
-          const q = query(collection(db, "orders"), where("orderNumber", "==", orderId));
-          const querySnap = await getDocs(q);
-          if (active && !querySnap.empty) {
-            const docFound = querySnap.docs[0];
-            setOrder({ id: docFound.id, ...docFound.data() });
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // Fall through
-        }
-
-        if (active) {
-          setError(json.error || "Order invoice could not be located.");
+        const q = query(collection(db, "orders"), where("orderNumber", "==", resolvedOrderId));
+        const querySnap = await getDocs(q);
+        if (active && !querySnap.empty) {
+          const docFound = querySnap.docs[0];
+          setOrder({ id: docFound.id, ...docFound.data() });
           setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.warn("[invoice] Firestore direct read error:", e);
+      }
+
+      // 3. Fallback: API route with safe JSON parsing
+      try {
+        const token = await auth.currentUser?.getIdToken().catch(() => null);
+        const res = await fetch(`/api/orders/${encodeURIComponent(resolvedOrderId)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: "no-store",
+        });
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
+          const json = await res.json();
+          if (active && json.success && json.data) {
+            setOrder(json.data);
+            setLoading(false);
+            return;
+          }
         }
       } catch (err: any) {
-        if (active) {
-          setError(err?.message || "Failed to load order invoice.");
-          setLoading(false);
-        }
+        console.warn("[invoice] API fallback error:", err);
+      }
+
+      if (active) {
+        setError(`We could not find an invoice for order "${resolvedOrderId}".`);
+        setLoading(false);
       }
     }
 
@@ -101,7 +134,7 @@ export function StorefrontInvoiceClient({ orderId }: Props) {
     return () => {
       active = false;
     };
-  }, [orderId, orders]);
+  }, [resolvedOrderId, cleanTarget, orders]);
 
   if (loading) {
     return (
@@ -126,7 +159,7 @@ export function StorefrontInvoiceClient({ orderId }: Props) {
             {error || "We could not find the invoice for this order. Sign in with the account used at checkout and try again."}
           </p>
           <Link
-            href={`/orders/${orderId}`}
+            href={resolvedOrderId ? `/orders/track?orderId=${encodeURIComponent(resolvedOrderId)}` : "/orders"}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -152,7 +185,7 @@ export function StorefrontInvoiceClient({ orderId }: Props) {
     <div style={{ backgroundColor: "#EBE8DF", minHeight: "100vh", padding: "32px 16px 80px 16px" }}>
       <OrderInvoice
         order={order}
-        backUrl={`/orders/${order.id || orderId}`}
+        backUrl={order?.id || resolvedOrderId ? `/orders/track?orderId=${encodeURIComponent(order?.id || resolvedOrderId)}` : "/orders"}
         isAdmin={false}
       />
     </div>
