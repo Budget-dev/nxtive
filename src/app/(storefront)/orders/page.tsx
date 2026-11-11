@@ -63,12 +63,12 @@ export default function OrdersPage() {
               raw.status === "Delivered" || raw.status === "delivered"
                 ? "Delivered"
                 : raw.status === "shipped" || raw.status === "out_for_delivery"
-                ? "Shipped"
-                : raw.status === "cancelled"
-                ? "Cancelled"
-                : raw.status === "processing"
-                ? "Processing"
-                : "Order Confirmed",
+                  ? "Shipped"
+                  : raw.status === "cancelled"
+                    ? "Cancelled"
+                    : raw.status === "processing"
+                      ? "Processing"
+                      : "Order Confirmed",
             paymentMethod: raw.paymentMethod || "Online Payment",
             paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
             shippingAddress: raw.shippingAddress || {},
