@@ -155,17 +155,21 @@ export default async function CategoriesIndexPage() {
           {categories.map((category) => {
             const count = productsForCategory(products, category.slug).length;
             const bannerImage =
-              category.image ||
-              (category.slug.includes("sweat") || category.slug.includes("sweet") || category.slug.includes("hoodie")
+              category.image && category.image.trim() !== ""
+                ? category.image
+                : (category.slug.includes("sweat") || category.slug.includes("sweet") || category.slug.includes("hoodie")
                 ? "/images/nxtvie/cat-hoodies.jpg"
                 : category.slug.includes("jacket")
                 ? "/images/nxtvie/promo-jackets-hd.jpg"
                 : "/images/nxtvie/hero-model.jpg");
+            const cleanSlug = category.slug === "sweetshirts" ? "sweatshirts" : category.slug;
+            const displayName =
+              category.name?.toLowerCase() === "sweetshirts" ? "Sweatshirts" : (category.name || "Apparel");
 
             return (
               <Link
                 key={category.slug}
-                href={`/categories/${category.slug}`}
+                href={`/categories/${cleanSlug}`}
                 style={{
                   position: "relative",
                   height: "360px",
@@ -183,7 +187,7 @@ export default async function CategoriesIndexPage() {
               >
                 <img
                   src={sharpImageSrc(bannerImage)}
-                  alt={category.title || category.name}
+                  alt={category.title || displayName}
                   style={{
                     position: "absolute",
                     inset: 0,
@@ -227,7 +231,7 @@ export default async function CategoriesIndexPage() {
                       marginBottom: "6px",
                     }}
                   >
-                    {category.name}
+                    {displayName}
                   </h3>
 
                   <p

@@ -12,11 +12,16 @@ import Link from "next/link";
 import { NxtvieLogo } from "@/components/layout/nxtvie-logo";
 
 function AdminContentShell({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { isAdmin, loading, adminUser } = useAdminAuth();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isLoginPage = pathname === "/admin/login";
 
@@ -28,21 +33,21 @@ function AdminContentShell({ children }: { children: React.ReactNode }) {
     adminEmail === "nxtiveclothing@gmail.com";
 
   useEffect(() => {
-    if (!loading) {
+    if (mounted && !loading) {
       if ((!isAdmin || !isAuthorized) && !isLoginPage) {
         router.push("/admin/login");
       } else if (isAdmin && isAuthorized && isLoginPage) {
         router.push("/admin/dashboard");
       }
     }
-  }, [isAdmin, isAuthorized, loading, isLoginPage, router]);
+  }, [mounted, isAdmin, isAuthorized, loading, isLoginPage, router]);
 
   // If on login page, render clean login view directly without admin shell or global loading unmount
   if (isLoginPage) {
     return <>{children}</>;
   }
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div
         style={{

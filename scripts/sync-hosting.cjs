@@ -146,6 +146,8 @@ async function prerenderDynamicRoutes() {
   ];
 
   const productSlugsSet = new Set([
+    't-shirt',
+    'prod-1794389675927-gigncq',
     'shirt',
     'relaxed-shirt',
     'dem',
@@ -153,6 +155,21 @@ async function prerenderDynamicRoutes() {
     'prod-1793944052304-597glu',
     'prod-1794287175968-hic2x4',
   ]);
+
+  try {
+    const fsRes = await fetchUrl('https://firestore.googleapis.com/v1/projects/nxtive-80349/databases/(default)/documents/products?pageSize=100&key=AIzaSyAWwaVSLhQcj6QS_Nm3OWZmQ2WSdQyTyMQ');
+    if (fsRes.statusCode === 200 && fsRes.body) {
+      const parsed = JSON.parse(fsRes.body);
+      for (const d of (parsed.documents || [])) {
+        const id = d.name.split('/').pop();
+        if (id) productSlugsSet.add(id);
+        const slug = d.fields?.slug?.stringValue;
+        if (slug) productSlugsSet.add(slug);
+      }
+    }
+  } catch (err) {
+    console.warn('Could not query Firestore REST API for products:', err.message);
+  }
 
   try {
     const productsJsonPath = path.join(ROOT, '.data', 'firestore', 'products.json');

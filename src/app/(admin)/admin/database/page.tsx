@@ -314,7 +314,7 @@ export default function AdminDatabasePage() {
             <ShieldCheck size={18} color="#D19B68" />
           </div>
           <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#121110", marginBottom: "4px" }}>
-            {status?.source === "service_account" ? "Firebase Admin SDK" : "Google Cloud OAuth2"}
+            {status?.source === "service_account" ? "Firebase Admin SDK" : (status?.source || "Cloud Firestore Client SDK")}
           </div>
           <div style={{ fontSize: "0.82rem", color: "#666" }}>
             {status?.source === "service_account" ? "Service Account configured" : "Authenticated as nxtiveclothing@gmail.com"}

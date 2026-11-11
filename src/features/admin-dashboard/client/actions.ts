@@ -1457,34 +1457,36 @@ const ALL_COLLECTIONS: { name: string; label: string; description: string; isCor
 ];
 
 export async function getDatabaseOverview(): Promise<DatabaseStatus> {
-  const collectionsMeta: CollectionMeta[] = [];
-  let totalDocs = 0;
-
-  for (const c of ALL_COLLECTIONS) {
+  const collectionPromises = ALL_COLLECTIONS.map(async (c): Promise<CollectionMeta> => {
     try {
       const colRef = collection(db, c.name);
-      const snapshot = await getDocs(colRef);
-      const count = snapshot.size;
-      totalDocs += count;
-      collectionsMeta.push({
+      // Fast fetch with timeout
+      const snapPromise = getDocs(colRef);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+      const snapshot = (await Promise.race([snapPromise, timeoutPromise])) as any;
+      const count = snapshot && typeof snapshot.size === "number" ? snapshot.size : 0;
+      return {
         name: c.name,
         label: c.label,
         description: c.description,
         count,
         status: count > 0 ? "ready" : "empty",
         isCore: c.isCore,
-      });
+      };
     } catch {
-      collectionsMeta.push({
+      return {
         name: c.name,
         label: c.label,
         description: c.description,
         count: 0,
         status: "empty",
         isCore: c.isCore,
-      });
+      };
     }
-  }
+  });
+
+  const collectionsMeta = await Promise.all(collectionPromises);
+  const totalDocs = collectionsMeta.reduce((sum, item) => sum + item.count, 0);
 
   return {
     connected: true,
