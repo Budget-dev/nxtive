@@ -13,7 +13,7 @@ import {
   Minus,
   RefreshCw,
 } from "lucide-react";
-import { getAdminInventory, updateStockLevel } from "@/features/admin-dashboard/server/actions";
+import { getAdminInventory, updateStockLevel } from "@/features/admin-dashboard/client/actions";
 import type { Product } from "@/types/product";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 

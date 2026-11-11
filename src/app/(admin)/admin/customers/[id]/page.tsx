@@ -25,7 +25,7 @@ import {
   updateCustomerStatus,
   updateCustomerDetails,
   getAdminOrders,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 import type { Customer } from "@/types/user";
 import type { Order } from "@/types/order";
 import { AdminDataState, adminErrorMessage } from "../../_components/admin-data-state";

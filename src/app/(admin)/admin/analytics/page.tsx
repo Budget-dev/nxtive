@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { TrendingUp, BarChart3, Award, ArrowUpRight } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminAnalytics, type AdminAnalytics } from "@/features/admin-dashboard/server/actions";
+import { getAdminAnalytics, type AdminAnalytics } from "@/features/admin-dashboard/client/actions";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 const CHART_COLORS = ["#F2AC24", "#3B82F6", "#8B5CF6", "#10B981", "#EC4899"];

@@ -7,7 +7,7 @@ import {
   getAdminShippingSettings,
   saveAdminShippingSettings,
   type AdminShippingSettings,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 import { AdminDataState, adminErrorMessage } from "../../_components/admin-data-state";
 
 export default function ShippingSettingsPage() {

@@ -13,7 +13,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { getAdminRoles, saveAdminRole } from "@/features/admin-dashboard/server/actions";
+import { getAdminRoles, saveAdminRole } from "@/features/admin-dashboard/client/actions";
 import type { AdminRoleDefinition, AdminPermission } from "@/types/user";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 

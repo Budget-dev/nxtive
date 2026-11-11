@@ -21,7 +21,7 @@ import {
   getAdminRoles,
   saveAdminUser,
   toggleAdminUserStatus,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 import type { AdminUser, AdminRoleDefinition } from "@/types/user";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 

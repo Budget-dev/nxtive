@@ -21,7 +21,7 @@ import {
 import { formatCurrency } from "@/utils/format-currency";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 import type { Order, OrderStatus } from "@/types/order";
-import { updateOrderStatus, updateOrderPaymentStatus } from "../server/actions";
+import { updateOrderStatus, updateOrderPaymentStatus } from "../client/actions";
 
 interface OrderDetailManagerProps {
   order: Order;

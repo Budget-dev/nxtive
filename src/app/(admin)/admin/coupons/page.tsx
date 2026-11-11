@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Ticket, Plus, Trash2, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminCoupons, saveCoupon, deleteCoupon } from "@/features/admin-dashboard/server/actions";
+import { getAdminCoupons, saveCoupon, deleteCoupon } from "@/features/admin-dashboard/client/actions";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminCouponsPage() {

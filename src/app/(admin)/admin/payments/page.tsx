@@ -16,7 +16,7 @@ import {
   Download,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminPayments } from "@/features/admin-dashboard/server/actions";
+import { getAdminPayments } from "@/features/admin-dashboard/client/actions";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
 export default function AdminPaymentsPage() {

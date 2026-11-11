@@ -18,7 +18,7 @@ import {
   Printer,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminOrders } from "@/features/admin-dashboard/server/actions";
+import { getAdminOrders } from "@/features/admin-dashboard/client/actions";
 import { ORDER_STATUS_LABELS } from "@/constants/order-status";
 import type { Order, OrderStatus } from "@/types/order";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";

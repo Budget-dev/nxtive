@@ -43,6 +43,23 @@ const BADGES: (ProductBadge | "None")[] = [
 
 const AVAILABLE_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "28", "30", "32", "34", "36"];
 
+function sanitizeFirestorePayload<T extends Record<string, any>>(data: T): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      clean[key] = value.map((item) =>
+        item !== null && typeof item === "object" ? sanitizeFirestorePayload(item) : item
+      );
+    } else if (value !== null && typeof value === "object") {
+      clean[key] = sanitizeFirestorePayload(value);
+    } else {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
+
 export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -272,20 +289,21 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
       );
 
       const now = new Date().toISOString();
-      const productPayload: any = {
-        id: initialProduct?.id,
+      const docId = initialProduct?.id || `prod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const prodRef = doc(db, "products", docId);
+
+      const fullDoc: Record<string, any> = {
+        id: docId,
         title: title.trim(),
         slug: slug.trim() || slugify(title),
         category,
         categoryId: paramCategoryId || slugify(category),
-        badge: badge === "None" ? undefined : badge,
         price: Number(price),
-        originalPrice: originalPrice ? Number(originalPrice) : undefined,
         totalStock: Number(totalStock),
         stock: Number(totalStock),
         lowStockThreshold: Number(lowStockThreshold),
-        inStock,
-        featured,
+        inStock: Boolean(inStock),
+        featured: Boolean(featured),
         fit,
         sizes: selectedSizes,
         colors,
@@ -301,29 +319,45 @@ export function ProductForm({ initialProduct, isEdit }: ProductFormProps) {
         updatedAt: now,
       };
 
-      // Direct Firestore Client SDK write using Firebase web API key
-      const docId = initialProduct?.id || `prod-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const prodRef = doc(db, "products", docId);
-      const fullDoc = {
-        ...productPayload,
-        id: docId,
-        isActive: true,
-        createdAt: initialProduct?.createdAt || now,
-        updatedAt: now,
-      };
+      if (badge && badge !== "None") {
+        fullDoc.badge = badge;
+      }
+
+      if (
+        originalPrice !== undefined &&
+        originalPrice !== null &&
+        !isNaN(Number(originalPrice)) &&
+        Number(originalPrice) > 0
+      ) {
+        fullDoc.originalPrice = Number(originalPrice);
+      }
+
+      const cleanDoc = sanitizeFirestorePayload(fullDoc);
 
       try {
-        await setDoc(prodRef, fullDoc, { merge: true });
+        await setDoc(prodRef, cleanDoc, { merge: true });
       } catch (clientErr: any) {
         console.warn("[product-form] Direct setDoc fallback to /api/products:", clientErr);
-        const res = await fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(fullDoc),
-        });
-        const resData = await res.json();
-        if (!res.ok || !resData.success) {
-          throw new Error(resData?.error || clientErr?.message || "Failed to save product.");
+        try {
+          const res = await fetch("/api/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cleanDoc),
+          });
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const resData = await res.json();
+            if (!res.ok || !resData.success) {
+              throw new Error(resData?.error || clientErr?.message || "Failed to save product.");
+            }
+          } else {
+            // Received non-JSON response (e.g. Firebase Hosting static HTML rewrite)
+            throw new Error(
+              clientErr?.message || "Database write failed. Please check network connection or permissions."
+            );
+          }
+        } catch (apiErr: any) {
+          throw new Error(clientErr?.message || apiErr?.message || "Failed to save product to database.");
         }
       }
 

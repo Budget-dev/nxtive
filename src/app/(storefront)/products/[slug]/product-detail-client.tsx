@@ -22,7 +22,7 @@ import { useStore } from "@/components/store-context";
 import type { Product } from "@/types/product";
 import { sharpImageSrc } from "@/lib/sharp-image";
 import { ProductCard } from "@/components/ui/product-card";
-import { getPublicApprovedReviews, submitCustomerReview } from "@/features/admin-dashboard/server/actions";
+import { getPublicApprovedReviews, submitCustomerReview } from "@/features/admin-dashboard/client/actions";
 import type { Review } from "@/types/review";
 import { useStorefrontCatalog } from "@/lib/use-storefront-catalog";
 import { relatedProducts as getRelatedProducts } from "@/lib/catalog";

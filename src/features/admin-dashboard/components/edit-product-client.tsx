@@ -83,7 +83,8 @@ export function EditProductClient({ productId }: EditProductClientProps) {
         // 3. Fallback to /api/products
         try {
           const apiRes = await fetch("/api/products");
-          if (apiRes.ok) {
+          const contentType = apiRes.headers.get("content-type") || "";
+          if (apiRes.ok && contentType.includes("application/json")) {
             const apiData = await apiRes.json();
             const list: Product[] = apiData.products || [];
             const found = list.find(

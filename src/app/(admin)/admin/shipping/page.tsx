@@ -30,7 +30,7 @@ import {
   saveShippingProvider,
   toggleShippingProvider,
   setDefaultShippingProvider,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 import type { ShippingProvider } from "@/types/delivery";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 

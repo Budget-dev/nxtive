@@ -18,7 +18,7 @@ import {
 import {
   getAdminShipments,
   getAdminShippingLogs,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 import type { Shipment, ShippingLog } from "@/types/delivery";
 import { AdminDataState, adminErrorMessage } from "../../_components/admin-data-state";
 

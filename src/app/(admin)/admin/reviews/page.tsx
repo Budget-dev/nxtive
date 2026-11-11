@@ -20,7 +20,7 @@ import {
   approveReview,
   rejectReview,
   deleteReview,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 import type { Review, ReviewStatus } from "@/types/review";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 

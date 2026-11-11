@@ -17,7 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
-import { getAdminCustomers, updateCustomerStatus } from "@/features/admin-dashboard/server/actions";
+import { getAdminCustomers, updateCustomerStatus } from "@/features/admin-dashboard/client/actions";
 import type { Customer } from "@/types/user";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 

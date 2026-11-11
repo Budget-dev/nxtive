@@ -22,7 +22,7 @@ import {
   initializeFirestoreCollections,
   type DatabaseStatus,
   type CollectionMeta,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 
 export default function AdminDatabasePage() {
   const [status, setStatus] = useState<DatabaseStatus | null>(null);

@@ -20,7 +20,7 @@ import {
 import {
   getAdminSettings,
   saveAdminSettings,
-} from "@/features/admin-dashboard/server/actions";
+} from "@/features/admin-dashboard/client/actions";
 import type { AdminAppSettings } from "@/types/settings";
 import { DEFAULT_SOCIAL_GALLERY } from "@/constants/social-gallery";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";

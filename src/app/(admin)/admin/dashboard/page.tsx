@@ -35,8 +35,8 @@ import {
   getAdminProducts,
   approveReview,
   rejectReview,
-} from "@/features/admin-dashboard/server/actions";
-import type { DashboardStats } from "@/features/admin-dashboard/server/admin-data";
+  type DashboardStats,
+} from "@/features/admin-dashboard/client/actions";
 import type { Product } from "@/types/product";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
