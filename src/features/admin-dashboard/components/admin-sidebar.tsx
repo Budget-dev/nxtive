@@ -13,8 +13,6 @@ import {
   CreditCard,
   Truck,
   ShieldCheck,
-  Settings,
-  Database,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -134,27 +132,6 @@ const SIDEBAR_ITEMS: NavSection[] = [
     ],
   },
   {
-    id: "settings",
-    label: "Settings",
-    icon: Settings,
-    href: "/admin/settings",
-    children: [
-      { label: "General Settings", href: "/admin/settings" },
-      { label: "Store Settings", href: "/admin/settings?tab=store" },
-      { label: "Notification Settings", href: "/admin/settings?tab=notifications" },
-    ],
-  },
-  {
-    id: "database",
-    label: "Database & Collections",
-    icon: Database,
-    href: "/admin/database",
-    children: [
-      { label: "Collections Overview", href: "/admin/database" },
-      { label: "Initialize Collections", href: "/admin/database" },
-    ],
-  },
-  {
     id: "manual",
     label: "Operations Manual",
     icon: BookOpen,
@@ -205,8 +182,6 @@ export function AdminSidebar({
     payments: pathname.startsWith("/admin/payments"),
     shipping: pathname.startsWith("/admin/shipping"),
     admins: pathname.startsWith("/admin/admin-users") || pathname.startsWith("/admin/roles"),
-    settings: pathname.startsWith("/admin/settings"),
-    database: pathname.startsWith("/admin/database"),
   });
 
   const toggleSection = (id: string, e: React.MouseEvent) => {

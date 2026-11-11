@@ -163,13 +163,13 @@ async function run() {
   try {
     await page.goto(`${BASE_URL}/admin/database`, { waitUntil: "domcontentloaded", timeout: 35000 });
     // Wait for client loadStatus to hydrate and complete
-    await page.locator('text="Cloud Firestore Client SDK"').first().waitFor({ timeout: 8000 }).catch(() => {});
+    await page.locator('text="Cloud Firestore Client SDK"').first().waitFor({ timeout: 8000 }).catch(() => { });
     await page.waitForTimeout(2000);
 
     const bodyText = await page.innerText("body");
     const isLive = bodyText.includes("Live & Connected") || bodyText.includes("Cloud Firestore Client SDK");
     const isStuckConnecting = bodyText.includes("Connecting...") && !bodyText.includes("Live & Connected");
-    
+
     // Look for collection badges or rows
     const collectionsCountMatch = bodyText.match(/(\d+)\s*(store collections|collections|documents|items)/i);
     const collectionsMentioned = ["products", "orders", "categories", "users"].filter((c) =>
@@ -211,11 +211,15 @@ async function run() {
       { name: "Reviews", selector: 'a[href="/admin/reviews"]', target: "/admin/reviews" },
       { name: "Payments", selector: 'a[href="/admin/payments"]', target: "/admin/payments" },
       { name: "Shipping", selector: 'a[href="/admin/shipping"]', target: "/admin/shipping" },
-      { name: "Database", selector: 'a[href="/admin/database"]', target: "/admin/database" },
-      { name: "Settings", selector: 'a[href="/admin/settings"]', target: "/admin/settings" },
-      { name: "Coupons", selector: 'a[href="/admin/coupons"]', target: "/admin/coupons" },
-      { name: "Analytics", selector: 'a[href="/admin/analytics"]', target: "/admin/analytics" },
+      { name: "Admin Users", selector: 'a[href="/admin/admin-users"]', target: "/admin/admin-users" },
+      { name: "Manual", selector: 'a[href="/admin/manual"]', target: "/admin/manual" },
     ];
+
+    // Explicit check: Settings and Database MUST NOT be present in the sidebar
+    const settingsInSidebar = await page.locator('aside a[href^="/admin/settings"]').count();
+    const databaseInSidebar = await page.locator('aside a[href^="/admin/database"]').count();
+    const isSidebarClean = settingsInSidebar === 0 && databaseInSidebar === 0;
+    console.log(`  [${isSidebarClean ? "PASS" : "FAIL"}] Sidebar Removal Check: Settings present: ${settingsInSidebar > 0}, Database present: ${databaseInSidebar > 0}`);
 
     for (const nav of navTargets) {
       const link = page.locator(nav.selector).first();

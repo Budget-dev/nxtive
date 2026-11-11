@@ -338,17 +338,46 @@ function labelForDate(date: Date): string {
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 }
 
+function buildCustomersFromUsersAndOrders(users: Record<string, unknown>[], orders: Order[]): Customer[] {
+  const aggregates = new Map<string, { ordersCount: number; totalSpent: number }>();
+  orders
+    .filter((order) => order.status !== "cancelled" && order.paymentStatus !== "failed" && order.paymentStatus !== "cancelled")
+    .forEach((order) => {
+      const keys = Array.from(new Set([order.userId, order.shippingAddress?.email?.toLowerCase()].filter(Boolean) as string[]));
+      keys.forEach((key) => {
+        const current = aggregates.get(key) || { ordersCount: 0, totalSpent: 0 };
+        current.ordersCount += 1;
+        current.totalSpent += Number(order.total || 0);
+        aggregates.set(key, current);
+      });
+    });
+
+  return users.map((user) => {
+    const id = String(user.id);
+    const email = String(user.email ?? "").toLowerCase();
+    const aggregate = aggregates.get(id) || aggregates.get(email) || { ordersCount: 0, totalSpent: 0 };
+    return {
+      ...getCustomerFromUser(id, user),
+      ordersCount: typeof user.ordersCount === "number" && user.ordersCount > aggregate.ordersCount ? user.ordersCount : aggregate.ordersCount,
+      totalSpent: typeof user.totalSpent === "number" && user.totalSpent > aggregate.totalSpent ? user.totalSpent : aggregate.totalSpent,
+    };
+  });
+}
+
 // ============================================================================
 // DASHBOARD & ANALYTICS
 // ============================================================================
 
-export async function getDashboardStats(): Promise<DashboardStats> {
-  const orders = await readClientCollection<Order>("orders");
-  const [products, reviews, customers] = await Promise.all([
+export async function getDashboardData(): Promise<{ stats: DashboardStats; products: Product[] }> {
+  // Ultra-fast concurrent fetch across all required collections in a single round-trip
+  const [orders, products, reviews, users] = await Promise.all([
+    readClientCollection<Order>("orders"),
     readClientCollection<Product>("products"),
     readClientCollection<Review>("reviews"),
-    readCustomers(orders),
+    readClientCollection<Record<string, unknown>>("users"),
   ]);
+
+  const customers = buildCustomersFromUsersAndOrders(users, orders);
 
   const allOrders = sortNewest(orders).map((order: any) => ({
     ...order,
@@ -405,7 +434,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     trend.set(key, current);
   }
 
-  return {
+  const stats: DashboardStats = {
     dataState:
       allOrders.length || products.length || customers.length || allReviews.length ? "ready" : "empty",
     totalRevenue,
@@ -425,6 +454,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .slice(-7)
       .map(([, value]) => value),
   };
+
+  return { stats, products };
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const { stats } = await getDashboardData();
+  return stats;
 }
 
 export async function getAdminAnalytics(): Promise<AdminAnalytics> {

@@ -31,72 +31,113 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import {
-  getDashboardStats,
-  getAdminProducts,
+  getDashboardData,
   approveReview,
   rejectReview,
   type DashboardStats,
 } from "@/features/admin-dashboard/client/actions";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 import type { Product } from "@/types/product";
 import { AdminDataState, adminErrorMessage } from "../_components/admin-data-state";
 
-let cachedDashboardStats: DashboardStats | null = null;
-let cachedDashboardProducts: Product[] | null = null;
-let lastDashboardFetchTime = 0;
-const DASHBOARD_CACHE_TTL_MS = 60_000;
+const SESSION_CACHE_KEY = "nxtive_admin_dashboard_cache";
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(() => cachedDashboardStats);
-  const [products, setProducts] = useState<Product[]>(() => cachedDashboardProducts || []);
-  const [loading, setLoading] = useState<boolean>(() => !cachedDashboardStats);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [lastRefreshedText, setLastRefreshedText] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("Products");
   const [productSearch, setProductSearch] = useState("");
   const [reviewActionLoading, setReviewActionLoading] = useState<string | null>(null);
 
-  const loadData = async (force = false) => {
-    const now = Date.now();
-    if (!force && cachedDashboardStats && now - lastDashboardFetchTime < DASHBOARD_CACHE_TTL_MS) {
-      setStats(cachedDashboardStats);
-      setProducts(cachedDashboardProducts || []);
-      setLoading(false);
-      return;
-    }
-    if (!cachedDashboardStats) {
-      setLoading(true);
+  // 1. Instant hydration from sessionStorage (0ms render, no blocking skeleton)
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(SESSION_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.stats && Array.isArray(parsed?.products)) {
+          setStats(parsed.stats);
+          setProducts(parsed.products);
+          setLoading(false);
+          setLastRefreshedText("Cached (live syncing...)");
+        }
+      }
+    } catch {}
+  }, []);
+
+  const loadData = async (isBackground = false) => {
+    if (!isBackground) {
+      setRefreshing(true);
     }
     setError(null);
     try {
-      const [dashStats, prods] = await Promise.all([
-        getDashboardStats(),
-        getAdminProducts(),
-      ]);
-      cachedDashboardStats = dashStats;
-      cachedDashboardProducts = prods;
-      lastDashboardFetchTime = Date.now();
-      setStats(dashStats);
-      setProducts(prods);
+      const { stats: freshStats, products: freshProducts } = await getDashboardData();
+      setStats(freshStats);
+      setProducts(freshProducts);
+      setLastRefreshedText(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      try {
+        sessionStorage.setItem(
+          SESSION_CACHE_KEY,
+          JSON.stringify({ stats: freshStats, products: freshProducts })
+        );
+      } catch {}
     } catch (err) {
       console.error("Failed to load dashboard data", err);
-      if (!cachedDashboardStats) {
-        setStats(null);
-        setProducts([]);
+      if (!stats) {
         setError(adminErrorMessage(err));
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
+    let active = true;
     loadData();
+
+    // 2. Real-time live Firestore subscriptions so dashboard updates automatically
+    let debounceTimer: any = null;
+    const unsubOrders = onSnapshot(
+      collection(db, "orders"),
+      () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          if (active) loadData(true);
+        }, 700);
+      },
+      (err: any) => console.warn("Live orders listener:", err)
+    );
+
+    const unsubProducts = onSnapshot(
+      collection(db, "products"),
+      () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          if (active) loadData(true);
+        }, 700);
+      },
+      (err: any) => console.warn("Live products listener:", err)
+    );
+
+    return () => {
+      active = false;
+      clearTimeout(debounceTimer);
+      unsubOrders();
+      unsubProducts();
+    };
   }, []);
 
   const handleApproveReview = async (id: string) => {
     setReviewActionLoading(id);
     try {
       await approveReview(id);
-      await loadData(true);
+      await loadData(false);
     } catch (err) {
       setError(adminErrorMessage(err));
     } finally {
@@ -108,7 +149,7 @@ export default function AdminDashboardPage() {
     setReviewActionLoading(id);
     try {
       await rejectReview(id);
-      await loadData(true);
+      await loadData(false);
     } catch (err) {
       setError(adminErrorMessage(err));
     } finally {
@@ -116,7 +157,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
         <div style={{ height: "100px", borderRadius: "12px", backgroundColor: "#FFFFFF", border: "1px solid #E8E5DF", animation: "pulse 1.2s infinite" }} />
@@ -125,13 +166,13 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (error) {
+  if (error && !stats) {
     return (
       <AdminDataState
         title="Dashboard data unavailable"
         message={error}
         actionLabel="Retry"
-        onAction={loadData}
+        onAction={() => loadData(false)}
       />
     );
   }
@@ -179,16 +220,31 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          {lastRefreshedText && (
+            <span style={{ fontSize: "12px", color: "var(--adm-text-muted)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <span
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  backgroundColor: refreshing ? "#EAB308" : "#10B981",
+                  boxShadow: refreshing ? "0 0 6px #EAB308" : "0 0 6px #10B981",
+                  display: "inline-block",
+                }}
+              />
+              {refreshing ? "Syncing live data..." : `Live sync: ${lastRefreshedText}`}
+            </span>
+          )}
           <button
-            onClick={() => loadData(true)}
+            onClick={() => loadData(false)}
+            disabled={refreshing}
             className="admin-btn-secondary admin-btn-sm"
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: refreshing ? "not-allowed" : "pointer" }}
           >
-            <RefreshCw size={14} className={loading ? "spin" : ""} />
-            <span>Refresh Live Data</span>
+            <RefreshCw size={14} className={refreshing ? "spin" : ""} />
+            <span>{refreshing ? "Refreshing..." : "Refresh Live Data"}</span>
           </button>
-          <span style={{ fontSize: "13px", color: "var(--adm-text-muted)" }}>All recorded Firestore data</span>
         </div>
       </div>
 
