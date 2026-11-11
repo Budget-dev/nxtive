@@ -85,6 +85,8 @@ service cloud.firestore {
              (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
              (!('cancelReason' in data) || (data.cancelReason is string && data.cancelReason.size() <= 500)) &&
              (!('returnReason' in data) || (data.returnReason is string && data.returnReason.size() <= 500)) &&
+             (!('errorCode' in data) || (data.errorCode is string && data.errorCode.size() <= 100)) &&
+             (!('errorDescription' in data) || (data.errorDescription is string && data.errorDescription.size() <= 1000)) &&
              (!('trackingNumber' in data) || (data.trackingNumber is string && data.trackingNumber.size() <= 128)) &&
              (!('trackingUrl' in data) || (data.trackingUrl is string && data.trackingUrl.size() <= 2048));
     }
