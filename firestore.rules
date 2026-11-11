@@ -2,19 +2,132 @@ rules_version = '2';
 
 // ===============================================================
 // NXTIVE Cloud Firestore Security Rules
-// Web Client Key-Based Architecture (Zero Permission Error Mode)
 // ===============================================================
-// - Public & Admin Access:
-//   Allows direct client-side read and write access for catalog
-//   management, product CRUD, category creation, order tracking,
-//   settings, user synchronization, and storefront checkout without
-//   requiring complex custom auth claims or server-side OAuth tokens.
-// - Admin console authorization is strictly protected at the application
-//   and session layer (restricted exclusively to nxtiveclothing@gmail.com).
+//
+// Assumed Data Model:
+//
+// Collection: orders
+// Document ID: orderId
+// Fields:
+//   - orderNumber: string (optional, max 128 chars) - human-readable order code
+//   - userId: string (required, immutable, max 128 chars) - customer authentication UID
+//   - customerEmail: string (optional, max 255 chars) - customer email address
+//   - items: list of maps (required/optional, max 100 items) - purchased line items
+//   - total: number (optional, >= 0, <= 10,000,000) - total payable order value
+//   - totalAmount: number (optional, >= 0, <= 10,000,000) - alternate total amount
+//   - amount: number (optional, >= 0, <= 10,000,000) - order payment value
+//   - subtotal: number (optional, >= 0, <= 10,000,000) - merchandise subtotal
+//   - discount: number (optional, >= 0, <= 10,000,000) - promotional discount applied
+//   - shipping: number (optional, >= 0, <= 10,000,000) - courier shipping charges
+//   - status: string (required/optional, max 50 chars) - order fulfillment lifecycle state
+//   - statusHistory: list of maps (optional, max 100 entries) - order status progression logs
+//   - paymentMethod: string (optional, max 100 chars) - payment method used (COD, Razorpay, etc.)
+//   - paymentStatus: string (required/optional, max 50 chars) - payment settlement state
+//   - paymentId: string (optional, max 255 chars) - payment gateway transaction ID
+//   - razorpayOrderId: string (optional, max 255 chars) - Razorpay gateway order identifier
+//   - razorpayPaymentId: string (optional, max 255 chars) - Razorpay gateway payment transaction identifier
+//   - shippingAddress: map (optional) - shipping destination details
+//   - deliveryMethod: string (optional, max 100 chars) - delivery carrier speed
+//   - deliveryDateEstimate: string (optional, max 100 chars) - estimated transit time
+//   - trackingNumber: string (optional, max 128 chars) - AWB or shipping tracking code
+//   - trackingUrl: string (optional, max 2048 chars) - external tracking link
+//   - idempotencyKey: string (optional, max 128 chars) - deduplication key
+//   - notes: string (optional, max 1000 chars) - customer or admin order instructions
+//   - cancelReason: string (optional, max 500 chars) - cancellation rationale
+//   - returnReason: string (optional, max 500 chars) - return rationale
+//   - createdAt: string or timestamp (optional/required) - order placement timestamp
+//   - updatedAt: string or timestamp (optional) - last updated timestamp
+//
 // ===============================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ─── Helper Functions ────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'nxtiveclothing@gmail.com' ||
+        (request.auth.token.admin == true)
+      );
+    }
+
+    function isOrderOwner() {
+      return isAuthenticated() && (
+        (('userId' in resource.data) && resource.data.userId == request.auth.uid) ||
+        (('customerEmail' in resource.data) && resource.data.customerEmail == request.auth.token.email) ||
+        isAdmin()
+      );
+    }
+
+    // Domain validator enforcing type safety, field constraints, and DoS limits
+    function isValidOrder(data) {
+      return (!('userId' in data) || (data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128)) &&
+             (!('orderNumber' in data) || (data.orderNumber is string && data.orderNumber.size() <= 128)) &&
+             (!('customerEmail' in data) || (data.customerEmail is string && data.customerEmail.size() <= 255)) &&
+             (!('total' in data) || (data.total is number && data.total >= 0 && data.total <= 10000000)) &&
+             (!('totalAmount' in data) || (data.totalAmount is number && data.totalAmount >= 0 && data.totalAmount <= 10000000)) &&
+             (!('amount' in data) || (data.amount is number && data.amount >= 0 && data.amount <= 10000000)) &&
+             (!('subtotal' in data) || (data.subtotal is number && data.subtotal >= 0 && data.subtotal <= 10000000)) &&
+             (!('discount' in data) || (data.discount is number && data.discount >= 0 && data.discount <= 10000000)) &&
+             (!('shipping' in data) || (data.shipping is number && data.shipping >= 0 && data.shipping <= 10000000)) &&
+             (!('items' in data) || (data.items is list && data.items.size() <= 100)) &&
+             (!('statusHistory' in data) || (data.statusHistory is list && data.statusHistory.size() <= 100)) &&
+             (!('shippingAddress' in data) || data.shippingAddress is map) &&
+             (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 100)) &&
+             (!('paymentStatus' in data) || (data.paymentStatus is string && data.paymentStatus.size() <= 50)) &&
+             (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+             (!('idempotencyKey' in data) || (data.idempotencyKey is string && data.idempotencyKey.size() <= 128)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('cancelReason' in data) || (data.cancelReason is string && data.cancelReason.size() <= 500)) &&
+             (!('returnReason' in data) || (data.returnReason is string && data.returnReason.size() <= 500)) &&
+             (!('trackingNumber' in data) || (data.trackingNumber is string && data.trackingNumber.size() <= 128)) &&
+             (!('trackingUrl' in data) || (data.trackingUrl is string && data.trackingUrl.size() <= 2048));
+    }
+
+    // Rules for Client Order Creation
+    function canClientCreateOrder() {
+      return isAuthenticated() &&
+             ('userId' in request.resource.data) &&
+             request.resource.data.userId == request.auth.uid &&
+             isValidOrder(request.resource.data) &&
+             // Block client from setting status to paid, shipped, delivered, or refunded
+             (!('status' in request.resource.data) || !(request.resource.data.status in ['paid', 'Paid', 'shipped', 'delivered', 'Shipped', 'Delivered', 'refunded'])) &&
+             // Block client from setting paymentStatus to paid or refunded
+             (!('paymentStatus' in request.resource.data) || !(request.resource.data.paymentStatus in ['paid', 'Paid', 'refunded', 'refund_initiated'])) &&
+             // Block client from directly writing paymentId or razorpayPaymentId
+             (!('paymentId' in request.resource.data) || request.resource.data.paymentId == '' || request.resource.data.paymentId == null) &&
+             (!('razorpayPaymentId' in request.resource.data) || request.resource.data.razorpayPaymentId == '' || request.resource.data.razorpayPaymentId == null);
+    }
+
+    // Rules for Client Order Updates
+    function canClientUpdateOrder() {
+      return isAuthenticated() &&
+             resource.data.userId == request.auth.uid &&
+             request.resource.data.userId == resource.data.userId &&
+             isValidOrder(request.resource.data) &&
+             // Strictly block client writes to payment status, fulfillment status, payment IDs, amounts, line items, and immutable IDs
+             !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+               'status',
+               'paymentStatus',
+               'paymentId',
+               'razorpayPaymentId',
+               'amount',
+               'total',
+               'totalAmount',
+               'subtotal',
+               'discount',
+               'shipping',
+               'items',
+               'userId',
+               'orderNumber',
+               'createdAt'
+             ]);
+    }
 
     // ─── 1. Products & Categories (Catalog Management) ───────────
     match /products/{productId} {
@@ -35,10 +148,18 @@ service cloud.firestore {
 
     // ─── 2. Orders & Order Tracking ─────────────────────────────
     match /orders/{orderId} {
-      allow read, write: if true;
+      // Users can only read their own orders; admin (nxtiveclothing@gmail.com) can read all
+      allow read: if isOrderOwner();
+
+      // Only server (Admin SDK) or authorized admin can write payment fields, status, paymentId, or amount directly.
+      // Admin SDK bypasses security rules entirely. Client writes are restricted to own orders with strict field locks.
+      allow create: if (isAdmin() && isValidOrder(request.resource.data)) || canClientCreateOrder();
+      allow update: if (isAdmin() && isValidOrder(request.resource.data)) || canClientUpdateOrder();
+      allow delete: if isAdmin();
 
       match /{allSubcollections=**} {
-        allow read, write: if true;
+        allow read: if isOrderOwner();
+        allow write: if isAdmin();
       }
     }
 
@@ -154,9 +275,9 @@ service cloud.firestore {
       }
     }
 
-    // ─── DEFAULT ROOT FALLBACK (ALL DOCUMENTS) ───────────────────
+    // ─── DEFAULT ROOT FALLBACK (ALL OTHER COLLECTIONS) ───────────
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

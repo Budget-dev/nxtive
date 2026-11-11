@@ -218,6 +218,10 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
                 ? "Cancelled"
                 : rawStatus === "processing" || rawStatus === "packed" || rawStatus === "payment_confirmed"
                 ? "Processing"
+                : rawStatus === "failed"
+                ? "Payment Failed"
+                : rawStatus === "pending" || rawStatus === "created"
+                ? "Pending"
                 : "Order Confirmed";
 
             const normalized: ExtendedOrder = {
@@ -250,10 +254,14 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
                   ? "Paid"
                   : raw.paymentStatus === "refunded"
                   ? "Refunded"
+                  : raw.paymentStatus === "failed" || rawStatus === "failed"
+                  ? "Payment Failed"
                   : "Pending COD",
               shippingAddress: raw.shippingAddress || {},
               deliveryDateEstimate: String(raw.deliveryDateEstimate || "3-5 Business Days"),
               trackingNumber: String(raw.trackingNumber || raw.awbCode || ""),
+              errorDescription: raw.errorDescription || raw.error_description || undefined,
+              errorCode: raw.errorCode || raw.error_code || undefined,
             };
 
             setFetchedOrder(normalized);
@@ -472,16 +480,21 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
 
   // Determine actual tracking status milestones
   const rawStatus = (order.rawStatus || order.status || "pending").toLowerCase();
+  const isPaymentFailed =
+    order.status === "Payment Failed" ||
+    order.paymentStatus === "Payment Failed" ||
+    rawStatus === "failed";
   const isCancelled = order.status === "Cancelled" || rawStatus === "cancelled" || rawStatus === "refunded";
   const isDelivered = order.status === "Delivered" || rawStatus === "delivered";
   const isOutForDelivery = rawStatus === "out_for_delivery";
-  const isShipped = order.status === "Shipped" || rawStatus === "shipped" || isOutForDelivery || isDelivered;
+  const isShipped = !isPaymentFailed && (order.status === "Shipped" || rawStatus === "shipped" || isOutForDelivery || isDelivered);
   const isPacked =
-    isShipped ||
+    !isPaymentFailed &&
+    (isShipped ||
     order.status === "Processing" ||
     rawStatus === "packed" ||
     rawStatus === "processing" ||
-    rawStatus === "payment_confirmed";
+    rawStatus === "payment_confirmed");
 
   // Check carrier details: no dummy fallback placeholders
   const rawAwb = deliveryData?.awbCode || order.awbCode || order.trackingNumber || "";
@@ -497,27 +510,29 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
   const steps = [
     {
       id: "confirmed",
-      label: "Order Confirmed",
+      label: isPaymentFailed ? "Payment Failed" : "Order Confirmed",
       date: order.date,
-      note: "Payment received & order verified",
-      completed: !isCancelled,
-      current: !isCancelled && !isPacked && !isShipped,
+      note: isPaymentFailed
+        ? (order.errorDescription || "Payment was unsuccessful or cancelled")
+        : "Payment received & order verified",
+      completed: !isCancelled && !isPaymentFailed,
+      current: !isCancelled && !isPaymentFailed && !isPacked && !isShipped,
     },
     {
       id: "packed",
       label: "Quality Check & Pack",
       date: isPacked ? "Completed" : "In Progress",
       note: isPacked ? "Sealed in protective apparel bag" : "Queue for inspection",
-      completed: isPacked && !isCancelled,
-      current: !isCancelled && isPacked && !isShipped,
+      completed: isPacked && !isCancelled && !isPaymentFailed,
+      current: !isCancelled && !isPaymentFailed && isPacked && !isShipped,
     },
     {
       id: "shipped",
       label: "Dispatched with Courier",
       date: isShipped ? (actualAwb ? "In Transit" : "Dispatched") : "Pending Dispatch",
       note: isShipped ? carrierName : "Awaiting carrier pickup",
-      completed: isShipped && !isCancelled,
-      current: !isCancelled && isShipped && !isOutForDelivery && !isDelivered,
+      completed: isShipped && !isCancelled && !isPaymentFailed,
+      current: !isCancelled && !isPaymentFailed && isShipped && !isOutForDelivery && !isDelivered,
     },
     {
       id: "out_for_delivery",
@@ -528,16 +543,16 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
         : isDelivered
         ? "Delivered to recipient"
         : "Reaching local hub",
-      completed: (isOutForDelivery || isDelivered) && !isCancelled,
-      current: !isCancelled && isOutForDelivery,
+      completed: (isOutForDelivery || isDelivered) && !isCancelled && !isPaymentFailed,
+      current: !isCancelled && !isPaymentFailed && isOutForDelivery,
     },
     {
       id: "delivered",
       label: "Delivered",
       date: isDelivered ? "Delivered" : order.deliveryDateEstimate,
       note: isDelivered ? "Package received safely" : `Est. ${order.deliveryDateEstimate}`,
-      completed: isDelivered && !isCancelled,
-      current: isDelivered,
+      completed: isDelivered && !isCancelled && !isPaymentFailed,
+      current: isDelivered && !isPaymentFailed,
     },
   ];
 
@@ -630,6 +645,55 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
                   : "If payment was deducted, refund will credit back within 3-5 business days."}
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Payment Failed Banner if applicable */}
+        {isPaymentFailed && (
+          <div
+            style={{
+              backgroundColor: "#FEF2F2",
+              border: "1px solid #FCA5A5",
+              borderRadius: "12px",
+              padding: "20px 24px",
+              marginBottom: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "16px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <AlertCircle size={28} color="#DC2626" style={{ flexShrink: 0 }} />
+              <div>
+                <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#991B1B", margin: 0 }}>
+                  Payment Unsuccessful
+                </h3>
+                <p style={{ fontSize: "13px", color: "#B91C1C", margin: "4px 0 0 0" }}>
+                  {order.errorDescription || "Your payment could not be processed or was cancelled. No money was debited from your account."}
+                  {order.errorCode ? ` (Error Reference: ${order.errorCode})` : ""}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/checkout"
+              style={{
+                backgroundColor: "#DC2626",
+                color: "#FFFFFF",
+                padding: "10px 20px",
+                borderRadius: "9999px",
+                fontSize: "12.5px",
+                fontWeight: 700,
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <span>Retry Payment</span>
+              <ExternalLink size={13} />
+            </Link>
           </div>
         )}
 

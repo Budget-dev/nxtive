@@ -51,9 +51,9 @@ export interface Order {
   discount: number;
   shipping: number;
   total: number;
-  status: "Order Confirmed" | "Processing" | "Shipped" | "Delivered" | "Cancelled";
+  status: "Order Confirmed" | "Processing" | "Shipped" | "Delivered" | "Cancelled" | "Payment Failed" | "Pending";
   paymentMethod: string;
-  paymentStatus: "Paid" | "Pending COD" | "Refunded";
+  paymentStatus: "Paid" | "Pending COD" | "Refunded" | "Payment Failed" | "Pending";
   shippingAddress: {
     fullName: string;
     email: string;
@@ -67,6 +67,9 @@ export interface Order {
   };
   deliveryDateEstimate: string;
   trackingNumber: string;
+  errorDescription?: string;
+  errorCode?: string;
+  razorpayOrderId?: string;
 }
 
 interface StoreContextType {
@@ -152,14 +155,18 @@ export function normalizeOrder(raw: any): Order {
         ? "Cancelled"
         : rawStatus === "processing" || rawStatus === "packed" || rawStatus === "payment_confirmed" || rawStatus === "advance_submitted"
           ? "Processing"
-          : "Order Confirmed";
+          : rawStatus === "failed"
+            ? "Payment Failed"
+            : rawStatus === "created" || rawStatus === "pending"
+              ? "Pending"
+              : "Order Confirmed";
   const createdAt = toIsoDate(raw.createdAt || raw.date || raw.submittedAt);
   const rawMethod = String(raw.paymentMethod || "Razorpay");
   const isPaid =
     raw.paymentStatus === "paid" ||
     raw.paymentStatus === "Paid" ||
     rawStatus === "payment_confirmed" ||
-    (!rawMethod.toLowerCase().includes("cod") && Boolean(raw.upiTransactionId || raw.paymentTransactionId));
+    (!rawMethod.toLowerCase().includes("cod") && Boolean(raw.razorpayPaymentId || raw.paymentTransactionId));
 
   return {
     id: String(raw.id || raw.orderId || ""),
@@ -179,7 +186,15 @@ export function normalizeOrder(raw: any): Order {
     total: Number(raw.total || raw.totalAmount || raw.amount || 0),
     status,
     paymentMethod: rawMethod === "cod_partial" ? "Cash on Delivery (Advance Paid)" : rawMethod,
-    paymentStatus: isPaid ? "Paid" : raw.paymentStatus === "refunded" ? "Refunded" : "Pending COD",
+    paymentStatus: isPaid
+      ? "Paid"
+      : raw.paymentStatus === "refunded"
+      ? "Refunded"
+      : raw.paymentStatus === "failed" || rawStatus === "failed"
+      ? "Payment Failed"
+      : raw.paymentStatus === "cod_pending"
+      ? "Pending COD"
+      : "Pending",
     shippingAddress: {
       fullName: String(raw.shippingAddress?.fullName || raw.shippingAddress?.name || raw.customerName || raw.userName || "Customer"),
       email: String(raw.shippingAddress?.email || raw.customerEmail || raw.userEmail || ""),
@@ -193,6 +208,9 @@ export function normalizeOrder(raw: any): Order {
     },
     deliveryDateEstimate: String(raw.deliveryDateEstimate || "3-5 Business Days"),
     trackingNumber: String(raw.trackingNumber || raw.orderNumber || raw.id || ""),
+    errorDescription: raw.errorDescription || raw.error_description || undefined,
+    errorCode: raw.errorCode || raw.error_code || undefined,
+    razorpayOrderId: raw.razorpayOrderId || undefined,
   };
 }
 
@@ -226,14 +244,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem("nxtive_cart", JSON.stringify(cart));
       localStorage.setItem("nxtvie_cart", JSON.stringify(cart));
-    } catch {}
+    } catch { }
   }, [cart]);
 
   useEffect(() => {
     try {
       localStorage.setItem("nxtive_wishlist", JSON.stringify(wishlist));
       localStorage.setItem("nxtvie_wishlist", JSON.stringify(wishlist));
-    } catch {}
+    } catch { }
   }, [wishlist]);
 
   useEffect(() => {

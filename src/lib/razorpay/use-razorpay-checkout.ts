@@ -79,6 +79,7 @@ export interface RazorpayCheckoutInput {
   deliveryMethod: string;
   couponCode?: string;
   userId: string;
+  idToken?: string;
 }
 
 export type CheckoutStatus =
@@ -101,6 +102,22 @@ export interface RazorpayCheckoutResult {
 }
 
 // Dynamically injects checkout.js script if not present
+async function recordPaymentFailure(orderId: string, errorCode?: string, errorDescription?: string) {
+  try {
+    await fetch("/api/razorpay/record-failure", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        errorCode: errorCode || "PAYMENT_FAILED",
+        errorDescription: errorDescription || "Payment was cancelled or failed.",
+      }),
+    });
+  } catch (e) {
+    console.warn("[Razorpay] Failed to record failure on server:", e);
+  }
+}
+
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === "undefined") {
@@ -270,20 +287,37 @@ export function useRazorpayCheckout() {
         const createTimeoutId = setTimeout(() => createController.abort(), 8000);
 
         let createData: any;
+        const requestPayload = {
+          items: input.items,
+          shippingAddress: input.shippingAddress,
+          deliveryMethod: input.deliveryMethod,
+          couponCode: input.couponCode,
+          userId: input.userId,
+          idToken: input.idToken,
+        };
+        const requestHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+          ...(input.idToken ? { Authorization: `Bearer ${input.idToken}` } : {}),
+        };
+
         try {
-          const apiRes = await fetch("/api/payments/create-order", {
+          const apiRes = await fetch("/api/razorpay/create-order", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: requestHeaders,
             signal: createController.signal,
-            body: JSON.stringify({
-              items: input.items,
-              shippingAddress: input.shippingAddress,
-              deliveryMethod: input.deliveryMethod,
-              couponCode: input.couponCode,
-              userId: input.userId,
-            }),
+            body: JSON.stringify(requestPayload),
           });
           createData = await apiRes.json();
+          if (!createData?.success) {
+            // Fallback to legacy payments route if needed
+            const fallbackRes = await fetch("/api/payments/create-order", {
+              method: "POST",
+              headers: requestHeaders,
+              body: JSON.stringify(requestPayload),
+            });
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData?.success) createData = fallbackData;
+          }
         } finally {
           clearTimeout(createTimeoutId);
         }
@@ -333,19 +367,30 @@ export function useRazorpayCheckout() {
 
               try {
                 let verifyData: any;
+                const verifyPayload = {
+                  orderId,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                };
+
                 try {
-                  const apiRes = await fetch("/api/payments/verify", {
+                  const apiRes = await fetch("/api/razorpay/verify-payment", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     signal: controller.signal,
-                    body: JSON.stringify({
-                      orderId,
-                      razorpay_order_id: response.razorpay_order_id,
-                      razorpay_payment_id: response.razorpay_payment_id,
-                      razorpay_signature: response.razorpay_signature,
-                    }),
+                    body: JSON.stringify(verifyPayload),
                   });
                   verifyData = await apiRes.json();
+                  if (!verifyData?.success) {
+                    const fallbackRes = await fetch("/api/payments/verify", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(verifyPayload),
+                    });
+                    const fallbackData = await fallbackRes.json();
+                    if (fallbackData?.success) verifyData = fallbackData;
+                  }
                 } catch (verifyErr: any) {
                   console.warn("[Payment] Direct verification fetch failed:", verifyErr);
                 }
@@ -369,6 +414,7 @@ export function useRazorpayCheckout() {
                     verifyData?.error || "Signature verification failed",
                     "verification_failed"
                   );
+                  recordPaymentFailure(orderId, "SIGNATURE_FAILED", mapped.userMessage);
                   setStatus("failed");
                   setError(mapped.userMessage);
                   setMappedError(mapped);
@@ -405,6 +451,7 @@ export function useRazorpayCheckout() {
                   resolve(webhookRes);
                 } else {
                   const mapped = getRazorpayUserErrorMessage("PAYMENT_CANCELLED", "Checkout was closed.", "cancelled");
+                  recordPaymentFailure(orderId, "PAYMENT_CANCELLED", "Customer closed payment modal without completing transaction.");
                   setStatus("failed");
                   setError(mapped.userMessage);
                   setMappedError(mapped);
@@ -431,6 +478,7 @@ export function useRazorpayCheckout() {
             console.error("[Razorpay] payment.failed fired on client:", response?.error);
             const err = response?.error;
             const mapped = getRazorpayUserErrorMessage(err?.code, err?.description, err?.reason);
+            recordPaymentFailure(orderId, err?.code || "PAYMENT_FAILED", err?.description || mapped.userMessage);
 
             setStatus("failed");
             setError(mapped.userMessage);

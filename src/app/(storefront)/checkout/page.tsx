@@ -78,6 +78,7 @@ export default function CheckoutPage() {
   const [postalCode, setPostalCode] = useState("");
   const { initiatePayment, loading: razorpayLoading, error: razorpayError } = useRazorpayCheckout();
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [failedOrderId, setFailedOrderId] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
@@ -260,6 +261,15 @@ export default function CheckoutPage() {
 
     setOrderError(null);
 
+    let idToken: string | undefined;
+    if (user && typeof user.getIdToken === "function") {
+      try {
+        idToken = await user.getIdToken();
+      } catch (tokenErr) {
+        console.warn("[Checkout] Failed to retrieve Firebase ID token:", tokenErr);
+      }
+    }
+
     const res = await initiatePayment({
       items: cart.map((item) => ({
         id: item.id,
@@ -284,6 +294,7 @@ export default function CheckoutPage() {
       deliveryMethod: "standard",
       couponCode: couponCode || undefined,
       userId: user.uid,
+      idToken,
     });
 
     if (res.success && res.orderId) {
@@ -294,6 +305,9 @@ export default function CheckoutPage() {
       );
     } else if (res.error) {
       setOrderError(res.error);
+      if (res.orderId) {
+        setFailedOrderId(res.orderId);
+      }
     }
   };
 
@@ -921,7 +935,7 @@ export default function CheckoutPage() {
                 {orderError && (
                   <div style={{
                     marginTop: "12px",
-                    padding: "12px 16px",
+                    padding: "14px 16px",
                     borderRadius: "8px",
                     backgroundColor: "#FEF2F2",
                     border: "1px solid #FECACA",
@@ -929,7 +943,22 @@ export default function CheckoutPage() {
                     fontSize: "12.5px",
                     fontWeight: 600,
                   }}>
-                    {orderError}
+                    <div>{orderError}</div>
+                    {failedOrderId && (
+                      <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed rgba(220, 38, 38, 0.2)", fontSize: "11.5px", color: "#7F1D1D", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                        <span>Order #{failedOrderId} logged as failed.</span>
+                        <Link
+                          href="/orders"
+                          style={{
+                            color: "#991B1B",
+                            fontWeight: 700,
+                            textDecoration: "underline",
+                          }}
+                        >
+                          View in Order History →
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -22,6 +22,7 @@ import { formatCurrency } from "@/utils/format-currency";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/constants/order-status";
 import type { Order, OrderStatus } from "@/types/order";
 import { updateOrderStatus, updateOrderPaymentStatus } from "../client/actions";
+import { auth } from "@/lib/firebase/client";
 
 interface OrderDetailManagerProps {
   order: Order;
@@ -54,9 +55,13 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
     setShippingShiprocket(true);
     setMessage(null);
     try {
+      const token = await auth.currentUser?.getIdToken().catch(() => null);
       const res = await fetch("/api/delivery/shiprocket", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           action: "create_shipment",
           orderId: order.id,
@@ -79,6 +84,56 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
       setMessage({ type: "error", text: e?.message || "Shiprocket consignment creation failed." });
     } finally {
       setShippingShiprocket(false);
+    }
+  };
+
+  const handleManualShippingOverride = async () => {
+    if (!trackingNumber.trim()) {
+      setMessage({ type: "error", text: "Please enter an AWB / Tracking number before updating shipping." });
+      return;
+    }
+    setUpdating(true);
+    setMessage(null);
+    try {
+      const token = await auth.currentUser?.getIdToken().catch(() => null);
+      const computedUrl =
+        trackingUrl.trim() ||
+        `https://shiprocket.co/tracking/${encodeURIComponent(trackingNumber.trim())}`;
+
+      const res = await fetch("/api/delivery/shiprocket", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          action: "override",
+          orderId: order.id,
+          awbCode: trackingNumber.trim(),
+          carrier: courier || "Shiprocket",
+          trackingUrl: computedUrl,
+          status: selectedStatus || "shipped",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrder((prev: any) => ({
+          ...prev,
+          awbCode: trackingNumber.trim(),
+          trackingNumber: trackingNumber.trim(),
+          carrier: courier || "Shiprocket",
+          trackingUrl: computedUrl,
+          status: selectedStatus || prev.status,
+        }));
+        setTrackingUrl(computedUrl);
+        setMessage({ type: "success", text: "Shiprocket tracking details updated manually." });
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to update tracking details." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err?.message || "Failed to update tracking." });
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -503,14 +558,38 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={updating}
-                className="admin-action-btn-primary"
-                style={{ width: "100%", justifyContent: "center", marginTop: "8px" }}
-              >
-                {updating ? "Updating..." : "Commit Status Change"}
-              </button>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="admin-action-btn-primary"
+                  style={{ width: "100%", justifyContent: "center" }}
+                >
+                  {updating ? "Saving..." : "Update Status"}
+                </button>
+                <button
+                  type="button"
+                  disabled={updating}
+                  onClick={handleManualShippingOverride}
+                  style={{
+                    padding: "9px 14px",
+                    borderRadius: "6px",
+                    backgroundColor: "rgba(242, 172, 36, 0.12)",
+                    color: "var(--adm-gold)",
+                    border: "1px solid rgba(242, 172, 36, 0.3)",
+                    fontWeight: 700,
+                    fontSize: "0.82rem",
+                    cursor: updating ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <Truck size={14} />
+                  <span>Update Shipping</span>
+                </button>
+              </div>
               <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px dashed var(--adm-border)" }}>
                 <button
                   type="button"
@@ -537,7 +616,7 @@ export function OrderDetailManager({ order: initialOrder }: OrderDetailManagerPr
                   <span>{shippingShiprocket ? "Dispatching via Shiprocket..." : "Ship via Shiprocket Logistics"}</span>
                 </button>
                 <div style={{ fontSize: "11px", color: "var(--adm-text-muted)", marginTop: "6px", textAlign: "center" }}>
-                  Generates AWB code, courier labels &amp; syncs live tracking link
+                  Automates AWB generation, courier assignment &amp; updates live tracking link
                 </div>
               </div>
             </form>

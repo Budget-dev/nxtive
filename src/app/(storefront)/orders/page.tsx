@@ -15,6 +15,8 @@ import {
   Loader2,
   FileText,
   Search,
+  XCircle,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useStore, Order } from "@/components/store-context";
@@ -22,13 +24,65 @@ import { useAuth } from "@/features/auth";
 import { auth, db } from "@/lib/firebase/client";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
+// Normalize order status from Firestore raw value
+function resolveOrderStatus(raw: string): Order["status"] {
+  const s = (raw || "").toLowerCase();
+  if (s === "delivered") return "Delivered";
+  if (s === "shipped" || s === "out_for_delivery") return "Shipped";
+  if (s === "cancelled") return "Cancelled";
+  if (s === "processing" || s === "packed" || s === "payment_confirmed") return "Processing";
+  if (s === "failed") return "Payment Failed";
+  if (s === "created" || s === "pending") return "Pending";
+  return "Order Confirmed";
+}
+
+// Normalize payment status from Firestore raw value
+function resolvePaymentStatus(raw: string): Order["paymentStatus"] {
+  const s = (raw || "").toLowerCase();
+  if (s === "paid") return "Paid";
+  if (s === "refunded") return "Refunded";
+  if (s === "failed") return "Payment Failed";
+  if (s === "cod_pending") return "Pending COD";
+  return "Pending";
+}
+
+// Map an order raw doc → Order shape
+function mapRawOrder(docId: string, raw: any): Order {
+  return {
+    id: docId,
+    date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
+    items: (raw.items || []).map((i: any) => ({
+      id: String(i.productId || i.id || ""),
+      title: String(i.title || "Item"),
+      price: Number(i.price || 0),
+      quantity: Number(i.quantity || 1),
+      selectedSize: String(i.selectedSize || "M"),
+      selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
+      image: String(i.image || ""),
+    })),
+    subtotal: Number(raw.subtotal || 0),
+    discount: Number(raw.discount || 0),
+    shipping: Number(raw.shipping || 0),
+    total: Number(raw.total || raw.totalAmount || raw.amount || 0),
+    status: resolveOrderStatus(raw.status),
+    paymentMethod: raw.paymentMethod || "Online Payment",
+    paymentStatus: resolvePaymentStatus(raw.paymentStatus),
+    shippingAddress: raw.shippingAddress || {},
+    deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
+    trackingNumber: raw.trackingNumber || raw.awbCode || "",
+    errorDescription: raw.errorDescription || raw.error_description || undefined,
+    errorCode: raw.errorCode || raw.error_code || undefined,
+    razorpayOrderId: raw.razorpayOrderId || undefined,
+  };
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const { orders: storeOrders, addToCart } = useStore();
   const { user } = useAuth();
   const [fetchedOrders, setFetchedOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
-  const [filter, setFilter] = useState<"all" | "active" | "delivered">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "delivered" | "failed">("all");
   const [trackQuery, setTrackQuery] = useState("");
 
   useEffect(() => {
@@ -65,55 +119,23 @@ export default function OrdersPage() {
                 discount: Number(parsed.discount || 0),
                 shipping: Number(parsed.shipping || 0),
                 total: Number(parsed.total || parsed.totalAmount || parsed.amount || 0),
-                status: parsed.status === "delivered" ? "Delivered" : "Processing",
+                status: resolveOrderStatus(parsed.status || "confirmed"),
                 paymentMethod: parsed.paymentMethod || "Online Payment",
-                paymentStatus: parsed.paymentStatus || "Paid",
+                paymentStatus: resolvePaymentStatus(parsed.paymentStatus || "paid"),
                 shippingAddress: parsed.shippingAddress || {},
                 deliveryDateEstimate: parsed.deliveryDateEstimate || "3-5 Business Days",
                 trackingNumber: parsed.trackingNumber || parsed.awbCode || "",
               });
             }
           }
-        } catch {}
+        } catch { }
 
         if (uid) {
           const qUid = query(collection(db, "orders"), where("userId", "==", uid));
           const snap = await getDocs(qUid);
           snap.forEach((doc: any) => {
-            const raw = doc.data();
             if (!collectedOrders.some((o) => o.id === doc.id)) {
-              collectedOrders.push({
-                id: doc.id,
-                date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
-                items: (raw.items || []).map((i: any) => ({
-                  id: String(i.productId || i.id || ""),
-                  title: String(i.title || "Item"),
-                  price: Number(i.price || 0),
-                  quantity: Number(i.quantity || 1),
-                  selectedSize: String(i.selectedSize || "M"),
-                  selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
-                  image: String(i.image || ""),
-                })),
-                subtotal: Number(raw.subtotal || 0),
-                discount: Number(raw.discount || 0),
-                shipping: Number(raw.shipping || 0),
-                total: Number(raw.total || raw.totalAmount || raw.amount || 0),
-                status:
-                  raw.status === "Delivered" || raw.status === "delivered"
-                    ? "Delivered"
-                    : raw.status === "shipped" || raw.status === "out_for_delivery"
-                      ? "Shipped"
-                      : raw.status === "cancelled"
-                        ? "Cancelled"
-                        : raw.status === "processing"
-                          ? "Processing"
-                          : "Order Confirmed",
-                paymentMethod: raw.paymentMethod || "Online Payment",
-                paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
-                shippingAddress: raw.shippingAddress || {},
-                deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
-                trackingNumber: raw.trackingNumber || raw.awbCode || "",
-              });
+              collectedOrders.push(mapRawOrder(doc.id, doc.data()));
             }
           });
         }
@@ -122,40 +144,8 @@ export default function OrdersPage() {
           const qEmail = query(collection(db, "orders"), where("customerEmail", "==", email));
           const snapEmail = await getDocs(qEmail);
           snapEmail.forEach((doc: any) => {
-            const raw = doc.data();
             if (!collectedOrders.some((o) => o.id === doc.id)) {
-              collectedOrders.push({
-                id: doc.id,
-                date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
-                items: (raw.items || []).map((i: any) => ({
-                  id: String(i.productId || i.id || ""),
-                  title: String(i.title || "Item"),
-                  price: Number(i.price || 0),
-                  quantity: Number(i.quantity || 1),
-                  selectedSize: String(i.selectedSize || "M"),
-                  selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
-                  image: String(i.image || ""),
-                })),
-                subtotal: Number(raw.subtotal || 0),
-                discount: Number(raw.discount || 0),
-                shipping: Number(raw.shipping || 0),
-                total: Number(raw.total || raw.totalAmount || raw.amount || 0),
-                status:
-                  raw.status === "Delivered" || raw.status === "delivered"
-                    ? "Delivered"
-                    : raw.status === "shipped" || raw.status === "out_for_delivery"
-                      ? "Shipped"
-                      : raw.status === "cancelled"
-                        ? "Cancelled"
-                        : raw.status === "processing"
-                          ? "Processing"
-                          : "Order Confirmed",
-                paymentMethod: raw.paymentMethod || "Online Payment",
-                paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
-                shippingAddress: raw.shippingAddress || {},
-                deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
-                trackingNumber: raw.trackingNumber || raw.awbCode || "",
-              });
+              collectedOrders.push(mapRawOrder(doc.id, doc.data()));
             }
           });
         }
@@ -180,38 +170,9 @@ export default function OrdersPage() {
         if (res.ok && contentType.includes("application/json")) {
           const json = await res.json();
           if (mounted && json.success && Array.isArray(json.data?.items)) {
-            const normalized: Order[] = json.data.items.map((raw: any) => ({
-              id: String(raw.id || ""),
-              date: (raw.createdAt || "").split("T")[0] || new Date().toISOString().split("T")[0],
-              items: (raw.items || []).map((i: any) => ({
-                id: String(i.productId || i.id || ""),
-                title: String(i.title || "Item"),
-                price: Number(i.price || 0),
-                quantity: Number(i.quantity || 1),
-                selectedSize: String(i.selectedSize || "M"),
-                selectedColor: i.selectedColor ? String(i.selectedColor) : undefined,
-                image: String(i.image || ""),
-              })),
-              subtotal: Number(raw.subtotal || 0),
-              discount: Number(raw.discount || 0),
-              shipping: Number(raw.shipping || 0),
-              total: Number(raw.total || 0),
-              status:
-                raw.status === "Delivered" || raw.status === "delivered"
-                  ? "Delivered"
-                  : raw.status === "shipped" || raw.status === "out_for_delivery"
-                    ? "Shipped"
-                    : raw.status === "cancelled"
-                      ? "Cancelled"
-                      : raw.status === "processing"
-                        ? "Processing"
-                        : "Order Confirmed",
-              paymentMethod: raw.paymentMethod || "Online Payment",
-              paymentStatus: raw.paymentStatus === "paid" ? "Paid" : "Pending COD",
-              shippingAddress: raw.shippingAddress || {},
-              deliveryDateEstimate: raw.deliveryDateEstimate || "3-5 Business Days",
-              trackingNumber: raw.trackingNumber || raw.awbCode || "",
-            }));
+            const normalized: Order[] = json.data.items.map((raw: any) =>
+              mapRawOrder(String(raw.id || ""), raw)
+            );
             setFetchedOrders(normalized);
           }
         }
@@ -231,9 +192,12 @@ export default function OrdersPage() {
 
   const filteredOrders = orders.filter((order) => {
     if (filter === "delivered") return order.status === "Delivered";
-    if (filter === "active") return order.status !== "Delivered";
+    if (filter === "active") return order.status !== "Delivered" && order.status !== "Payment Failed" && order.status !== "Pending";
+    if (filter === "failed") return order.status === "Payment Failed" || order.status === "Pending";
     return true;
   });
+
+  const failedCount = orders.filter((o) => o.status === "Payment Failed" || o.paymentStatus === "Payment Failed").length;
 
   return (
     <div style={{ backgroundColor: "var(--bg-sand)", minHeight: "85vh", padding: "48px 0 90px 0" }}>
@@ -402,12 +366,15 @@ export default function OrdersPage() {
             { id: "all", label: `All Orders (${orders.length})` },
             {
               id: "active",
-              label: `Active Shipments (${orders.filter((o) => o.status !== "Delivered").length})`,
+              label: `Active Shipments (${orders.filter((o) => o.status !== "Delivered" && o.status !== "Payment Failed" && o.status !== "Pending").length})`,
             },
             {
               id: "delivered",
               label: `Delivered (${orders.filter((o) => o.status === "Delivered").length})`,
             },
+            ...(failedCount > 0
+              ? [{ id: "failed", label: `Payment Issues (${failedCount})` }]
+              : []),
           ].map((tab) => (
             <button
               key={tab.id}
@@ -418,8 +385,14 @@ export default function OrdersPage() {
                 fontSize: "12.5px",
                 fontWeight: 600,
                 border: "1px solid",
-                borderColor: filter === tab.id ? "#111110" : "rgba(0,0,0,0.12)",
-                backgroundColor: filter === tab.id ? "#111110" : "#FFFFFF",
+                borderColor:
+                  filter === tab.id
+                    ? tab.id === "failed" ? "#DC2626" : "#111110"
+                    : "rgba(0,0,0,0.12)",
+                backgroundColor:
+                  filter === tab.id
+                    ? tab.id === "failed" ? "#DC2626" : "#111110"
+                    : "#FFFFFF",
                 color: filter === tab.id ? "#FFFFFF" : "#111110",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
@@ -473,18 +446,62 @@ export default function OrdersPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {filteredOrders.map((order) => {
               const isDelivered = order.status === "Delivered";
+              const isPaymentFailed = order.status === "Payment Failed" || order.paymentStatus === "Payment Failed";
+              const isPending = order.status === "Pending" && !isPaymentFailed;
+
+              // Determine badge colors
+              let badgeBg = "rgba(217, 119, 6, 0.1)";
+              let badgeColor = "#B45309";
+              if (isDelivered) { badgeBg = "rgba(43, 147, 72, 0.1)"; badgeColor = "#2B9348"; }
+              else if (isPaymentFailed) { badgeBg = "rgba(220, 38, 38, 0.1)"; badgeColor = "#DC2626"; }
+              else if (isPending) { badgeBg = "rgba(107, 114, 128, 0.1)"; badgeColor = "#6B7280"; }
 
               return (
                 <div
                   key={order.id}
                   className="order-card"
                   style={{
-                    boxShadow: "0 6px 20px rgba(0,0,0,0.03)",
+                    boxShadow: isPaymentFailed
+                      ? "0 6px 20px rgba(220, 38, 38, 0.06)"
+                      : "0 6px 20px rgba(0,0,0,0.03)",
                     overflow: "hidden",
                     padding: 0,
                     transition: "box-shadow 0.2s ease",
+                    border: isPaymentFailed ? "1px solid rgba(220, 38, 38, 0.15)" : undefined,
                   }}
                 >
+                  {/* Payment Failed Banner */}
+                  {isPaymentFailed && (
+                    <div
+                      style={{
+                        backgroundColor: "rgba(220, 38, 38, 0.06)",
+                        borderBottom: "1px solid rgba(220, 38, 38, 0.15)",
+                        padding: "10px 24px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      <XCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#DC2626" }}>
+                          Payment Failed
+                        </div>
+                        {order.errorDescription && (
+                          <div style={{ fontSize: "11.5px", color: "#B91C1C", marginTop: "2px" }}>
+                            {order.errorDescription}
+                            {order.errorCode ? ` (Code: ${order.errorCode})` : ""}
+                          </div>
+                        )}
+                        {!order.errorDescription && (
+                          <div style={{ fontSize: "11.5px", color: "#6B7280", marginTop: "2px" }}>
+                            Your payment could not be processed. No money was debited. Please try again.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Order Top Bar */}
                   <div
                     style={{
@@ -537,8 +554,8 @@ export default function OrdersPage() {
                           borderRadius: "9999px",
                           fontSize: "12px",
                           fontWeight: 700,
-                          backgroundColor: isDelivered ? "rgba(43, 147, 72, 0.1)" : "rgba(217, 119, 6, 0.1)",
-                          color: isDelivered ? "#2B9348" : "#B45309",
+                          backgroundColor: badgeBg,
+                          color: badgeColor,
                         }}
                       >
                         <span
@@ -546,52 +563,76 @@ export default function OrdersPage() {
                             width: "6px",
                             height: "6px",
                             borderRadius: "50%",
-                            backgroundColor: isDelivered ? "#2B9348" : "#B45309",
+                            backgroundColor: badgeColor,
                           }}
                         />
                         <span>{order.status}</span>
                       </span>
 
-                      <Link
-                        href={`/orders/invoice?orderId=${encodeURIComponent(order.id)}`}
-                        title="View & Download Invoice"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          fontSize: "12.5px",
-                          fontWeight: 700,
-                          color: isDelivered ? "#2B9348" : "#111110",
-                          backgroundColor: isDelivered ? "#F0FDF4" : "#FFFFFF",
-                          border: isDelivered ? "1px solid rgba(43, 147, 72, 0.3)" : "1px solid rgba(0,0,0,0.12)",
-                          padding: "6px 12px",
-                          borderRadius: "9999px",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        <FileText size={13} />
-                        <span>Invoice</span>
-                      </Link>
+                      {!isPaymentFailed && (
+                        <Link
+                          href={`/orders/invoice?orderId=${encodeURIComponent(order.id)}`}
+                          title="View & Download Invoice"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            fontSize: "12.5px",
+                            fontWeight: 700,
+                            color: isDelivered ? "#2B9348" : "#111110",
+                            backgroundColor: isDelivered ? "#F0FDF4" : "#FFFFFF",
+                            border: isDelivered ? "1px solid rgba(43, 147, 72, 0.3)" : "1px solid rgba(0,0,0,0.12)",
+                            padding: "6px 12px",
+                            borderRadius: "9999px",
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <FileText size={13} />
+                          <span>Invoice</span>
+                        </Link>
+                      )}
 
-                      <Link
-                        href={`/orders/track?orderId=${encodeURIComponent(order.id)}`}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "12.5px",
-                          fontWeight: 700,
-                          color: "#111110",
-                          backgroundColor: "#FFFFFF",
-                          border: "1px solid rgba(0,0,0,0.12)",
-                          padding: "6px 14px",
-                          borderRadius: "9999px",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        <span>Details</span>
-                        <ChevronRight size={14} />
-                      </Link>
+                      {isPaymentFailed ? (
+                        <Link
+                          href="/checkout"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontSize: "12.5px",
+                            fontWeight: 700,
+                            color: "#FFFFFF",
+                            backgroundColor: "#DC2626",
+                            border: "none",
+                            padding: "6px 14px",
+                            borderRadius: "9999px",
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <span>Try Again</span>
+                          <ChevronRight size={14} />
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/orders/track?orderId=${encodeURIComponent(order.id)}`}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontSize: "12.5px",
+                            fontWeight: 700,
+                            color: "#111110",
+                            backgroundColor: "#FFFFFF",
+                            border: "1px solid rgba(0,0,0,0.12)",
+                            padding: "6px 14px",
+                            borderRadius: "9999px",
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <span>Details</span>
+                          <ChevronRight size={14} />
+                        </Link>
+                      )}
                     </div>
                   </div>
 
@@ -606,6 +647,7 @@ export default function OrdersPage() {
                             alignItems: "center",
                             justifyContent: "space-between",
                             gap: "16px",
+                            opacity: isPaymentFailed ? 0.6 : 1,
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
@@ -656,53 +698,91 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Bottom Status strip */}
-                    <div
-                      style={{
-                        marginTop: "18px",
-                        paddingTop: "14px",
-                        borderTop: "1px solid rgba(0,0,0,0.05)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        flexWrap: "wrap",
-                        gap: "10px",
-                        fontSize: "12px",
-                        color: "#746E66",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <Truck size={14} color="#936037" />
-                          <span>
-                            {isDelivered
-                              ? `Delivered on ${order.deliveryDateEstimate}`
-                              : `Estimated delivery: ${order.deliveryDateEstimate}`}
-                          </span>
+                    {!isPaymentFailed && (
+                      <div
+                        style={{
+                          marginTop: "18px",
+                          paddingTop: "14px",
+                          borderTop: "1px solid rgba(0,0,0,0.05)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: "10px",
+                          fontSize: "12px",
+                          color: "#746E66",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Truck size={14} color="#936037" />
+                            <span>
+                              {isDelivered
+                                ? `Delivered on ${order.deliveryDateEstimate}`
+                                : `Estimated delivery: ${order.deliveryDateEstimate}`}
+                            </span>
+                          </div>
+                          {order.trackingNumber && !order.trackingNumber.includes("998811") && !order.trackingNumber.includes("1001") && (
+                            <span style={{ fontSize: "11px", color: "#936037", fontWeight: 700, backgroundColor: "rgba(147, 96, 55, 0.08)", padding: "2px 8px", borderRadius: "9999px" }}>
+                              AWB: {order.trackingNumber}
+                            </span>
+                          )}
                         </div>
-                        {order.trackingNumber && !order.trackingNumber.includes("998811") && !order.trackingNumber.includes("1001") && (
-                          <span style={{ fontSize: "11px", color: "#936037", fontWeight: 700, backgroundColor: "rgba(147, 96, 55, 0.08)", padding: "2px 8px", borderRadius: "9999px" }}>
-                            AWB: {order.trackingNumber}
-                          </span>
-                        )}
-                      </div>
 
-                      <div style={{ display: "flex", gap: "16px" }}>
+                        <div style={{ display: "flex", gap: "16px" }}>
+                          <Link
+                            href={`/orders/track?orderId=${encodeURIComponent(order.id)}`}
+                            style={{
+                              fontWeight: 700,
+                              color: "#111110",
+                              textDecoration: "underline",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <span>Track Package</span>
+                            <ChevronRight size={13} />
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Failed payment footer */}
+                    {isPaymentFailed && (
+                      <div
+                        style={{
+                          marginTop: "18px",
+                          paddingTop: "14px",
+                          borderTop: "1px solid rgba(220, 38, 38, 0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: "10px",
+                        }}
+                      >
+                        <div style={{ fontSize: "12px", color: "#9CA3AF" }}>
+                          <AlertCircle size={13} style={{ display: "inline", marginRight: "4px", color: "#DC2626" }} />
+                          Payment not processed — your cart items are safe. Try checkout again to complete your order.
+                        </div>
                         <Link
-                          href={`/orders/track?orderId=${encodeURIComponent(order.id)}`}
+                          href="/checkout"
                           style={{
+                            fontSize: "12.5px",
                             fontWeight: 700,
-                            color: "#111110",
+                            color: "#DC2626",
                             textDecoration: "underline",
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "4px",
                           }}
                         >
-                          <span>Track Package</span>
+                          <span>Retry Checkout</span>
                           <ChevronRight size={13} />
                         </Link>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               );
