@@ -3,9 +3,9 @@
 import React, { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useRouter, useSearchParams } from "next/navigation";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import {
   CheckCircle2,
   Package,
@@ -20,6 +20,7 @@ import {
 import { useStore, normalizeOrder, type Order } from "@/components/store-context";
 
 function OrderSuccessContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
   const orderNumberParam = searchParams.get("orderNumber");
@@ -40,14 +41,20 @@ function OrderSuccessContent() {
   // Resolve order details:
   // 1. From StoreContext orders
   // 2. From sessionStorage last_confirmed_order
-  // 3. Direct Firestore document query
+  // 3. Direct Firestore document query (doc ID or orderNumber)
+  // 4. Logged in user recent order fallback
   useEffect(() => {
     let active = true;
 
     async function loadOrder() {
       // 1. Check StoreContext orders
-      if (orderId) {
-        const memoryOrder = orders.find((o) => o.id === orderId || (o as any).orderNumber === orderNumberParam);
+      if (orderId || orderNumberParam) {
+        const memoryOrder = orders.find(
+          (o) =>
+            (orderId && o.id === orderId) ||
+            (orderNumberParam && (o as any).orderNumber === orderNumberParam) ||
+            (orderId && (o as any).orderNumber === orderId)
+        );
         if (memoryOrder) {
           if (active) {
             setFetchedOrder(memoryOrder);
@@ -62,7 +69,13 @@ function OrderSuccessContent() {
         const storedJson = sessionStorage.getItem("last_confirmed_order");
         if (storedJson) {
           const parsed = JSON.parse(storedJson);
-          if (!orderId || parsed.id === orderId || parsed.orderId === orderId || parsed.orderNumber === orderNumberParam) {
+          if (
+            !orderId ||
+            parsed.id === orderId ||
+            parsed.orderId === orderId ||
+            parsed.orderNumber === orderNumberParam ||
+            parsed.orderNumber === orderId
+          ) {
             const normalized = normalizeOrder(parsed);
             if (active) {
               setFetchedOrder(normalized);
@@ -75,7 +88,7 @@ function OrderSuccessContent() {
         console.warn("Could not read last_confirmed_order from sessionStorage:", err);
       }
 
-      // 3. Check Firestore
+      // 3. Check Firestore by doc ID
       if (orderId) {
         try {
           const snap = await getDoc(doc(db, "orders", orderId));
@@ -90,6 +103,45 @@ function OrderSuccessContent() {
         }
       }
 
+      // 3b. Check Firestore by orderNumber
+      const lookupNum = orderNumberParam || orderId;
+      if (lookupNum) {
+        try {
+          const q = query(collection(db, "orders"), where("orderNumber", "==", lookupNum));
+          const snap = await getDocs(q);
+          if (!snap.empty && active) {
+            const docItem = snap.docs[0];
+            const normalized = normalizeOrder({ id: docItem.id, ...docItem.data() });
+            setFetchedOrder(normalized);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn("Firestore order query by number notice:", err);
+        }
+      }
+
+      // 4. Try current logged-in user's latest order from Firestore
+      try {
+        const u = auth.currentUser;
+        if (u?.uid) {
+          const uQuery = query(collection(db, "orders"), where("userId", "==", u.uid));
+          const uSnap = await getDocs(uQuery);
+          if (!uSnap.empty && active) {
+            const sorted = uSnap.docs
+              .map((d: any) => normalizeOrder({ id: d.id, ...d.data() }))
+              .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            if (sorted[0]) {
+              setFetchedOrder(sorted[0]);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("User recent order query notice:", err);
+      }
+
       if (active) {
         setLoading(false);
       }
@@ -102,11 +154,70 @@ function OrderSuccessContent() {
     };
   }, [orderId, orderNumberParam, orders]);
 
-  const currentOrder = fetchedOrder || (orderId ? orders.find((o) => o.id === orderId) : undefined);
+  const currentOrder =
+    fetchedOrder ||
+    (orderId ? orders.find((o) => o.id === orderId || (o as any).orderNumber === orderNumberParam) : undefined) ||
+    (orders.length > 0 ? orders[0] : undefined);
+
+  const targetOrderId = (
+    currentOrder?.id ||
+    orderId ||
+    orderNumberParam ||
+    (typeof window !== "undefined"
+      ? (() => {
+          try {
+            const s = sessionStorage.getItem("last_confirmed_order");
+            if (s) {
+              const p = JSON.parse(s);
+              return p.id || p.orderId || p.orderNumber || "";
+            }
+          } catch {}
+          return "";
+        })()
+      : "") ||
+    (orders.length > 0 ? orders[0].id : "")
+  )?.trim() || "";
+
   const displayOrderNumber =
     orderNumberParam ||
     (currentOrder as any)?.orderNumber ||
-    (orderId?.startsWith("NXT") ? orderId : orderId ? `NXTIVE-${orderId.slice(-6).toUpperCase()}` : "");
+    (currentOrder?.id?.startsWith("NXT")
+      ? currentOrder.id
+      : currentOrder?.id
+      ? `NXTIVE-${currentOrder.id.slice(-6).toUpperCase()}`
+      : targetOrderId?.startsWith("NXT")
+      ? targetOrderId
+      : targetOrderId
+      ? `NXTIVE-${targetOrderId.slice(-6).toUpperCase()}`
+      : "");
+
+  const trackHref = targetOrderId
+    ? `/orders/track?orderId=${encodeURIComponent(targetOrderId)}`
+    : "/orders/track";
+
+  const invoiceHref = targetOrderId
+    ? `/orders/invoice?orderId=${encodeURIComponent(targetOrderId)}`
+    : "/orders";
+
+  const shopHref = "/products";
+  const accountHref = "/account";
+
+  const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    if (typeof window === "undefined") return;
+    try {
+      router.push(href);
+    } catch {
+      window.location.href = href;
+      return;
+    }
+    setTimeout(() => {
+      const current = window.location.pathname + window.location.search;
+      if (!window.location.href.includes(href) && current !== href) {
+        window.location.href = href;
+      }
+    }, 250);
+  };
 
   if (loading && !currentOrder && orderId) {
     return (
@@ -311,8 +422,15 @@ function OrderSuccessContent() {
                       >
                         <Image
                           src={item.image || "/images/nxtvie/cat-tshirts.jpg"}
-                          alt={item.title}
+                          alt={item.title || "Product item"}
                           fill
+                          unoptimized
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            if (!target.src.includes("/images/nxtvie/cat-tshirts.jpg")) {
+                              target.src = "/images/nxtvie/cat-tshirts.jpg";
+                            }
+                          }}
                           style={{ objectFit: "cover" }}
                           sizes="60px"
                         />
@@ -581,53 +699,56 @@ function OrderSuccessContent() {
             flexWrap: "wrap",
           }}
         >
-          {(currentOrder || orderId || orderNumberParam) && (
-            <Link
-              href={`/orders/${currentOrder?.id || orderId || orderNumberParam}`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#111110",
-                color: "#FFFFFF",
-                padding: "13px 26px",
-                borderRadius: "9999px",
-                fontSize: "13.5px",
-                fontWeight: 700,
-                transition: "opacity 0.2s ease",
-              }}
-              className="btn-pill-dark"
-            >
-              <Package size={16} />
-              <span>Track & View Order</span>
-            </Link>
-          )}
-
-          {(currentOrder || orderId) && (
-            <Link
-              href={`/orders/${currentOrder?.id || orderId}/invoice`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#FFFFFF",
-                color: "#111110",
-                border: "1px solid rgba(0,0,0,0.2)",
-                padding: "13px 24px",
-                borderRadius: "9999px",
-                fontSize: "13.5px",
-                fontWeight: 700,
-                transition: "all 0.2s ease",
-              }}
-              className="btn-pill-outline"
-            >
-              <FileText size={16} />
-              <span>View Invoice</span>
-            </Link>
-          )}
+          <Link
+            href={trackHref}
+            onClick={(e) => handleNavigate(e, trackHref)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor: "#111110",
+              color: "#FFFFFF",
+              padding: "13px 26px",
+              borderRadius: "9999px",
+              fontSize: "13.5px",
+              fontWeight: 700,
+              transition: "opacity 0.2s ease",
+              cursor: "pointer",
+              textDecoration: "none",
+            }}
+            className="btn-pill-dark"
+          >
+            <Package size={16} />
+            <span>Track & View Order</span>
+          </Link>
 
           <Link
-            href="/products"
+            href={invoiceHref}
+            onClick={(e) => handleNavigate(e, invoiceHref)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor: "#FFFFFF",
+              color: "#111110",
+              border: "1px solid rgba(0,0,0,0.2)",
+              padding: "13px 24px",
+              borderRadius: "9999px",
+              fontSize: "13.5px",
+              fontWeight: 700,
+              transition: "all 0.2s ease",
+              cursor: "pointer",
+              textDecoration: "none",
+            }}
+            className="btn-pill-outline"
+          >
+            <FileText size={16} />
+            <span>View Invoice</span>
+          </Link>
+
+          <Link
+            href={shopHref}
+            onClick={(e) => handleNavigate(e, shopHref)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -640,6 +761,8 @@ function OrderSuccessContent() {
               fontSize: "13.5px",
               fontWeight: 700,
               transition: "all 0.2s ease",
+              cursor: "pointer",
+              textDecoration: "none",
             }}
             className="btn-pill-outline"
           >
@@ -648,7 +771,8 @@ function OrderSuccessContent() {
           </Link>
 
           <Link
-            href="/account"
+            href={accountHref}
+            onClick={(e) => handleNavigate(e, accountHref)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -658,6 +782,7 @@ function OrderSuccessContent() {
               fontWeight: 600,
               padding: "13px 16px",
               textDecoration: "underline",
+              cursor: "pointer",
             }}
           >
             <span>Go to My Account</span>
