@@ -480,9 +480,12 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
 
   // Determine actual tracking status milestones
   const rawStatus = (order.rawStatus || order.status || "pending").toLowerCase();
+  const rawPaymentStatus = (order.paymentStatus || "").toLowerCase();
   const isPaymentFailed =
     order.status === "Payment Failed" ||
+    order.status === "failed" ||
     order.paymentStatus === "Payment Failed" ||
+    rawPaymentStatus === "failed" ||
     rawStatus === "failed";
   const isCancelled = order.status === "Cancelled" || rawStatus === "cancelled" || rawStatus === "refunded";
   const isDelivered = order.status === "Delivered" || rawStatus === "delivered";

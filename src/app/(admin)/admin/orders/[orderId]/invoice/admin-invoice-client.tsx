@@ -73,3 +73,4 @@ export function AdminOrderInvoiceClient({ orderId: propOrderId }: AdminOrderInvo
 
   return <OrderInvoice order={order} />;
 }
+

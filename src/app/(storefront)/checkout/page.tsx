@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
+import { auth } from "@/lib/firebase/client";
+import { signInAnonymously } from "firebase/auth";
 import { useRazorpayCheckout } from "@/lib/razorpay/use-razorpay-checkout";
 import { reverseGeocode, matchIndianState, sanitizePostalCode } from "@/lib/location";
 
@@ -276,11 +278,6 @@ export default function CheckoutPage() {
       e.preventDefault();
     }
 
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-
     if (!validateForm()) {
       return;
     }
@@ -288,8 +285,23 @@ export default function CheckoutPage() {
     setOrderError(null);
     setFailedOrderId(null);
 
+    // Seamless single-page direct checkout:
+    // If customer is already authenticated, use their UID; otherwise authenticate anonymously in the background.
+    let effectiveUserId = user?.uid;
     let idToken: string | undefined;
-    if (user && typeof user.getIdToken === "function") {
+
+    if (!effectiveUserId) {
+      try {
+        const anonCred = await signInAnonymously(auth);
+        effectiveUserId = anonCred.user.uid;
+        try {
+          idToken = await anonCred.user.getIdToken();
+        } catch {}
+      } catch (authErr) {
+        console.warn("[Checkout] Anonymous auth fallback:", authErr);
+        effectiveUserId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      }
+    } else if (user && typeof user.getIdToken === "function") {
       try {
         idToken = await user.getIdToken();
       } catch (tokenErr) {
@@ -325,7 +337,7 @@ export default function CheckoutPage() {
       couponCode: couponCode || undefined,
       totalAmount: finalTotal,
       discountAmount: discountAmount,
-      userId: user.uid,
+      userId: effectiveUserId,
       idToken,
     });
 

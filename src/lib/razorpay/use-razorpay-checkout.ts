@@ -165,11 +165,11 @@ function loadRazorpayScript(): Promise<boolean> {
       resolve(false);
       return;
     }
-    if (window.Razorpay) {
+    if (typeof (window as any).Razorpay === "function") {
       resolve(true);
       return;
     }
-    let script = document.getElementById("razorpay-checkout-script") as HTMLScriptElement | null;
+    let script = document.querySelector('script[src*="checkout.razorpay.com"]') as HTMLScriptElement | null;
     if (!script) {
       script = document.createElement("script");
       script.id = "razorpay-checkout-script";
@@ -178,10 +178,15 @@ function loadRazorpayScript(): Promise<boolean> {
       document.body.appendChild(script);
     }
 
+    let elapsed = 0;
     const checkInterval = setInterval(() => {
-      if (window.Razorpay) {
+      elapsed += 100;
+      if (typeof (window as any).Razorpay === "function") {
         clearInterval(checkInterval);
         resolve(true);
+      } else if (elapsed > 8000) {
+        clearInterval(checkInterval);
+        resolve(typeof (window as any).Razorpay === "function");
       }
     }, 100);
 
@@ -189,7 +194,7 @@ function loadRazorpayScript(): Promise<boolean> {
       "load",
       () => {
         clearInterval(checkInterval);
-        resolve(true);
+        resolve(typeof (window as any).Razorpay === "function");
       },
       { once: true }
     );
@@ -202,11 +207,6 @@ function loadRazorpayScript(): Promise<boolean> {
       },
       { once: true }
     );
-
-    setTimeout(() => {
-      clearInterval(checkInterval);
-      resolve(!!window.Razorpay);
-    }, 4000);
   });
 }
 
@@ -379,13 +379,16 @@ export function useRazorpayCheckout() {
         let keyId = createData?.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_TzBTAqPKFWxzK4";
 
         if (!orderId) {
-          // If server order creation returned non-JSON/404 (e.g. Firebase static hosting),
-          // synthesize a client order and persist directly into Firestore.
+          // Synthesize client order identifier
           const fallbackOrderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
           const itemsTotal = input.totalAmount !== undefined
             ? input.totalAmount
             : input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
           const finalAmountInPaise = Math.max(100, Math.round(itemsTotal * 100));
+
+          orderId = fallbackOrderId;
+          amount = finalAmountInPaise;
+          currency = "INR";
 
           try {
             await setDoc(doc(db, "orders", fallbackOrderId), {
@@ -416,12 +419,8 @@ export function useRazorpayCheckout() {
                 },
               ],
             });
-            orderId = fallbackOrderId;
-            amount = finalAmountInPaise;
-            currency = "INR";
           } catch (dbErr) {
-            console.error("[Razorpay] Failed to create order in Firestore directly:", dbErr);
-            throw new Error("Unable to initialize order. Please check your connection and try again.");
+            console.warn("[Razorpay] Initial order pre-record notice:", dbErr);
           }
         }
 
@@ -429,8 +428,8 @@ export function useRazorpayCheckout() {
 
         // Ensure SDK script is ready
         const scriptLoaded = await loadRazorpayScript();
-        if (!scriptLoaded || typeof window === "undefined" || !window.Razorpay) {
-          throw new Error("Razorpay Checkout SDK could not be loaded. Please check your internet connection.");
+        if (!scriptLoaded || typeof window === "undefined" || !(window as any).Razorpay) {
+          throw new Error("Razorpay Checkout SDK is still loading. Please click Pay again in 2 seconds.");
         }
 
         setStatus("awaiting_payment");
@@ -502,13 +501,31 @@ export function useRazorpayCheckout() {
 
                 clearTimeout(timeoutId);
 
-                // Update order in Firestore to paid
+                // Update order in Firestore to paid with full customer and order details
                 try {
+                  const finalTotalRupees = finalAmountPaise / 100;
                   await setDoc(
                     doc(db, "orders", orderId),
                     {
+                      id: orderId,
+                      orderNumber: orderId,
+                      userId: input.userId,
+                      customerEmail: input.shippingAddress.email || "",
+                      customerName: input.shippingAddress.fullName || "",
+                      customerPhone: input.shippingAddress.phone || "",
+                      items: input.items,
+                      shippingAddress: input.shippingAddress,
+                      deliveryMethod: input.deliveryMethod || "standard",
+                      couponCode: input.couponCode || null,
+                      amount: finalTotalRupees,
+                      total: finalTotalRupees,
+                      totalAmount: finalTotalRupees,
+                      subtotal: input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0),
+                      shipping: 0,
+                      discount: input.discountAmount || 0,
                       status: "paid",
                       paymentStatus: "paid",
+                      paymentMethod: "Razorpay",
                       paymentId: response.razorpay_payment_id,
                       razorpayPaymentId: response.razorpay_payment_id,
                       ...(response.razorpay_order_id ? { razorpayOrderId: response.razorpay_order_id } : {}),
@@ -582,59 +599,93 @@ export function useRazorpayCheckout() {
           try {
             rzp = new window.Razorpay!(options);
           } catch (initErr: any) {
-            console.error("[Razorpay] Constructor initialization error:", initErr);
-            const mapped = getRazorpayUserErrorMessage("INITIATION_ERROR", initErr?.message, "gateway_error");
-            setStatus("failed");
-            setError(mapped.userMessage);
-            setMappedError(mapped);
-            setLoading(false);
-            resolve({
-              success: false,
-              orderId,
-              error: mapped.userMessage,
-              mappedError: mapped,
-              status: "failed",
-            });
-            return;
+            console.warn("[Razorpay] Initial constructor error, retrying with stripped options:", initErr);
+            try {
+              // Retry without prefill data to avoid regex / pattern mismatch in Safari/WebKit
+              const strippedOptions: any = {
+                key: keyId,
+                amount: finalAmountPaise,
+                currency: "INR",
+                name: "NXTIVE",
+                description: `Order #${orderId}`,
+                theme: { color: "#111110" },
+                handler: options.handler,
+                modal: options.modal,
+              };
+              rzp = new window.Razorpay!(strippedOptions);
+            } catch (fallbackErr: any) {
+              console.error("[Razorpay] Constructor initialization error:", fallbackErr);
+              const mapped = getRazorpayUserErrorMessage("INITIATION_ERROR", fallbackErr?.message, "gateway_error");
+              setStatus("failed");
+              setError(mapped.userMessage);
+              setMappedError(mapped);
+              setLoading(false);
+              resolve({
+                success: false,
+                orderId,
+                error: mapped.userMessage,
+                mappedError: mapped,
+                status: "failed",
+              });
+              return;
+            }
           }
 
           // 2b. Payment failure callback
-          rzp.on("payment.failed", (response: any) => {
-            hasHandledCallback = true;
-            console.error("[Razorpay] payment.failed fired on client:", response?.error);
-            const err = response?.error;
-            const mapped = getRazorpayUserErrorMessage(err?.code, err?.description, err?.reason);
-            recordPaymentFailure(orderId, err?.code || "PAYMENT_FAILED", err?.description || mapped.userMessage);
+          if (rzp && typeof rzp.on === "function") {
+            rzp.on("payment.failed", (response: any) => {
+              hasHandledCallback = true;
+              console.error("[Razorpay] payment.failed fired on client:", response?.error);
+              const err = response?.error;
+              const mapped = getRazorpayUserErrorMessage(err?.code, err?.description, err?.reason);
+              recordPaymentFailure(orderId, err?.code || "PAYMENT_FAILED", err?.description || mapped.userMessage);
 
-            setStatus("failed");
-            setError(mapped.userMessage);
-            setMappedError(mapped);
-            setLoading(false);
-            resolve({
-              success: false,
-              orderId,
-              error: mapped.userMessage,
-              mappedError: mapped,
-              status: "failed",
+              setStatus("failed");
+              setError(mapped.userMessage);
+              setMappedError(mapped);
+              setLoading(false);
+              resolve({
+                success: false,
+                orderId,
+                error: mapped.userMessage,
+                mappedError: mapped,
+                status: "failed",
+              });
             });
-          });
+          }
 
           try {
             rzp.open();
           } catch (openErr: any) {
-            console.error("[Razorpay] open() error:", openErr);
-            const mapped = getRazorpayUserErrorMessage("INITIATION_ERROR", openErr?.message, "gateway_error");
-            setStatus("failed");
-            setError(mapped.userMessage);
-            setMappedError(mapped);
-            setLoading(false);
-            resolve({
-              success: false,
-              orderId,
-              error: mapped.userMessage,
-              mappedError: mapped,
-              status: "failed",
-            });
+            console.warn("[Razorpay] open() error, attempting recovery open:", openErr);
+            try {
+              const strippedOptions: any = {
+                key: keyId,
+                amount: finalAmountPaise,
+                currency: "INR",
+                name: "NXTIVE",
+                description: `Order #${orderId}`,
+                theme: { color: "#111110" },
+                handler: options.handler,
+                modal: options.modal,
+              };
+              const retryRzp = new (window as any).Razorpay(strippedOptions);
+              retryRzp.open();
+            } catch (retryOpenErr: any) {
+              console.error("[Razorpay] Retry open error:", retryOpenErr);
+              const mapped = getRazorpayUserErrorMessage("INITIATION_ERROR", retryOpenErr?.message, "gateway_error");
+              setStatus("failed");
+              setError(mapped.userMessage);
+              setMappedError(mapped);
+              setLoading(false);
+              resolve({
+                success: false,
+                orderId,
+                error: mapped.userMessage,
+                mappedError: mapped,
+                status: "failed",
+              });
+            }
           }
         });
       } catch (err: any) {

@@ -237,7 +237,14 @@ export function ProductDetailClient({
                       transition: "all 0.2s ease",
                     }}
                   >
-                    <img src={img} alt={`Angle ${idx + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img
+                      src={img}
+                      alt={`Angle ${idx + 1}`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/images/nxtvie/product-oversized-tee-hd.jpg";
+                      }}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
                   </button>
                 ))}
               </div>
@@ -258,6 +265,14 @@ export function ProductDetailClient({
               <img
                 src={selectedImage}
                 alt={product.title}
+                onError={() => {
+                  const altCandidate = gallery.find((g) => g && g !== selectedImage);
+                  if (altCandidate) {
+                    setSelectedImage(altCandidate);
+                  } else {
+                    setSelectedImage("/images/nxtvie/product-oversized-tee-hd.jpg");
+                  }
+                }}
                 style={{
                   width: "100%",
                   height: "100%",

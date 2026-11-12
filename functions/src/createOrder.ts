@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { razorpayKeyIdSecret, razorpayKeySecret, getRazorpayKeyId } from "./config";
+import { getRazorpayKeyId, getRazorpayKeySecret } from "./config";
 import { getRazorpay } from "./razorpay";
 
 interface OrderItemInput {
@@ -32,7 +32,6 @@ interface CreateOrderRequest {
 
 export const createRazorpayOrder = onCall(
   {
-    secrets: [razorpayKeyIdSecret, razorpayKeySecret],
     cors: true,
   },
   async (request) => {

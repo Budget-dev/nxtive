@@ -447,3 +447,4 @@ export function CustomerDetailClient({ id: propId }: CustomerDetailClientProps =
     </div>
   );
 }
+

@@ -20,6 +20,14 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const inWishlist = isInWishlist(product.id);
   const activeColor = product.colors?.[selectedColorIdx]?.name || "Original";
+  const initialImg = sharpImageSrc(product.image) || (product.images?.[0] ? sharpImageSrc(product.images[0]) : "/images/placeholder.jpg");
+  const [imgSrc, setImgSrc] = useState(initialImg);
+  const [imgErrorCount, setImgErrorCount] = useState(0);
+
+  React.useEffect(() => {
+    setImgSrc(sharpImageSrc(product.image) || (product.images?.[0] ? sharpImageSrc(product.images[0]) : "/images/placeholder.jpg"));
+    setImgErrorCount(0);
+  }, [product.image, product.images]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -62,10 +70,24 @@ export function ProductCard({ product }: ProductCardProps) {
       >
         <Link href={getProductHref(product)} style={{ display: "block", width: "100%", height: "100%" }}>
           <img
-            src={sharpImageSrc(product.image)}
+            src={imgSrc}
             alt={product.title}
             loading="lazy"
             decoding="async"
+            onError={() => {
+              if (imgErrorCount === 0 && product.images && product.images.length > 1) {
+                // Try second image from gallery
+                const nextCandidate = product.images.find((img) => img && img !== imgSrc);
+                if (nextCandidate) {
+                  setImgSrc(sharpImageSrc(nextCandidate));
+                  setImgErrorCount(1);
+                  return;
+                }
+              }
+              // Final fallback to high-quality garment preview
+              setImgSrc("/images/nxtvie/product-oversized-tee-hd.jpg");
+              setImgErrorCount((c) => c + 1);
+            }}
             style={{
               width: "100%",
               height: "100%",

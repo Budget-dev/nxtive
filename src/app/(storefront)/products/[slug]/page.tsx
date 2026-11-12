@@ -10,19 +10,28 @@ export const revalidate = 60;
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  const products = await fetchStorefrontProducts().catch(() => []);
-  const slugs = new Set<string>();
-  for (const p of products) {
-    if (p.slug) slugs.add(p.slug.toLowerCase());
-    if (p.id) slugs.add(p.id.toLowerCase());
-  }
-  slugs.add("shirt");
-  slugs.add("relaxed-shirt");
-  slugs.add("dem");
-  slugs.add("prod-1793939922857-2s6mie");
-  slugs.add("prod-1793944052304-597glu");
-  slugs.add("prod-1794287175968-hic2x4");
-  return Array.from(slugs).map((slug) => ({ slug }));
+  const knownSlugs = [
+    "t-shirt",
+    "prod-1794389675927-gigncq",
+    "shirt",
+    "prod-1794464298801-cndqf7",
+    "jacket",
+    "prod-1794464476776-vr9k5t",
+    "bottom",
+    "prod-1794464650216-3k9ojn",
+    "hoodies",
+    "prod-1794464817660-blsq8w",
+    "sweatshirt",
+    "prod-1794465268161-1nohnt",
+    "nxtive-fear-series-02-sweatshirt",
+    "prod-1794466330846-os9a26",
+    "relaxed-shirt",
+    "dem",
+    "prod-1793939922857-2s6mie",
+    "prod-1793944052304-597glu",
+    "prod-1794287175968-hic2x4",
+  ];
+  return knownSlugs.map((slug) => ({ slug }));
 }
 
 interface ProductPageProps {

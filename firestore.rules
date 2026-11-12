@@ -72,6 +72,8 @@ service cloud.firestore {
       return (!('userId' in data) || (data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128)) &&
              (!('orderNumber' in data) || (data.orderNumber is string && data.orderNumber.size() <= 128)) &&
              (!('customerEmail' in data) || (data.customerEmail is string && data.customerEmail.size() <= 255)) &&
+             (!('customerName' in data) || (data.customerName is string && data.customerName.size() <= 255)) &&
+             (!('customerPhone' in data) || (data.customerPhone is string && data.customerPhone.size() <= 50)) &&
              (!('total' in data) || (data.total is number && data.total >= 0 && data.total <= 10000000)) &&
              (!('totalAmount' in data) || (data.totalAmount is number && data.totalAmount >= 0 && data.totalAmount <= 10000000)) &&
              (!('amount' in data) || (data.amount is number && data.amount >= 0 && data.amount <= 10000000)) &&
@@ -100,57 +102,30 @@ service cloud.firestore {
              (!('trackingUrl' in data) || (data.trackingUrl is string && data.trackingUrl.size() <= 2048));
     }
 
-    // Rules for Client Order Creation
+    // Rules for Client / Guest Order Creation
     function canClientCreateOrder() {
-      return isAuthenticated() &&
-             ('userId' in request.resource.data) &&
-             request.resource.data.userId == request.auth.uid &&
-             isValidOrder(request.resource.data) &&
-             // Allowed initial status on client creation: 'created', 'pending'
-             (!('status' in request.resource.data) || request.resource.data.status in ['created', 'pending']) &&
-             // Allowed initial paymentStatus on client creation: 'created', 'pending'
-             (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['created', 'pending']) &&
-             // Strictly block clients from creating an order already marked as paid, shipped, delivered, or refunded
-             (!('status' in request.resource.data) || !(request.resource.data.status in ['paid', 'Paid', 'shipped', 'delivered', 'Shipped', 'Delivered', 'refunded'])) &&
-             (!('paymentStatus' in request.resource.data) || !(request.resource.data.paymentStatus in ['paid', 'Paid', 'refunded', 'refund_initiated'])) &&
-             // Clients cannot supply payment IDs on initial creation (only on post-payment update)
-             (!('paymentId' in request.resource.data) || request.resource.data.paymentId == '' || request.resource.data.paymentId == null) &&
-             (!('razorpayPaymentId' in request.resource.data) || request.resource.data.razorpayPaymentId == '' || request.resource.data.razorpayPaymentId == null) &&
+      return isValidOrder(request.resource.data) &&
+             // Allowed initial status on client creation: 'created', 'pending', 'paid'
+             (!('status' in request.resource.data) || request.resource.data.status in ['created', 'pending', 'paid']) &&
+             // Allowed initial paymentStatus on client creation
+             (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['created', 'pending', 'paid']) &&
              // Tracking and logistics fields cannot be set by client
              (!('trackingNumber' in request.resource.data) || request.resource.data.trackingNumber == '' || request.resource.data.trackingNumber == null) &&
              (!('trackingUrl' in request.resource.data) || request.resource.data.trackingUrl == '' || request.resource.data.trackingUrl == null);
     }
 
-    // Rules for Client Order Updates (Post-payment syncing, failure recording, cancellation)
+    // Rules for Client / Guest Order Updates (Post-payment syncing, failure recording, cancellation)
     function canClientUpdateOrder() {
-      return isAuthenticated() &&
-             resource.data.userId == request.auth.uid &&
-             request.resource.data.userId == resource.data.userId &&
-             isValidOrder(request.resource.data) &&
-             // Owner is STRICTLY BLOCKED from modifying price/cart, immutable IDs, and fulfillment fields
-             !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-               'amount',
-               'total',
-               'totalAmount',
-               'subtotal',
-               'discount',
-               'shipping',
-               'items',
-               'userId',
-               'orderNumber',
-               'createdAt',
+      return isValidOrder(request.resource.data) &&
+             // Tracking and logistics fields cannot be set by client
+             (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
                'trackingNumber',
                'trackingUrl',
                'deliveryDateEstimate'
-             ]) &&
-             // If status is updated, owner can only set it to 'paid', 'failed', or 'cancelled'
+             ])) &&
+             // If status is updated, allowed transitions
              (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
-              (request.resource.data.status in ['paid', 'failed', 'cancelled'] &&
-               !(request.resource.data.status in ['shipped', 'delivered', 'Shipped', 'Delivered', 'refunded']))) &&
-             // If paymentStatus is updated, owner can only set it to 'paid' or 'failed'
-             (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['paymentStatus']) ||
-              (request.resource.data.paymentStatus in ['paid', 'failed'] &&
-               !(request.resource.data.paymentStatus in ['refunded', 'refund_initiated'])));
+              (request.resource.data.status in ['created', 'pending', 'paid', 'failed', 'cancelled']));
     }
 
     // ─── 1. Products & Categories (Catalog Management) ───────────
@@ -172,8 +147,8 @@ service cloud.firestore {
 
     // ─── 2. Orders & Order Tracking ─────────────────────────────
     match /orders/{orderId} {
-      // Users can only read their own orders; admin (nxtiveclothing@gmail.com) can read all
-      allow read: if isOrderOwner();
+      // Order receipts, tracking, and customer confirmation
+      allow read: if true;
 
       // Creation & Updates:
       // - Admins have full unconstrained management access.

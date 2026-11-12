@@ -73,3 +73,4 @@ export function AdminOrderDetailClient({ orderId: propOrderId }: AdminOrderDetai
 
   return <OrderDetailManager order={order} />;
 }
+

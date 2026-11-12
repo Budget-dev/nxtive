@@ -1,6 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { razorpayKeyIdSecret, razorpayKeySecret } from "./config";
 import { getRazorpay, verifyPaymentSignature } from "./razorpay";
 
 interface VerifyPaymentRequest {
@@ -12,7 +11,6 @@ interface VerifyPaymentRequest {
 
 export const verifyRazorpayPayment = onCall(
   {
-    secrets: [razorpayKeyIdSecret, razorpayKeySecret],
     cors: true,
   },
   async (request) => {

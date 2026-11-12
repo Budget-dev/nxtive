@@ -1290,29 +1290,38 @@ function AccountContent() {
                         </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              padding: "5px 14px",
-                              borderRadius: "9999px",
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              backgroundColor: isDelivered ? "rgba(43, 147, 72, 0.1)" : "rgba(217, 119, 6, 0.1)",
-                              color: isDelivered ? "#2B9348" : "#B45309",
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: "6px",
-                                height: "6px",
-                                borderRadius: "50%",
-                                backgroundColor: isDelivered ? "#2B9348" : "#B45309",
-                              }}
-                            />
-                            <span>{order.status}</span>
-                          </span>
+                          {(() => {
+                            const isFailed = order.status === "failed" || (order as any).paymentStatus === "failed";
+                            return (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  padding: "5px 14px",
+                                  borderRadius: "9999px",
+                                  fontSize: "12px",
+                                  fontWeight: 700,
+                                  backgroundColor: isDelivered
+                                    ? "rgba(43, 147, 72, 0.1)"
+                                    : isFailed
+                                    ? "rgba(220, 38, 38, 0.1)"
+                                    : "rgba(217, 119, 6, 0.1)",
+                                  color: isDelivered ? "#2B9348" : isFailed ? "#DC2626" : "#B45309",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: "6px",
+                                    height: "6px",
+                                    borderRadius: "50%",
+                                    backgroundColor: isDelivered ? "#2B9348" : isFailed ? "#DC2626" : "#B45309",
+                                  }}
+                                />
+                                <span>{isFailed ? "Payment Failed" : order.status}</span>
+                              </span>
+                            );
+                          })()}
 
                           <Link
                             href={`/orders/${order.id}`}
@@ -1415,6 +1424,41 @@ function AccountContent() {
                             </Link>
                           </div>
                         </div>
+
+                        {(order.status === "failed" || (order as any).paymentStatus === "failed") && (
+                          <div
+                            style={{
+                              marginTop: "12px",
+                              padding: "10px 14px",
+                              backgroundColor: "#FEF2F2",
+                              borderRadius: "8px",
+                              border: "1px solid #FECACA",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "10px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span style={{ fontSize: "12px", color: "#991B1B", fontWeight: 600 }}>
+                              Payment failed for Order #{order.id}: {(order as any).errorDescription || "Transaction was cancelled or declined."}
+                            </span>
+                            <Link
+                              href="/checkout"
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#FFFFFF",
+                                backgroundColor: "#111110",
+                                padding: "5px 12px",
+                                borderRadius: "9999px",
+                                textDecoration: "none",
+                              }}
+                            >
+                              Retry Checkout
+                            </Link>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

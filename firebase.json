@@ -14,7 +14,7 @@
         "*.local"
       ],
       "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run build"
+        "npm --prefix functions run build"
       ]
     }
   ],
@@ -185,6 +185,10 @@
       {
         "source": "/orders/**",
         "destination": "/orders/track.html"
+      },
+      {
+        "source": "/products/**",
+        "destination": "/products/fallback.html"
       },
       {
         "source": "**",

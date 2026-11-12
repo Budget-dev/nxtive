@@ -1,12 +1,10 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
-import { razorpayKeyIdSecret, razorpayKeySecret } from "./config";
 import { getRazorpay } from "./razorpay";
 
 export const reconcileStuckOrders = onSchedule(
   {
     schedule: "every 15 minutes",
-    secrets: [razorpayKeyIdSecret, razorpayKeySecret],
   },
   async (event) => {
     const db = getFirestore();

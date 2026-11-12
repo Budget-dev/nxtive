@@ -81,19 +81,20 @@ async function waitForServer(port, maxAttempts = 120) {
   return false;
 }
 
-function fetchUrl(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const req = http.get(url, { headers }, (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
-      res.on('end', () => resolve({ statusCode: res.statusCode, headers: res.headers, body }));
-    });
-    req.on('error', reject);
-    req.setTimeout(10000, () => {
-      req.destroy();
-      reject(new Error(`Timeout fetching ${url}`));
-    });
-  });
+async function fetchUrl(url, headers = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    const body = await res.text();
+    clearTimeout(timeout);
+    const headersObj = {};
+    res.headers.forEach((v, k) => { headersObj[k] = v; });
+    return { statusCode: res.status, headers: headersObj, body };
+  } catch (err) {
+    clearTimeout(timeout);
+    throw err;
+  }
 }
 
 function saveFile(destPath, content) {
@@ -149,6 +150,17 @@ async function prerenderDynamicRoutes() {
     't-shirt',
     'prod-1794389675927-gigncq',
     'shirt',
+    'prod-1794464298801-cndqf7',
+    'jacket',
+    'prod-1794464476776-vr9k5t',
+    'bottom',
+    'prod-1794464650216-3k9ojn',
+    'hoodies',
+    'prod-1794464817660-blsq8w',
+    'sweatshirt',
+    'prod-1794465268161-1nohnt',
+    'nxtive-fear-series-02-sweatshirt',
+    'prod-1794466330846-os9a26',
     'relaxed-shirt',
     'dem',
     'prod-1793939922857-2s6mie',
@@ -227,6 +239,11 @@ async function prerenderDynamicRoutes() {
         saveFile(path.join(HOSTING_DIR, 'products', slug, 'index.rsc'), rscRes.body);
       }
       console.log(`  ✓ /products/${slug} (${htmlRes.statusCode})`);
+      // Use the first valid product HTML as fallback.html for any unprerendered product dynamic routes
+      const fallbackHtmlPath = path.join(HOSTING_DIR, 'products', 'fallback.html');
+      if (!fs.existsSync(fallbackHtmlPath) && htmlRes.body) {
+        saveFile(fallbackHtmlPath, htmlRes.body);
+      }
     } catch (err) {
       console.warn(`  ✗ Failed to prerender /products/${slug}:`, err.message);
     }

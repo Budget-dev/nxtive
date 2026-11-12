@@ -179,13 +179,16 @@ async function readActiveDocuments<T>(
   collectionName: string,
   normalize: (id: string, data: Record<string, unknown>) => T | null
 ): Promise<T[]> {
-  // 1. Ultra-fast direct REST read (bypasses Node.js client SDK timeout during SSR & works everywhere)
+  // 1. Direct REST read with fast timeout for SSR and static build
   try {
     const apiKey = firebaseConfig.apiKey;
     const projectId = firebaseConfig.projectId;
     if (apiKey && projectId) {
-      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}?pageSize=300&key=${apiKey}`;
-      const res = await fetch(url, { next: { revalidate: 60 } } as RequestInit);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}?pageSize=100&key=${apiKey}`;
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
       if (res.ok) {
         const json = await res.json();
         const docs = json.documents || [];
@@ -201,20 +204,24 @@ async function readActiveDocuments<T>(
       }
     }
   } catch {
-    // Fall through to Client SDK
+    // REST failed or timed out
   }
 
-  // 2. Client SDK fallback
-  try {
-    const col = collection(db, collectionName);
-    const snapshot = await getDocs(col);
-    const docs = snapshot.docs as CatalogDoc[];
-    return docs
-      .map((docSnap) => normalize(docSnap.id, docSnap.data()))
-      .filter((row): row is T => row !== null);
-  } catch {
-    return [];
+  // 2. Client SDK fallback (browser only; skip in Node/SSR to prevent hanging static page generation)
+  if (typeof window !== "undefined") {
+    try {
+      const col = collection(db, collectionName);
+      const snapshot = await getDocs(col);
+      const docs = snapshot.docs as CatalogDoc[];
+      return docs
+        .map((docSnap) => normalize(docSnap.id, docSnap.data()))
+        .filter((row): row is T => row !== null);
+    } catch {
+      return [];
+    }
   }
+
+  return [];
 }
 
 export const DEFAULT_CATEGORIES: Category[] = [

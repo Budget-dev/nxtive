@@ -1,34 +1,17 @@
-import { defineSecret } from "firebase-functions/params";
-
-// Firebase Cloud Functions v2 Secrets
-export const razorpayKeyIdSecret = defineSecret("RAZORPAY_KEY_ID");
-export const razorpayKeySecret = defineSecret("RAZORPAY_KEY_SECRET");
-export const razorpayWebhookSecret = defineSecret("RAZORPAY_WEBHOOK_SECRET");
+// Configuration for NXTIVE Razorpay payment gateway
 
 /**
  * Helper to safely resolve secret values across Cloud Functions v2 runtime
  * and local emulator / test environments.
  */
 export function getRazorpayKeyId(): string {
-  try {
-    return razorpayKeyIdSecret.value() || process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
-  } catch {
-    return process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
-  }
+  return process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_TzBTAqPKFWxzK4";
 }
 
 export function getRazorpayKeySecret(): string {
-  try {
-    return razorpayKeySecret.value() || process.env.RAZORPAY_KEY_SECRET || "";
-  } catch {
-    return process.env.RAZORPAY_KEY_SECRET || "";
-  }
+  return process.env.RAZORPAY_KEY_SECRET || "fb5ek2WRhKm0DlPL1DFmF4zB";
 }
 
 export function getRazorpayWebhookSecret(): string {
-  try {
-    return razorpayWebhookSecret.value() || process.env.RAZORPAY_WEBHOOK_SECRET || "";
-  } catch {
-    return process.env.RAZORPAY_WEBHOOK_SECRET || "";
-  }
+  return process.env.RAZORPAY_WEBHOOK_SECRET || "fb5ek2WRhKm0DlPL1DFmF4zB";
 }

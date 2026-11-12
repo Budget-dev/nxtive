@@ -282,6 +282,11 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
+        <Script
+          id="razorpay-sdk-global"
+          src="https://checkout.razorpay.com/v1/checkout.js"
+          strategy="afterInteractive"
+        />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

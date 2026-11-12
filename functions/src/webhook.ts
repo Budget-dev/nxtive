@@ -1,11 +1,9 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { razorpayWebhookSecret, razorpayKeyIdSecret, razorpayKeySecret } from "./config";
 import { verifyWebhookSignature } from "./razorpay";
 
 export const razorpayWebhook = onRequest(
   {
-    secrets: [razorpayWebhookSecret, razorpayKeyIdSecret, razorpayKeySecret],
     cors: false,
   },
   async (req, res) => {
