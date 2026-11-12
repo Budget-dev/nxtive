@@ -32,6 +32,7 @@ interface OrderDetailManagerProps {
 const ALL_STATUSES: OrderStatus[] = [
   "pending",
   "payment_confirmed",
+  "paid",
   "processing",
   "packed",
   "shipped",

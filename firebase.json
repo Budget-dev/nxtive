@@ -155,6 +155,18 @@
         "destination": "/admin/products/edit.html"
       },
       {
+        "source": "/admin/orders/**/invoice",
+        "destination": "/admin/orders/detail/invoice.html"
+      },
+      {
+        "source": "/admin/orders/**",
+        "destination": "/admin/orders/detail.html"
+      },
+      {
+        "source": "/admin/customers/**",
+        "destination": "/admin/customers/detail.html"
+      },
+      {
         "source": "/admin/**",
         "destination": "/admin/dashboard.html"
       },

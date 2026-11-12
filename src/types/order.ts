@@ -3,6 +3,10 @@
 export type OrderStatus =
   | "pending"
   | "payment_confirmed"
+  | "paid"
+  | "created"
+  | "failed"
+  | "verification_failed"
   | "processing"
   | "packed"
   | "shipped"

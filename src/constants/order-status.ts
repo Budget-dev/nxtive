@@ -6,6 +6,10 @@ import type { ShipmentStatus } from "@/types/delivery";
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: "Order Placed",
   payment_confirmed: "Payment Confirmed",
+  paid: "Paid & Confirmed",
+  created: "Order Created",
+  failed: "Payment Failed",
+  verification_failed: "Verification Failed",
   processing: "Processing",
   packed: "Packed",
   shipped: "Shipped",
@@ -21,6 +25,10 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   pending: "#D97706",
   payment_confirmed: "#2563EB",
+  paid: "#16A34A",
+  created: "#9CA3AF",
+  failed: "#DC2626",
+  verification_failed: "#B91C1C",
   processing: "#7C3AED",
   packed: "#6D28D9",
   shipped: "#0891B2",
@@ -35,8 +43,12 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
 
 /** Valid next statuses from any given status (admin transitions) */
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ["payment_confirmed", "processing", "packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
+  pending: ["payment_confirmed", "paid", "processing", "packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
   payment_confirmed: ["processing", "packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
+  paid: ["processing", "packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
+  created: ["pending", "payment_confirmed", "paid", "failed", "cancelled"],
+  failed: ["pending", "cancelled"],
+  verification_failed: ["pending", "paid", "cancelled"],
   processing: ["packed", "shipped", "out_for_delivery", "delivered", "cancelled"],
   packed: ["shipped", "out_for_delivery", "delivered", "cancelled"],
   shipped: ["out_for_delivery", "delivered", "cancelled"],

@@ -271,6 +271,33 @@ async function prerenderDynamicRoutes() {
     }
   }
 
+  console.log(`Prerendering admin dynamic routes...`);
+  const adminRoutes = [
+    { url: `http://localhost:${PRERENDER_PORT}/admin/orders/detail`, rel: path.join('admin', 'orders', 'detail') },
+    { url: `http://localhost:${PRERENDER_PORT}/admin/orders/detail/invoice`, rel: path.join('admin', 'orders', 'detail', 'invoice') },
+    { url: `http://localhost:${PRERENDER_PORT}/admin/customers/detail`, rel: path.join('admin', 'customers', 'detail') },
+  ];
+
+  for (const route of adminRoutes) {
+    try {
+      const [htmlRes, rscRes] = await Promise.all([
+        fetchUrl(route.url),
+        fetchUrl(route.url, { RSC: '1' }),
+      ]);
+      if (htmlRes.statusCode === 200 && htmlRes.body) {
+        saveFile(path.join(HOSTING_DIR, `${route.rel}.html`), htmlRes.body);
+        saveFile(path.join(HOSTING_DIR, route.rel, 'index.html'), htmlRes.body);
+      }
+      if (rscRes.statusCode === 200 && rscRes.body) {
+        saveFile(path.join(HOSTING_DIR, `${route.rel}.rsc`), rscRes.body);
+        saveFile(path.join(HOSTING_DIR, route.rel, 'index.rsc'), rscRes.body);
+      }
+      console.log(`  ✓ ${route.url} (${htmlRes.statusCode})`);
+    } catch (err) {
+      console.warn(`  ✗ Failed to prerender ${route.url}:`, err.message);
+    }
+  }
+
   console.log(`Prerendering storefront orders routes...`);
   const orderRoutes = [
     { url: `http://localhost:${PRERENDER_PORT}/orders/track`, rel: path.join('orders', 'track') },

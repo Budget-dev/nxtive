@@ -832,7 +832,16 @@ export async function updateOrderStatus(
     order = all.find((o) => o.orderNumber === orderId || o.id === orderId) || null;
   }
   if (!order) return { success: false, error: "Order not found" };
-  const allowed = ORDER_STATUS_TRANSITIONS[order.status] || [];
+  const allowed = ORDER_STATUS_TRANSITIONS[order.status] || [
+    "payment_confirmed",
+    "paid",
+    "processing",
+    "packed",
+    "shipped",
+    "out_for_delivery",
+    "delivered",
+    "cancelled",
+  ];
   if (!allowed.includes(newStatus) && newStatus !== order.status) {
     return { success: false, error: `Invalid transition from "${order.status}" to "${newStatus}".` };
   }
