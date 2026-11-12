@@ -15,6 +15,7 @@ import {
   X,
   User,
   CheckCircle2,
+  Edit3,
 } from "lucide-react";
 import { useStore, normalizeOrder } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
@@ -81,6 +82,58 @@ export default function CheckoutPage() {
   const [failedOrderId, setFailedOrderId] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+
+  // 3-Screen Checkout Workflow State (1: Personal Info, 2: Address, 3: Payment & Review)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  const validateStep1 = (): boolean => {
+    setOrderError(null);
+    if (!firstName.trim() || !lastName.trim()) {
+      setOrderError("Please enter both your first and last name.");
+      return false;
+    }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setOrderError("Please enter a valid email address.");
+      return false;
+    }
+    const cleanPhoneDigits = phone.replace(/\D/g, "");
+    if (cleanPhoneDigits.length < 10) {
+      setOrderError("Please enter a valid 10-digit mobile number for order and delivery SMS.");
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep2 = (): boolean => {
+    setOrderError(null);
+    if (!street.trim()) {
+      setOrderError("Please enter your street address / building name.");
+      return false;
+    }
+    if (!city.trim()) {
+      setOrderError("Please enter your city.");
+      return false;
+    }
+    const cleanPin = postalCode.replace(/\D/g, "");
+    if (cleanPin.length !== 6) {
+      setOrderError("Please enter a valid 6-digit PIN code.");
+      return false;
+    }
+    return true;
+  };
+
+  const goToStep = (step: 1 | 2 | 3) => {
+    if (step === 2) {
+      if (!validateStep1()) return;
+    } else if (step === 3) {
+      if (!validateStep1() || !validateStep2()) return;
+    }
+    setOrderError(null);
+    setCurrentStep(step);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   // Auth popup modal states
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -247,15 +300,13 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!email.trim() || !phone.trim() || !firstName.trim() || !lastName.trim() || !street.trim() || !city.trim() || !postalCode.trim()) {
-      setOrderError("Please fill in all required shipping and contact fields.");
-      const shippingSec = document.getElementById("shipping-section");
-      if (shippingSec) shippingSec.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!validateStep1()) {
+      setCurrentStep(1);
       return;
     }
 
-    if (!/^\d{6}$/.test(postalCode.trim())) {
-      setOrderError("Please enter a valid 6-digit PIN code.");
+    if (!validateStep2()) {
+      setCurrentStep(2);
       return;
     }
 
@@ -270,6 +321,9 @@ export default function CheckoutPage() {
       }
     }
 
+    const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+    const cleanPostal = postalCode.replace(/\D/g, "").slice(0, 6);
+
     const res = await initiatePayment({
       items: cart.map((item) => ({
         id: item.id,
@@ -282,13 +336,13 @@ export default function CheckoutPage() {
       })),
       shippingAddress: {
         fullName: `${firstName} ${lastName}`.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
+        email: email.trim().toLowerCase(),
+        phone: cleanPhone,
         street: street.trim(),
         apartment: apartment.trim(),
         city: city.trim(),
         state: state.trim(),
-        postalCode: postalCode.trim(),
+        postalCode: cleanPostal,
         country: "India",
       },
       deliveryMethod: "standard",
@@ -402,89 +456,396 @@ export default function CheckoutPage() {
       <div className="container" style={{ paddingTop: "36px" }}>
         <div className="checkout-form-shell">
           <div className="checkout-grid">
-            {/* Left: Checkout Steps (Delivery Method Card completely removed) */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
-              {/* 1. Contact Information */}
-              <div className="checkout-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", flexWrap: "wrap", gap: "8px" }}>
-                  <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: 0 }}>
-                    1. Contact Information
-                  </h2>
-                  {!user ? (
+            {/* Left: 3-Screen Step Checkout Flow */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              {/* 3-Step Breadcrumb Progress Bar */}
+              <div
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: "14px",
+                  padding: "16px 20px",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
+                  {/* Step 1 Indicator */}
+                  <button
+                    type="button"
+                    onClick={() => goToStep(1)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      borderRadius: "8px",
+                      backgroundColor: currentStep === 1 ? "rgba(17,17,16,0.06)" : "transparent",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        backgroundColor: currentStep === 1 ? "#111110" : currentStep > 1 ? "#2B9348" : "#E5E0D8",
+                        color: currentStep === 1 || currentStep > 1 ? "#FFFFFF" : "#777",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {currentStep > 1 ? <CheckCircle2 size={16} /> : "1"}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
+                        Step 1
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: currentStep === 1 ? 800 : 600, color: currentStep === 1 ? "#111110" : "#555" }}>
+                        Personal Info
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Divider line 1-2 */}
+                  <div style={{ flex: 1, height: "2px", margin: "0 10px", backgroundColor: currentStep >= 2 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
+
+                  {/* Step 2 Indicator */}
+                  <button
+                    type="button"
+                    onClick={() => goToStep(2)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      borderRadius: "8px",
+                      backgroundColor: currentStep === 2 ? "rgba(17,17,16,0.06)" : "transparent",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        backgroundColor: currentStep === 2 ? "#111110" : currentStep > 2 ? "#2B9348" : "#E5E0D8",
+                        color: currentStep === 2 || currentStep > 2 ? "#FFFFFF" : "#777",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {currentStep > 2 ? <CheckCircle2 size={16} /> : "2"}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
+                        Step 2
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: currentStep === 2 ? 800 : 600, color: currentStep === 2 ? "#111110" : "#555" }}>
+                        Shipping Address
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Divider line 2-3 */}
+                  <div style={{ flex: 1, height: "2px", margin: "0 10px", backgroundColor: currentStep >= 3 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
+
+                  {/* Step 3 Indicator */}
+                  <button
+                    type="button"
+                    onClick={() => goToStep(3)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      borderRadius: "8px",
+                      backgroundColor: currentStep === 3 ? "rgba(17,17,16,0.06)" : "transparent",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        backgroundColor: currentStep === 3 ? "#111110" : "#E5E0D8",
+                        color: currentStep === 3 ? "#FFFFFF" : "#777",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        flexShrink: 0,
+                      }}
+                    >
+                      3
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
+                        Step 3
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: currentStep === 3 ? 800 : 600, color: currentStep === 3 ? "#111110" : "#555" }}>
+                        Payment & Review
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* ─── SCREEN 1: PERSONAL INFORMATION ─── */}
+              {currentStep === 1 && (
+                <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "16px" }}>
+                    <div>
+                      <h2 style={{ fontSize: "18px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: "0 0 4px 0" }}>
+                        1. Personal Details
+                      </h2>
+                      <p style={{ fontSize: "13px", color: "#666", margin: 0, lineHeight: 1.4 }}>
+                        Enter your contact details for order status, tracking updates, and delivery SMS.
+                      </p>
+                    </div>
+                    {!user ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthModal(true)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          fontSize: "12.5px",
+                          fontWeight: 700,
+                          color: "#111110",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                          padding: "4px 0",
+                        }}
+                      >
+                        Sign In / Register
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: "12px", color: "#2B9348", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                        <CheckCircle2 size={13} /> Signed in as {user.displayName || user.email}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <div className="responsive-form-grid-2">
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          First Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={firstName}
+                          onChange={(e) => {
+                            setFirstName(e.target.value);
+                            if (orderError) setOrderError(null);
+                          }}
+                          placeholder="e.g. Rahul"
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(0,0,0,0.15)",
+                            fontSize: "15px",
+                            outline: "none",
+                            backgroundColor: "#FFFFFF",
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          Last Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={lastName}
+                          onChange={(e) => {
+                            setLastName(e.target.value);
+                            if (orderError) setOrderError(null);
+                          }}
+                          placeholder="e.g. Sharma"
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(0,0,0,0.15)",
+                            fontSize: "15px",
+                            outline: "none",
+                            backgroundColor: "#FFFFFF",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="responsive-form-grid-2">
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (orderError) setOrderError(null);
+                          }}
+                          placeholder="rahul@example.com"
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(0,0,0,0.15)",
+                            fontSize: "15px",
+                            outline: "none",
+                            backgroundColor: "#FFFFFF",
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          Mobile Phone (10 digits for delivery) *
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={phone}
+                          onChange={(e) => {
+                            // Strip invalid characters dynamically to prevent any pattern mismatches
+                            const cleaned = e.target.value.replace(/[^\d+ ]/g, "").slice(0, 15);
+                            setPhone(cleaned);
+                            if (orderError) setOrderError(null);
+                          }}
+                          placeholder="9876543210"
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(0,0,0,0.15)",
+                            fontSize: "15px",
+                            outline: "none",
+                            backgroundColor: "#FFFFFF",
+                          }}
+                        />
+                        <span style={{ fontSize: "11px", color: "#777", display: "block", marginTop: "4px" }}>
+                          Used for Shiprocket dispatch alerts and courier delivery OTP.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Screen 1 Footer Actions */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "18px", borderTop: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap", gap: "12px" }}>
+                    <Link
+                      href="/cart"
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#555",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <ArrowLeft size={14} />
+                      <span>Return to Bag</span>
+                    </Link>
+
                     <button
                       type="button"
-                      onClick={() => setShowAuthModal(true)}
+                      onClick={() => goToStep(2)}
+                      style={{
+                        padding: "13px 28px",
+                        borderRadius: "9999px",
+                        backgroundColor: "#111110",
+                        color: "#FFFFFF",
+                        fontSize: "13.5px",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      <span>Continue to Shipping Address</span>
+                      <ArrowRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── SCREEN 2: SHIPPING ADDRESS ─── */}
+              {currentStep === 2 && (
+                <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                  {/* Personal info summary strip */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      backgroundColor: "#F9F8F5",
+                      border: "1px solid rgba(0,0,0,0.06)",
+                      fontSize: "12.5px",
+                      color: "#444",
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontWeight: 700, color: "#111110" }}>Contact: </span>
+                      <span>{firstName} {lastName} • {phone} • {email}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => goToStep(1)}
                       style={{
                         background: "none",
                         border: "none",
-                        fontSize: "12.5px",
-                        fontWeight: 700,
                         color: "#111110",
+                        fontSize: "12px",
+                        fontWeight: 700,
                         textDecoration: "underline",
                         cursor: "pointer",
                       }}
                     >
-                      Sign In / Register
+                      Edit
                     </button>
-                  ) : (
-                    <span style={{ fontSize: "12px", color: "#2B9348", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
-                      <CheckCircle2 size={13} /> Signed in as {user.displayName || user.email}
-                    </span>
-                  )}
-                </div>
-
-                <div className="responsive-form-grid-2">
-                  <div>
-                    <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      style={{
-                        width: "100%",
-                        padding: "11px 14px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(0,0,0,0.15)",
-                        fontSize: "16px",
-                        outline: "none",
-                      }}
-                    />
                   </div>
 
-                  <div>
-                    <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                      Mobile Phone (for delivery SMS) *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      style={{
-                        width: "100%",
-                        padding: "11px 14px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(0,0,0,0.15)",
-                        fontSize: "16px",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "16px" }}>
+                    <div>
+                      <h2 style={{ fontSize: "18px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: "0 0 4px 0" }}>
+                        2. Shipping Address
+                      </h2>
+                      <p style={{ fontSize: "13px", color: "#666", margin: 0, lineHeight: 1.4 }}>
+                        Free insured domestic courier delivery across India (3-5 business days).
+                      </p>
+                    </div>
 
-              {/* 2. Shipping Address */}
-              <div className="checkout-card">
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "18px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: 0 }}>
-                      2. Shipping Address
-                    </h2>
                     <button
                       type="button"
                       onClick={fillFromCurrentLocation}
@@ -495,7 +856,6 @@ export default function CheckoutPage() {
                         justifyContent: "center",
                         gap: "6px",
                         minHeight: "36px",
-                        minWidth: "140px",
                         padding: "6px 14px",
                         borderRadius: "9999px",
                         border: "1px solid rgba(17,17,16,0.16)",
@@ -520,228 +880,376 @@ export default function CheckoutPage() {
                       )}
                     </button>
                   </div>
-                  <p style={{ fontSize: "12px", color: "#777", margin: 0, lineHeight: 1.45 }}>
-                    Free insured domestic delivery dispatched via express courier (3-5 business days).
-                  </p>
+
                   {locationMessage && (
                     <div
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
                         gap: "6px",
-                        marginTop: "4px",
-                        padding: "6px 10px",
+                        padding: "8px 12px",
                         borderRadius: "6px",
                         backgroundColor: locationMessage.includes("auto-filled") ? "rgba(43,147,72,0.08)" : "rgba(180,83,9,0.08)",
                         color: locationMessage.includes("auto-filled") ? "#2B9348" : "#B45309",
                         fontSize: "12px",
                         fontWeight: 600,
-                        lineHeight: 1.3,
                       }}
                     >
                       <MapPin size={13} style={{ flexShrink: 0 }} />
                       <span>{locationMessage}</span>
                     </div>
                   )}
-                </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  <div className="responsive-form-grid-2">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                     <div>
                       <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        First Name *
+                        Street Address *
                       </label>
                       <input
                         type="text"
                         required
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        placeholder="First name"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        Last Name *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        placeholder="Last name"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                      Street Address *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={street}
-                      onChange={(e) => setStreet(e.target.value)}
-                      placeholder="House / Flat #, Building Name, Street"
-                      style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
-                    />
-                  </div>
-
-                  <div className="responsive-form-grid-2">
-                    <div>
-                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        Apartment, suite, unit (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={apartment}
-                        onChange={(e) => setApartment(e.target.value)}
-                        placeholder="Flat 402, Wing B"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        placeholder="Mumbai"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="responsive-form-grid-3">
-                    <div>
-                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        State *
-                      </label>
-                      <select
-                        value={state}
-                        onChange={(e) => setState(e.target.value)}
-                        style={{ width: "100%", padding: "11px 10px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none", backgroundColor: "#FFFFFF" }}
-                      >
-                        {INDIAN_STATES.map((st) => (
-                          <option key={st} value={st}>
-                            {st}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        PIN Code *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
-                        placeholder="400050"
-                        maxLength={6}
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "16px", outline: "none" }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        Country
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value="India"
-                        style={{ width: "100%", padding: "11px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.1)", fontSize: "16px", backgroundColor: "#F7F5F0", color: "#555" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Payment Method */}
-              <div className="checkout-card" id="payment-section">
-                <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", marginBottom: "18px" }}>
-                  3. Payment Method
-                </h2>
-
-                <div
-                  style={{
-                    borderRadius: "12px",
-                    border: "2px solid #111110",
-                    backgroundColor: "#FAF9F6",
-                    overflow: "hidden",
-                    padding: "20px",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-                    <div style={{ display: "flex", gap: "14px" }}>
-                      <div
-                        style={{
-                          width: "40px",
-                          height: "40px",
-                          borderRadius: "10px",
-                          backgroundColor: "#111110",
-                          color: "#FFFFFF",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
+                        value={street}
+                        onChange={(e) => {
+                          setStreet(e.target.value);
+                          if (orderError) setOrderError(null);
                         }}
-                      >
-                        <ShieldCheck size={22} />
+                        placeholder="House / Flat #, Building Name, Street, Landmark"
+                        style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                      />
+                    </div>
+
+                    <div className="responsive-form-grid-2">
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          Apartment, suite, unit (optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={apartment}
+                          onChange={(e) => setApartment(e.target.value)}
+                          placeholder="Flat 402, Wing B"
+                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                        />
                       </div>
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
-                            Razorpay Secure Checkout
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              color: "#2B9348",
-                              backgroundColor: "#DCFCE7",
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                            }}
-                          >
-                            100% Secure &amp; Verified
-                          </span>
-                        </div>
-                        <p style={{ fontSize: "13px", color: "#666", marginTop: "6px", marginBottom: "12px", lineHeight: "1.5" }}>
-                          Pay securely with UPI (Google Pay, Paytm, BHIM, Cred), Credit/Debit Cards (Visa, Mastercard, RuPay), NetBanking, and Wallets.
-                        </p>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                            UPI / QR
-                          </span>
-                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                            Credit &amp; Debit Cards
-                          </span>
-                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                            NetBanking (50+ Banks)
-                          </span>
-                          <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                            Wallets
-                          </span>
-                        </div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          City *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={city}
+                          onChange={(e) => {
+                            setCity(e.target.value);
+                            if (orderError) setOrderError(null);
+                          }}
+                          placeholder="Mumbai"
+                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="responsive-form-grid-3">
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          State *
+                        </label>
+                        <select
+                          value={state}
+                          onChange={(e) => setState(e.target.value)}
+                          style={{ width: "100%", padding: "12px 10px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                        >
+                          {INDIAN_STATES.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          PIN Code *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={postalCode}
+                          onChange={(e) => {
+                            // Restrict to 6 digits cleanly
+                            const pinClean = e.target.value.replace(/\D/g, "").slice(0, 6);
+                            setPostalCode(pinClean);
+                            if (orderError) setOrderError(null);
+                          }}
+                          placeholder="400050"
+                          maxLength={6}
+                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                          Country
+                        </label>
+                        <input
+                          type="text"
+                          disabled
+                          value="India"
+                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.1)", fontSize: "15px", backgroundColor: "#F7F5F0", color: "#555" }}
+                        />
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#666" }}>
-                    <Lock size={13} color="#2B9348" />
-                    <span>Instant order confirmation with express dispatch upon payment completion.</span>
+                  {/* Screen 2 Footer Actions */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "18px", borderTop: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap", gap: "12px" }}>
+                    <button
+                      type="button"
+                      onClick={() => goToStep(1)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#555",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        cursor: "pointer",
+                        padding: "8px 0",
+                      }}
+                    >
+                      <ArrowLeft size={14} />
+                      <span>Back to Personal Details</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => goToStep(3)}
+                      style={{
+                        padding: "13px 28px",
+                        borderRadius: "9999px",
+                        backgroundColor: "#111110",
+                        color: "#FFFFFF",
+                        fontSize: "13.5px",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      <span>Continue to Payment & Review</span>
+                      <ArrowRight size={15} />
+                    </button>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* ─── SCREEN 3: PAYMENT & ORDER REVIEW ─── */}
+              {currentStep === 3 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                  {/* Order Details Review Recap Card */}
+                  <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: 0, paddingBottom: "10px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+                      Review Delivery Details
+                    </h2>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" }}>
+                      {/* Customer Card */}
+                      <div style={{ padding: "14px", borderRadius: "10px", backgroundColor: "#F9F8F5", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#888", letterSpacing: "0.06em" }}>
+                            Recipient Contact
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => goToStep(1)}
+                            style={{ background: "none", border: "none", color: "#111110", fontSize: "12px", fontWeight: 700, textDecoration: "underline", cursor: "pointer", display: "flex", alignItems: "center", gap: "3px" }}
+                          >
+                            <Edit3 size={11} />
+                            <span>Edit</span>
+                          </button>
+                        </div>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
+                          {firstName} {lastName}
+                        </div>
+                        <div style={{ fontSize: "12.5px", color: "#555", lineHeight: 1.4 }}>
+                          {email}<br />
+                          {phone}
+                        </div>
+                      </div>
+
+                      {/* Address Card */}
+                      <div style={{ padding: "14px", borderRadius: "10px", backgroundColor: "#F9F8F5", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#888", letterSpacing: "0.06em" }}>
+                            Delivery Destination
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => goToStep(2)}
+                            style={{ background: "none", border: "none", color: "#111110", fontSize: "12px", fontWeight: 700, textDecoration: "underline", cursor: "pointer", display: "flex", alignItems: "center", gap: "3px" }}
+                          >
+                            <Edit3 size={11} />
+                            <span>Edit</span>
+                          </button>
+                        </div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#111110", marginBottom: "2px" }}>
+                          {street}
+                        </div>
+                        <div style={{ fontSize: "12.5px", color: "#555", lineHeight: 1.4 }}>
+                          {apartment ? `${apartment}, ` : ""}{city}, {state} - {postalCode}<br />
+                          India
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#2B9348", fontWeight: 600, padding: "8px 12px", borderRadius: "6px", backgroundColor: "rgba(43,147,72,0.08)" }}>
+                      <Truck size={14} />
+                      <span>Free Insured Express Logistics (3-5 Business Days Delivery)</span>
+                    </div>
+                  </div>
+
+                  {/* Payment Gateway Option Card */}
+                  <div className="checkout-card" id="payment-section">
+                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", marginBottom: "18px" }}>
+                      3. Select Payment Gateway
+                    </h2>
+
+                    <div
+                      style={{
+                        borderRadius: "12px",
+                        border: "2px solid #111110",
+                        backgroundColor: "#FAF9F6",
+                        overflow: "hidden",
+                        padding: "20px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: "14px" }}>
+                          <div
+                            style={{
+                              width: "42px",
+                              height: "42px",
+                              borderRadius: "10px",
+                              backgroundColor: "#111110",
+                              color: "#FFFFFF",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <ShieldCheck size={24} />
+                          </div>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                              <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
+                                Razorpay Standard Checkout
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  color: "#2B9348",
+                                  backgroundColor: "#DCFCE7",
+                                  padding: "2px 8px",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                100% Secure &amp; Verified
+                              </span>
+                            </div>
+                            <p style={{ fontSize: "13px", color: "#666", marginTop: "6px", marginBottom: "12px", lineHeight: "1.5" }}>
+                              Pay instantly with UPI (Google Pay, PhonePe, Paytm, BHIM, Cred), Credit/Debit Cards (Visa, Mastercard, RuPay), NetBanking, and Wallets.
+                            </p>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                                UPI / QR
+                              </span>
+                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                                Credit &amp; Debit Cards
+                              </span>
+                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                                NetBanking (50+ Banks)
+                              </span>
+                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
+                                Wallets
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#666" }}>
+                        <Lock size={13} color="#2B9348" />
+                        <span>Instant order synchronization & confirmation with express dispatch upon payment completion.</span>
+                      </div>
+                    </div>
+
+                    {/* Step 3 Footer Actions */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "18px", paddingTop: "18px", borderTop: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap", gap: "12px" }}>
+                      <button
+                        type="button"
+                        onClick={() => goToStep(2)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#555",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          cursor: "pointer",
+                          padding: "8px 0",
+                        }}
+                      >
+                        <ArrowLeft size={14} />
+                        <span>Back to Shipping Address</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleRazorpayCheckout}
+                        disabled={razorpayLoading}
+                        style={{
+                          padding: "14px 32px",
+                          borderRadius: "9999px",
+                          backgroundColor: "#111110",
+                          color: "#FFFFFF",
+                          fontSize: "14px",
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          border: "none",
+                          cursor: razorpayLoading ? "not-allowed" : "pointer",
+                          opacity: razorpayLoading ? 0.7 : 1,
+                          boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        {razorpayLoading ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Opening Payment Gateway...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={14} />
+                            <span>Pay ₹{finalTotal.toLocaleString("en-IN")} via Razorpay</span>
+                            <ArrowRight size={15} />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right: Sticky Order Summary */}
@@ -856,7 +1364,7 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
-                {/* Submit Order Action Button */}
+                {/* Submit Order Action Button based on active step */}
                 {!user ? (
                   <button
                     type="button"
@@ -880,6 +1388,56 @@ export default function CheckoutPage() {
                     }}
                   >
                     <span>Sign In to Place Order</span>
+                    <ArrowRight size={16} />
+                  </button>
+                ) : currentStep === 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => goToStep(2)}
+                    style={{
+                      width: "100%",
+                      padding: "15px 24px",
+                      borderRadius: "9999px",
+                      backgroundColor: "#111110",
+                      color: "#FFFFFF",
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      letterSpacing: "0.02em",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                      border: "none",
+                    }}
+                  >
+                    <span>Continue to Shipping Address</span>
+                    <ArrowRight size={16} />
+                  </button>
+                ) : currentStep === 2 ? (
+                  <button
+                    type="button"
+                    onClick={() => goToStep(3)}
+                    style={{
+                      width: "100%",
+                      padding: "15px 24px",
+                      borderRadius: "9999px",
+                      backgroundColor: "#111110",
+                      color: "#FFFFFF",
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      letterSpacing: "0.02em",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                      border: "none",
+                    }}
+                  >
+                    <span>Continue to Payment & Review</span>
                     <ArrowRight size={16} />
                   </button>
                 ) : (

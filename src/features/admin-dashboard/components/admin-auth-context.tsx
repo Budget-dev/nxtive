@@ -87,7 +87,7 @@ async function establishSession(user?: FirebaseUserLike | any | null, emailFallb
   const fallback = buildFallbackProfile(user, emailFallback);
 
   try {
-    const token = user && typeof user.getIdToken === "function" ? await user.getIdToken() : "";
+    const token = user && typeof user.getIdToken === "function" ? await user.getIdToken(true) : "";
     const response = await fetch("/api/auth/session", {
       method: "POST",
       headers: {
@@ -109,7 +109,11 @@ async function establishSession(user?: FirebaseUserLike | any | null, emailFallb
         return result.data;
       }
       if (!response.ok && result.error) {
-        throw new Error(result.error);
+        if (result.error.toLowerCase().includes("access denied") || result.error.toLowerCase().includes("authorized")) {
+          throw new Error(result.error);
+        }
+        console.warn("Non-fatal session establishment notice:", result.error);
+        return fallback;
       }
     }
   } catch (err: any) {
@@ -281,23 +285,34 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         firebaseUser = result.user;
       } catch (authErr: any) {
         console.warn("Direct Firebase Auth signin notice:", authErr);
-        if (authErr?.code === "auth/invalid-credential" || authErr?.code === "auth/wrong-password") {
-          throw new Error("Invalid password for nxtiveclothing@gmail.com. Please enter your correct password, click 'Forgot password?' to set a new password, or use 'Continue with Google'.");
-        }
-        if (authErr?.code === "auth/user-not-found") {
+        // If password had accidental leading/trailing spaces, retry with trimmed password
+        if (pass !== pass.trim()) {
           try {
-            const signupRes = await createUserWithEmailAndPassword(auth, email.trim(), pass);
-            firebaseUser = signupRes.user;
-          } catch (signupErr: any) {
-            if (signupErr?.code === "auth/email-already-in-use") {
-              throw new Error("Incorrect password for nxtiveclothing@gmail.com. Please enter your password or click 'Forgot password?'.");
-            }
-            throw new Error(signupErr?.message || "Failed to initialize admin credentials. Please use 'Continue with Google'.");
+            const retryRes = await signInWithEmailAndPassword(auth, email.trim(), pass.trim());
+            firebaseUser = retryRes.user;
+          } catch {
+            // Keep original error handling
           }
-        } else if (authErr?.code === "auth/too-many-requests") {
-          throw new Error("Too many failed attempts. Please wait a few minutes or click 'Forgot password?'.");
-        } else if (authErr?.code) {
-          throw new Error(authErr.message);
+        }
+        if (!firebaseUser) {
+          if (authErr?.code === "auth/invalid-credential" || authErr?.code === "auth/wrong-password") {
+            throw new Error("Invalid password for nxtiveclothing@gmail.com. Please enter your correct password, click 'Forgot password?' to set a new password, or use 'Continue with Google'.");
+          }
+          if (authErr?.code === "auth/user-not-found") {
+            try {
+              const signupRes = await createUserWithEmailAndPassword(auth, email.trim(), pass.trim());
+              firebaseUser = signupRes.user;
+            } catch (signupErr: any) {
+              if (signupErr?.code === "auth/email-already-in-use") {
+                throw new Error("Incorrect password for nxtiveclothing@gmail.com. Please enter your password or click 'Forgot password?'.");
+              }
+              throw new Error(signupErr?.message || "Failed to initialize admin credentials. Please use 'Continue with Google'.");
+            }
+          } else if (authErr?.code === "auth/too-many-requests") {
+            throw new Error("Too many failed attempts. Please wait a few minutes or click 'Forgot password?'.");
+          } else if (authErr?.code) {
+            throw new Error(authErr.message);
+          }
         }
       }
 

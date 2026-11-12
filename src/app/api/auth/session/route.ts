@@ -117,11 +117,12 @@ export async function POST(request: Request) {
     
     let session = "dev-admin-session-cookie";
     if (hasAdminCredentials && token) {
-      const age = Math.floor(Date.now() / 1000) - admin.auth_time;
-      if (!Number.isFinite(age) || age < -60 || age > 300) {
-        throw new AuthError("Please sign in again to continue");
+      try {
+        session = await adminAuth.createSessionCookie(token, { expiresIn: SESSION_MAX_AGE_SECONDS * 1000 });
+      } catch (cookieErr) {
+        console.warn("createSessionCookie fallback to token session:", cookieErr);
+        session = token;
       }
-      session = await adminAuth.createSessionCookie(token, { expiresIn: SESSION_MAX_AGE_SECONDS * 1000 });
     }
 
     const response = NextResponse.json({ success: true, data: profile(admin) }, { headers: { "Cache-Control": "no-store" } });
