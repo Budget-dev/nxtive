@@ -167,24 +167,30 @@ function loadRazorpayScript(): Promise<boolean> {
       resolve(true);
       return;
     }
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
-    );
-    if (existingScript) {
+    const existing = document.getElementById("razorpay-checkout-script") as HTMLScriptElement | null;
+    if (existing) {
       if (window.Razorpay) {
         resolve(true);
-      } else {
-        existingScript.addEventListener("load", () => resolve(true), { once: true });
-        existingScript.addEventListener("error", () => resolve(false), { once: true });
+        return;
       }
+      existing.addEventListener("load", () => resolve(true), { once: true });
+      existing.addEventListener("error", () => resolve(false), { once: true });
+      setTimeout(() => resolve(!!window.Razorpay), 1200);
       return;
     }
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
+    try {
+      const script = document.createElement("script");
+      script.id = "razorpay-checkout-script";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+      setTimeout(() => resolve(!!window.Razorpay), 3000);
+    } catch (e) {
+      console.warn("[Razorpay] Script injection failed:", e);
+      resolve(false);
+    }
   });
 }
 
@@ -321,11 +327,8 @@ export function useRazorpayCheckout() {
       setStatus("creating_order");
 
       try {
-        // Step 1: Create Order Server-Side via direct Next.js API route
-        const createController = new AbortController();
-        const createTimeoutId = setTimeout(() => createController.abort(), 8000);
-
-        let createData: any;
+        // Step 1: Fast server order creation attempt (1.2s timeout so client never hangs)
+        let createData: any = null;
         const requestPayload = {
           items: input.items,
           shippingAddress: input.shippingAddress,
@@ -340,23 +343,17 @@ export function useRazorpayCheckout() {
         };
 
         try {
+          const createController = new AbortController();
+          const createTimeoutId = setTimeout(() => createController.abort(), 1200);
           createData = await safeJsonFetch("/api/razorpay/create-order", {
             method: "POST",
             headers: requestHeaders,
             signal: createController.signal,
             body: JSON.stringify(requestPayload),
           });
-          if (!createData?.success) {
-            // Fallback to legacy payments route if needed
-            const fallbackData = await safeJsonFetch("/api/payments/create-order", {
-              method: "POST",
-              headers: requestHeaders,
-              body: JSON.stringify(requestPayload),
-            });
-            if (fallbackData?.success) createData = fallbackData;
-          }
-        } finally {
           clearTimeout(createTimeoutId);
+        } catch {
+          createData = null;
         }
 
         let orderId = createData?.orderId;
@@ -377,12 +374,14 @@ export function useRazorpayCheckout() {
               id: fallbackOrderId,
               orderNumber: fallbackOrderId,
               userId: input.userId,
+              customerEmail: input.shippingAddress.email || "",
               items: input.items,
               shippingAddress: input.shippingAddress,
               deliveryMethod: input.deliveryMethod || "standard",
               couponCode: input.couponCode || null,
               amount: itemsTotal,
               total: itemsTotal,
+              totalAmount: itemsTotal,
               subtotal: itemsTotal,
               shipping: 0,
               discount: 0,
@@ -427,19 +426,16 @@ export function useRazorpayCheckout() {
         return new Promise<RazorpayCheckoutResult>((resolve) => {
           let hasHandledCallback = false;
 
-          const options: RazorpayOptions = {
+          const options: any = {
             key: keyId,
-            amount,
+            amount: Math.round(Number(amount)),
             currency: currency || "INR",
             name: "NXTIVE",
             description: `Order ${orderId}`,
-            ...(razorpayOrderId && typeof razorpayOrderId === "string" && razorpayOrderId.startsWith("order_")
-              ? { order_id: razorpayOrderId }
-              : {}),
             prefill: {
-              name: cleanName,
-              email: cleanEmail,
-              contact: cleanPhone,
+              ...(cleanName ? { name: cleanName } : {}),
+              ...(cleanEmail ? { email: cleanEmail } : {}),
+              ...(cleanPhone && cleanPhone.length === 10 ? { contact: cleanPhone } : {}),
             },
             theme: {
               color: "#111110",
@@ -554,7 +550,25 @@ export function useRazorpayCheckout() {
             },
           };
 
-          const rzp = new window.Razorpay!(options);
+          let rzp: any;
+          try {
+            rzp = new window.Razorpay!(options);
+          } catch (initErr: any) {
+            console.error("[Razorpay] Constructor initialization error:", initErr);
+            const mapped = getRazorpayUserErrorMessage("INITIATION_ERROR", initErr?.message, "gateway_error");
+            setStatus("failed");
+            setError(mapped.userMessage);
+            setMappedError(mapped);
+            setLoading(false);
+            resolve({
+              success: false,
+              orderId,
+              error: mapped.userMessage,
+              mappedError: mapped,
+              status: "failed",
+            });
+            return;
+          }
 
           // 2b. Payment failure callback
           rzp.on("payment.failed", (response: any) => {
@@ -577,7 +591,23 @@ export function useRazorpayCheckout() {
             });
           });
 
-          rzp.open();
+          try {
+            rzp.open();
+          } catch (openErr: any) {
+            console.error("[Razorpay] open() error:", openErr);
+            const mapped = getRazorpayUserErrorMessage("INITIATION_ERROR", openErr?.message, "gateway_error");
+            setStatus("failed");
+            setError(mapped.userMessage);
+            setMappedError(mapped);
+            setLoading(false);
+            resolve({
+              success: false,
+              orderId,
+              error: mapped.userMessage,
+              mappedError: mapped,
+              status: "failed",
+            });
+          }
         });
       } catch (err: any) {
         console.error("[Payment] Initiation error:", err);

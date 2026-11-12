@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import { useRouter } from "next/navigation";
 import {
   ShieldCheck,
@@ -412,7 +413,12 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div style={{ backgroundColor: "#F5F3ED", minHeight: "100vh", paddingBottom: "80px" }}>
+    <div style={{ backgroundColor: "#F5F3ED", minHeight: "100vh", paddingBottom: "80px", overflowX: "hidden" }}>
+      <Script
+        id="razorpay-checkout-script"
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+      />
       {/* Checkout Top Bar */}
       <header
         style={{
@@ -460,6 +466,7 @@ export default function CheckoutPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               {/* 3-Step Breadcrumb Progress Bar */}
               <div
+                className="checkout-stepper-box"
                 style={{
                   backgroundColor: "#FFFFFF",
                   borderRadius: "14px",
@@ -473,6 +480,7 @@ export default function CheckoutPage() {
                   <button
                     type="button"
                     onClick={() => goToStep(1)}
+                    className="stepper-step-btn"
                     style={{
                       background: "none",
                       border: "none",
@@ -503,7 +511,7 @@ export default function CheckoutPage() {
                     >
                       {currentStep > 1 ? <CheckCircle2 size={16} /> : "1"}
                     </div>
-                    <div>
+                    <div className="stepper-label">
                       <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
                         Step 1
                       </div>
@@ -514,12 +522,13 @@ export default function CheckoutPage() {
                   </button>
 
                   {/* Divider line 1-2 */}
-                  <div style={{ flex: 1, height: "2px", margin: "0 10px", backgroundColor: currentStep >= 2 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
+                  <div style={{ flex: 1, height: "2px", margin: "0 8px", backgroundColor: currentStep >= 2 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
 
                   {/* Step 2 Indicator */}
                   <button
                     type="button"
                     onClick={() => goToStep(2)}
+                    className="stepper-step-btn"
                     style={{
                       background: "none",
                       border: "none",
@@ -550,7 +559,7 @@ export default function CheckoutPage() {
                     >
                       {currentStep > 2 ? <CheckCircle2 size={16} /> : "2"}
                     </div>
-                    <div>
+                    <div className="stepper-label">
                       <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
                         Step 2
                       </div>
@@ -561,12 +570,13 @@ export default function CheckoutPage() {
                   </button>
 
                   {/* Divider line 2-3 */}
-                  <div style={{ flex: 1, height: "2px", margin: "0 10px", backgroundColor: currentStep >= 3 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
+                  <div style={{ flex: 1, height: "2px", margin: "0 8px", backgroundColor: currentStep >= 3 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
 
                   {/* Step 3 Indicator */}
                   <button
                     type="button"
                     onClick={() => goToStep(3)}
+                    className="stepper-step-btn"
                     style={{
                       background: "none",
                       border: "none",
@@ -597,7 +607,7 @@ export default function CheckoutPage() {
                     >
                       3
                     </div>
-                    <div>
+                    <div className="stepper-label">
                       <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
                         Step 3
                       </div>
@@ -606,6 +616,11 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   </button>
+                </div>
+
+                {/* Mobile Current Step Subtitle */}
+                <div className="stepper-mobile-label">
+                  Step {currentStep} of 3: {currentStep === 1 ? "Personal Details" : currentStep === 2 ? "Shipping Address" : "Payment & Order Review"}
                 </div>
               </div>
 
@@ -775,7 +790,13 @@ export default function CheckoutPage() {
 
                     <button
                       type="button"
-                      onClick={() => goToStep(2)}
+                      onClick={() => {
+                        if (!user) {
+                          setShowAuthModal(true);
+                          return;
+                        }
+                        goToStep(2);
+                      }}
                       style={{
                         padding: "13px 28px",
                         borderRadius: "9999px",
@@ -1364,119 +1385,26 @@ export default function CheckoutPage() {
                   </span>
                 </div>
 
-                {/* Submit Order Action Button based on active step */}
-                {!user ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowAuthModal(true)}
-                    style={{
-                      width: "100%",
-                      padding: "15px 24px",
-                      borderRadius: "9999px",
-                      backgroundColor: "#111110",
-                      color: "#FFFFFF",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      letterSpacing: "0.02em",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
-                      cursor: "pointer",
-                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-                      border: "none",
-                    }}
-                  >
-                    <span>Sign In to Place Order</span>
-                    <ArrowRight size={16} />
-                  </button>
-                ) : currentStep === 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => goToStep(2)}
-                    style={{
-                      width: "100%",
-                      padding: "15px 24px",
-                      borderRadius: "9999px",
-                      backgroundColor: "#111110",
-                      color: "#FFFFFF",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      letterSpacing: "0.02em",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
-                      cursor: "pointer",
-                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-                      border: "none",
-                    }}
-                  >
-                    <span>Continue to Shipping Address</span>
-                    <ArrowRight size={16} />
-                  </button>
-                ) : currentStep === 2 ? (
-                  <button
-                    type="button"
-                    onClick={() => goToStep(3)}
-                    style={{
-                      width: "100%",
-                      padding: "15px 24px",
-                      borderRadius: "9999px",
-                      backgroundColor: "#111110",
-                      color: "#FFFFFF",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      letterSpacing: "0.02em",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
-                      cursor: "pointer",
-                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-                      border: "none",
-                    }}
-                  >
-                    <span>Continue to Payment & Review</span>
-                    <ArrowRight size={16} />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleRazorpayCheckout}
-                    disabled={razorpayLoading}
-                    style={{
-                      width: "100%",
-                      padding: "15px 24px",
-                      borderRadius: "9999px",
-                      backgroundColor: "#111110",
-                      color: "#FFFFFF",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      letterSpacing: "0.02em",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
-                      cursor: razorpayLoading ? "not-allowed" : "pointer",
-                      opacity: razorpayLoading ? 0.7 : 1,
-                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-                      border: "none",
-                    }}
-                  >
-                    {razorpayLoading ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Opening Secure Payment Gateway...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Pay ₹{finalTotal.toLocaleString("en-IN")} via Razorpay</span>
-                        <ArrowRight size={16} />
-                      </>
-                    )}
-                  </button>
-                )}
+                {/* Security Guarantee Box (Action buttons are cleanly displayed in the active step container) */}
+                <div
+                  style={{
+                    padding: "16px",
+                    borderRadius: "12px",
+                    backgroundColor: "#FAF9F6",
+                    border: "1px solid rgba(0,0,0,0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "#2B9348", fontWeight: 700 }}>
+                    <ShieldCheck size={16} />
+                    <span>NXTIVE Guaranteed Protection</span>
+                  </div>
+                  <div style={{ fontSize: "11.5px", color: "#666", lineHeight: 1.45 }}>
+                    Encrypted Razorpay checkout. Supports UPI, credit/debit cards &amp; NetBanking. Includes free insured courier delivery across India.
+                  </div>
+                </div>
 
                 {/* Trust Badge */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "12px" }}>
@@ -1610,10 +1538,10 @@ export default function CheckoutPage() {
               }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
               </svg>
               <span>{authGoogleLoading ? "Signing in..." : "Continue with Google"}</span>
             </button>
@@ -1769,6 +1697,41 @@ export default function CheckoutPage() {
         @media (max-width: 900px) {
           .checkout-grid {
             grid-template-columns: 1fr !important;
+            gap: 24px !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .stepper-label {
+            display: none !important;
+          }
+          .checkout-stepper-box {
+            padding: 12px 14px !important;
+          }
+          .stepper-step-btn {
+            padding: 2px !important;
+            gap: 0 !important;
+          }
+          .stepper-mobile-label {
+            display: block !important;
+            text-align: center;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #111110;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+          }
+          .checkout-card {
+            padding: 18px 14px !important;
+            border-radius: 12px !important;
+          }
+          input, select, textarea {
+            font-size: 16px !important;
+          }
+        }
+        @media (min-width: 641px) {
+          .stepper-mobile-label {
+            display: none !important;
           }
         }
       `}</style>

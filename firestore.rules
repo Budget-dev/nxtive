@@ -26,6 +26,9 @@ rules_version = '2';
 //   - paymentId: string (optional, max 255 chars) - payment gateway transaction ID
 //   - razorpayOrderId: string (optional, max 255 chars) - Razorpay gateway order identifier
 //   - razorpayPaymentId: string (optional, max 255 chars) - Razorpay gateway payment transaction identifier
+//   - razorpaySignature: string (optional, max 255 chars) - Razorpay payment verification signature
+//   - errorCode: string (optional, max 100 chars) - payment failure error code
+//   - errorDescription: string (optional, max 1000 chars) - payment failure reason
 //   - shippingAddress: map (optional) - shipping destination details
 //   - deliveryMethod: string (optional, max 100 chars) - delivery carrier speed
 //   - deliveryDateEstimate: string (optional, max 100 chars) - estimated transit time
@@ -81,12 +84,18 @@ service cloud.firestore {
              (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 100)) &&
              (!('paymentStatus' in data) || (data.paymentStatus is string && data.paymentStatus.size() <= 50)) &&
              (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+             (!('paymentId' in data) || (data.paymentId is string && data.paymentId.size() <= 255)) &&
+             (!('razorpayPaymentId' in data) || (data.razorpayPaymentId is string && data.razorpayPaymentId.size() <= 255)) &&
+             (!('razorpayOrderId' in data) || (data.razorpayOrderId is string && data.razorpayOrderId.size() <= 255)) &&
+             (!('razorpaySignature' in data) || (data.razorpaySignature is string && data.razorpaySignature.size() <= 255)) &&
+             (!('errorCode' in data) || (data.errorCode is string && data.errorCode.size() <= 100)) &&
+             (!('errorDescription' in data) || (data.errorDescription is string && data.errorDescription.size() <= 1000)) &&
              (!('idempotencyKey' in data) || (data.idempotencyKey is string && data.idempotencyKey.size() <= 128)) &&
              (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
              (!('cancelReason' in data) || (data.cancelReason is string && data.cancelReason.size() <= 500)) &&
              (!('returnReason' in data) || (data.returnReason is string && data.returnReason.size() <= 500)) &&
-             (!('errorCode' in data) || (data.errorCode is string && data.errorCode.size() <= 100)) &&
-             (!('errorDescription' in data) || (data.errorDescription is string && data.errorDescription.size() <= 1000)) &&
+             (!('deliveryMethod' in data) || (data.deliveryMethod is string && data.deliveryMethod.size() <= 100)) &&
+             (!('deliveryDateEstimate' in data) || (data.deliveryDateEstimate is string && data.deliveryDateEstimate.size() <= 100)) &&
              (!('trackingNumber' in data) || (data.trackingNumber is string && data.trackingNumber.size() <= 128)) &&
              (!('trackingUrl' in data) || (data.trackingUrl is string && data.trackingUrl.size() <= 2048));
     }
@@ -97,27 +106,29 @@ service cloud.firestore {
              ('userId' in request.resource.data) &&
              request.resource.data.userId == request.auth.uid &&
              isValidOrder(request.resource.data) &&
-             // Block client from setting status to paid, shipped, delivered, or refunded
+             // Allowed initial status on client creation: 'created', 'pending'
+             (!('status' in request.resource.data) || request.resource.data.status in ['created', 'pending']) &&
+             // Allowed initial paymentStatus on client creation: 'created', 'pending'
+             (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus in ['created', 'pending']) &&
+             // Strictly block clients from creating an order already marked as paid, shipped, delivered, or refunded
              (!('status' in request.resource.data) || !(request.resource.data.status in ['paid', 'Paid', 'shipped', 'delivered', 'Shipped', 'Delivered', 'refunded'])) &&
-             // Block client from setting paymentStatus to paid or refunded
              (!('paymentStatus' in request.resource.data) || !(request.resource.data.paymentStatus in ['paid', 'Paid', 'refunded', 'refund_initiated'])) &&
-             // Block client from directly writing paymentId or razorpayPaymentId
+             // Clients cannot supply payment IDs on initial creation (only on post-payment update)
              (!('paymentId' in request.resource.data) || request.resource.data.paymentId == '' || request.resource.data.paymentId == null) &&
-             (!('razorpayPaymentId' in request.resource.data) || request.resource.data.razorpayPaymentId == '' || request.resource.data.razorpayPaymentId == null);
+             (!('razorpayPaymentId' in request.resource.data) || request.resource.data.razorpayPaymentId == '' || request.resource.data.razorpayPaymentId == null) &&
+             // Tracking and logistics fields cannot be set by client
+             (!('trackingNumber' in request.resource.data) || request.resource.data.trackingNumber == '' || request.resource.data.trackingNumber == null) &&
+             (!('trackingUrl' in request.resource.data) || request.resource.data.trackingUrl == '' || request.resource.data.trackingUrl == null);
     }
 
-    // Rules for Client Order Updates
+    // Rules for Client Order Updates (Post-payment syncing, failure recording, cancellation)
     function canClientUpdateOrder() {
       return isAuthenticated() &&
              resource.data.userId == request.auth.uid &&
              request.resource.data.userId == resource.data.userId &&
              isValidOrder(request.resource.data) &&
-             // Strictly block client writes to payment status, fulfillment status, payment IDs, amounts, line items, and immutable IDs
+             // Owner is STRICTLY BLOCKED from modifying price/cart, immutable IDs, and fulfillment fields
              !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-               'status',
-               'paymentStatus',
-               'paymentId',
-               'razorpayPaymentId',
                'amount',
                'total',
                'totalAmount',
@@ -127,8 +138,19 @@ service cloud.firestore {
                'items',
                'userId',
                'orderNumber',
-               'createdAt'
-             ]);
+               'createdAt',
+               'trackingNumber',
+               'trackingUrl',
+               'deliveryDateEstimate'
+             ]) &&
+             // If status is updated, owner can only set it to 'paid', 'failed', or 'cancelled'
+             (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+              (request.resource.data.status in ['paid', 'failed', 'cancelled'] &&
+               !(request.resource.data.status in ['shipped', 'delivered', 'Shipped', 'Delivered', 'refunded']))) &&
+             // If paymentStatus is updated, owner can only set it to 'paid' or 'failed'
+             (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['paymentStatus']) ||
+              (request.resource.data.paymentStatus in ['paid', 'failed'] &&
+               !(request.resource.data.paymentStatus in ['refunded', 'refund_initiated'])));
     }
 
     // ─── 1. Products & Categories (Catalog Management) ───────────
@@ -153,8 +175,11 @@ service cloud.firestore {
       // Users can only read their own orders; admin (nxtiveclothing@gmail.com) can read all
       allow read: if isOrderOwner();
 
-      // Only server (Admin SDK) or authorized admin can write payment fields, status, paymentId, or amount directly.
-      // Admin SDK bypasses security rules entirely. Client writes are restricted to own orders with strict field locks.
+      // Creation & Updates:
+      // - Admins have full unconstrained management access.
+      // - Clients can create orders with initial 'created'/'pending' state.
+      // - Clients can update orders to record successful/failed payment outcomes or cancel,
+      //   while price, cart items, order IDs, timestamps, and tracking fields are strictly locked.
       allow create: if (isAdmin() && isValidOrder(request.resource.data)) || canClientCreateOrder();
       allow update: if (isAdmin() && isValidOrder(request.resource.data)) || canClientUpdateOrder();
       allow delete: if isAdmin();
