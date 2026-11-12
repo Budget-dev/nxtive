@@ -159,14 +159,6 @@
         "destination": "/admin/dashboard.html"
       },
       {
-        "source": "/categories/**",
-        "destination": "/categories.html"
-      },
-      {
-        "source": "/products/**",
-        "destination": "/products.html"
-      },
-      {
         "source": "/orders/**/invoice",
         "destination": "/orders/invoice.html"
       },

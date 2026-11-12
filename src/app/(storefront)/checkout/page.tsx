@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import {
   ShieldCheck,
   Truck,
-  ArrowRight,
   ArrowLeft,
   Loader2,
   Lock,
@@ -16,9 +15,10 @@ import {
   X,
   User,
   CheckCircle2,
-  Edit3,
+  AlertCircle,
+  CreditCard,
 } from "lucide-react";
-import { useStore, normalizeOrder } from "@/components/store-context";
+import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
 import { useRazorpayCheckout } from "@/lib/razorpay/use-razorpay-checkout";
 import { reverseGeocode, matchIndianState, sanitizePostalCode } from "@/lib/location";
@@ -62,13 +62,13 @@ const INDIAN_STATES = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartSubtotal, discountAmount, shippingFee, clearCart, couponCode, recordOrder } = useStore();
+  const { cart, cartSubtotal, discountAmount, clearCart, couponCode } = useStore();
   const { user, loginWithEmail, signupWithEmail, loginWithGoogle } = useAuth();
 
   // Order submission state
   const [isOrderPlaced, setIsOrderPlaced] = useState(false);
 
-  // Form states
+  // Form states - prefilled from user sign in/up
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -78,63 +78,12 @@ export default function CheckoutPage() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("Maharashtra");
   const [postalCode, setPostalCode] = useState("");
+
   const { initiatePayment, loading: razorpayLoading, error: razorpayError } = useRazorpayCheckout();
   const [orderError, setOrderError] = useState<string | null>(null);
   const [failedOrderId, setFailedOrderId] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
-
-  // 3-Screen Checkout Workflow State (1: Personal Info, 2: Address, 3: Payment & Review)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
-
-  const validateStep1 = (): boolean => {
-    setOrderError(null);
-    if (!firstName.trim() || !lastName.trim()) {
-      setOrderError("Please enter both your first and last name.");
-      return false;
-    }
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setOrderError("Please enter a valid email address.");
-      return false;
-    }
-    const cleanPhoneDigits = phone.replace(/\D/g, "");
-    if (cleanPhoneDigits.length < 10) {
-      setOrderError("Please enter a valid 10-digit mobile number for order and delivery SMS.");
-      return false;
-    }
-    return true;
-  };
-
-  const validateStep2 = (): boolean => {
-    setOrderError(null);
-    if (!street.trim()) {
-      setOrderError("Please enter your street address / building name.");
-      return false;
-    }
-    if (!city.trim()) {
-      setOrderError("Please enter your city.");
-      return false;
-    }
-    const cleanPin = postalCode.replace(/\D/g, "");
-    if (cleanPin.length !== 6) {
-      setOrderError("Please enter a valid 6-digit PIN code.");
-      return false;
-    }
-    return true;
-  };
-
-  const goToStep = (step: 1 | 2 | 3) => {
-    if (step === 2) {
-      if (!validateStep1()) return;
-    } else if (step === 3) {
-      if (!validateStep1() || !validateStep2()) return;
-    }
-    setOrderError(null);
-    setCurrentStep(step);
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
 
   // Auth popup modal states
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -150,17 +99,50 @@ export default function CheckoutPage() {
   const deliveryCost = 0;
   const finalTotal = Math.max(0, cartSubtotal - discountAmount + deliveryCost);
 
-  // Auto-fill user email and name if logged in
+  // Auto-fill user email and name from sign in / sign up
   useEffect(() => {
     if (user) {
-      if (user.email && !email) setEmail(user.email);
+      if (user.email && !email) {
+        setEmail(user.email);
+      }
       if (user.displayName && (!firstName && !lastName)) {
-        const parts = user.displayName.split(" ");
+        const parts = user.displayName.trim().split(/\s+/);
         setFirstName(parts[0] || "");
         setLastName(parts.slice(1).join(" ") || "");
       }
     }
   }, [user]);
+
+  const validateForm = (): boolean => {
+    setOrderError(null);
+    if (!firstName.trim() || !lastName.trim()) {
+      setOrderError("Please enter your full name (both first and last name).");
+      return false;
+    }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setOrderError("Please enter a valid email address for order confirmation.");
+      return false;
+    }
+    const cleanPhoneDigits = phone.replace(/\D/g, "");
+    if (cleanPhoneDigits.length < 10) {
+      setOrderError("Please enter a valid 10-digit mobile number for courier delivery OTP & SMS.");
+      return false;
+    }
+    if (!street.trim()) {
+      setOrderError("Please enter your complete street address / building name.");
+      return false;
+    }
+    if (!city.trim()) {
+      setOrderError("Please enter your delivery city.");
+      return false;
+    }
+    const cleanPin = postalCode.replace(/\D/g, "");
+    if (cleanPin.length !== 6) {
+      setOrderError("Please enter a valid 6-digit delivery PIN code.");
+      return false;
+    }
+    return true;
+  };
 
   const fillFromCurrentLocation = () => {
     if (typeof window === "undefined" || !navigator?.geolocation) {
@@ -223,7 +205,6 @@ export default function CheckoutPage() {
     };
 
     const onGeoError = (err: GeolocationPositionError) => {
-      // If high accuracy timed out or failed, retry once with low accuracy (cell/Wi-Fi triangulation)
       if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
         navigator.geolocation.getCurrentPosition(
           ({ coords }) => onGeoSuccess(coords),
@@ -295,23 +276,17 @@ export default function CheckoutPage() {
       e.preventDefault();
     }
 
-    // Enforce sign-in popup before placing order
     if (!user) {
       setShowAuthModal(true);
       return;
     }
 
-    if (!validateStep1()) {
-      setCurrentStep(1);
-      return;
-    }
-
-    if (!validateStep2()) {
-      setCurrentStep(2);
+    if (!validateForm()) {
       return;
     }
 
     setOrderError(null);
+    setFailedOrderId(null);
 
     let idToken: string | undefined;
     if (user && typeof user.getIdToken === "function") {
@@ -348,6 +323,8 @@ export default function CheckoutPage() {
       },
       deliveryMethod: "standard",
       couponCode: couponCode || undefined,
+      totalAmount: finalTotal,
+      discountAmount: discountAmount,
       userId: user.uid,
       idToken,
     });
@@ -396,6 +373,7 @@ export default function CheckoutPage() {
           <Link
             href="/products"
             style={{
+              display: "inline-block",
               padding: "12px 24px",
               borderRadius: "9999px",
               backgroundColor: "#111110",
@@ -419,6 +397,7 @@ export default function CheckoutPage() {
         src="https://checkout.razorpay.com/v1/checkout.js"
         strategy="afterInteractive"
       />
+
       {/* Checkout Top Bar */}
       <header
         style={{
@@ -435,9 +414,9 @@ export default function CheckoutPage() {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#6B655D" }}>
-            <Lock size={13} color="#2B9348" />
-            <span>Secure Encrypted Checkout</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#6B655D" }}>
+            <Lock size={14} color="#2B9348" />
+            <span style={{ fontWeight: 600 }}>Secure Encrypted Checkout</span>
           </div>
 
           <Link
@@ -458,822 +437,482 @@ export default function CheckoutPage() {
         </div>
       </header>
 
-      {/* Main Checkout Container */}
-      <div className="container" style={{ paddingTop: "36px" }}>
+      {/* Main Single-Page Checkout Container */}
+      <div className="container" style={{ paddingTop: "32px" }}>
         <div className="checkout-form-shell">
           <div className="checkout-grid">
-            {/* Left: 3-Screen Step Checkout Flow */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              {/* 3-Step Breadcrumb Progress Bar */}
-              <div
-                className="checkout-stepper-box"
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "14px",
-                  padding: "16px 20px",
-                  border: "1px solid rgba(0,0,0,0.08)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
-                  {/* Step 1 Indicator */}
-                  <button
-                    type="button"
-                    onClick={() => goToStep(1)}
-                    className="stepper-step-btn"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      cursor: "pointer",
-                      padding: "4px 8px",
-                      borderRadius: "8px",
-                      backgroundColor: currentStep === 1 ? "rgba(17,17,16,0.06)" : "transparent",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "50%",
-                        backgroundColor: currentStep === 1 ? "#111110" : currentStep > 1 ? "#2B9348" : "#E5E0D8",
-                        color: currentStep === 1 || currentStep > 1 ? "#FFFFFF" : "#777",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {currentStep > 1 ? <CheckCircle2 size={16} /> : "1"}
-                    </div>
-                    <div className="stepper-label">
-                      <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
-                        Step 1
-                      </div>
-                      <div style={{ fontSize: "13px", fontWeight: currentStep === 1 ? 800 : 600, color: currentStep === 1 ? "#111110" : "#555" }}>
-                        Personal Info
-                      </div>
-                    </div>
-                  </button>
+            {/* Left Column: Single Page Checkout Form */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-                  {/* Divider line 1-2 */}
-                  <div style={{ flex: 1, height: "2px", margin: "0 8px", backgroundColor: currentStep >= 2 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
-
-                  {/* Step 2 Indicator */}
-                  <button
-                    type="button"
-                    onClick={() => goToStep(2)}
-                    className="stepper-step-btn"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      cursor: "pointer",
-                      padding: "4px 8px",
-                      borderRadius: "8px",
-                      backgroundColor: currentStep === 2 ? "rgba(17,17,16,0.06)" : "transparent",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "50%",
-                        backgroundColor: currentStep === 2 ? "#111110" : currentStep > 2 ? "#2B9348" : "#E5E0D8",
-                        color: currentStep === 2 || currentStep > 2 ? "#FFFFFF" : "#777",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {currentStep > 2 ? <CheckCircle2 size={16} /> : "2"}
-                    </div>
-                    <div className="stepper-label">
-                      <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
-                        Step 2
-                      </div>
-                      <div style={{ fontSize: "13px", fontWeight: currentStep === 2 ? 800 : 600, color: currentStep === 2 ? "#111110" : "#555" }}>
-                        Shipping Address
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Divider line 2-3 */}
-                  <div style={{ flex: 1, height: "2px", margin: "0 8px", backgroundColor: currentStep >= 3 ? "#111110" : "#E5E0D8", transition: "background-color 0.3s ease" }} />
-
-                  {/* Step 3 Indicator */}
-                  <button
-                    type="button"
-                    onClick={() => goToStep(3)}
-                    className="stepper-step-btn"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      cursor: "pointer",
-                      padding: "4px 8px",
-                      borderRadius: "8px",
-                      backgroundColor: currentStep === 3 ? "rgba(17,17,16,0.06)" : "transparent",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "50%",
-                        backgroundColor: currentStep === 3 ? "#111110" : "#E5E0D8",
-                        color: currentStep === 3 ? "#FFFFFF" : "#777",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      3
-                    </div>
-                    <div className="stepper-label">
-                      <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#888", fontWeight: 700 }}>
-                        Step 3
-                      </div>
-                      <div style={{ fontSize: "13px", fontWeight: currentStep === 3 ? 800 : 600, color: currentStep === 3 ? "#111110" : "#555" }}>
-                        Payment & Review
-                      </div>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Mobile Current Step Subtitle */}
-                <div className="stepper-mobile-label">
-                  Step {currentStep} of 3: {currentStep === 1 ? "Personal Details" : currentStep === 2 ? "Shipping Address" : "Payment & Order Review"}
-                </div>
-              </div>
-
-              {/* ─── SCREEN 1: PERSONAL INFORMATION ─── */}
-              {currentStep === 1 && (
-                <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "16px" }}>
-                    <div>
-                      <h2 style={{ fontSize: "18px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: "0 0 4px 0" }}>
-                        1. Personal Details
-                      </h2>
-                      <p style={{ fontSize: "13px", color: "#666", margin: 0, lineHeight: 1.4 }}>
-                        Enter your contact details for order status, tracking updates, and delivery SMS.
-                      </p>
-                    </div>
-                    {!user ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowAuthModal(true)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          fontSize: "12.5px",
-                          fontWeight: 700,
-                          color: "#111110",
-                          textDecoration: "underline",
-                          cursor: "pointer",
-                          padding: "4px 0",
-                        }}
-                      >
-                        Sign In / Register
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: "12px", color: "#2B9348", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
-                        <CheckCircle2 size={13} /> Signed in as {user.displayName || user.email}
-                      </span>
-                    )}
+              {/* ─── CARD 1: CUSTOMER CONTACT DETAILS ─── */}
+              <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "14px" }}>
+                  <div>
+                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: "0 0 4px 0", letterSpacing: "0.03em" }}>
+                      1. Contact Information
+                    </h2>
+                    <p style={{ fontSize: "12.5px", color: "#666", margin: 0, lineHeight: 1.4 }}>
+                      Used for order confirmation, Shiprocket tracking updates, and delivery alerts.
+                    </p>
                   </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    <div className="responsive-form-grid-2">
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          First Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={firstName}
-                          onChange={(e) => {
-                            setFirstName(e.target.value);
-                            if (orderError) setOrderError(null);
-                          }}
-                          placeholder="e.g. Rahul"
-                          style={{
-                            width: "100%",
-                            padding: "12px 14px",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(0,0,0,0.15)",
-                            fontSize: "15px",
-                            outline: "none",
-                            backgroundColor: "#FFFFFF",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          Last Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={lastName}
-                          onChange={(e) => {
-                            setLastName(e.target.value);
-                            if (orderError) setOrderError(null);
-                          }}
-                          placeholder="e.g. Sharma"
-                          style={{
-                            width: "100%",
-                            padding: "12px 14px",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(0,0,0,0.15)",
-                            fontSize: "15px",
-                            outline: "none",
-                            backgroundColor: "#FFFFFF",
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="responsive-form-grid-2">
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          Email Address *
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={email}
-                          onChange={(e) => {
-                            setEmail(e.target.value);
-                            if (orderError) setOrderError(null);
-                          }}
-                          placeholder="rahul@example.com"
-                          style={{
-                            width: "100%",
-                            padding: "12px 14px",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(0,0,0,0.15)",
-                            fontSize: "15px",
-                            outline: "none",
-                            backgroundColor: "#FFFFFF",
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          Mobile Phone (10 digits for delivery) *
-                        </label>
-                        <input
-                          type="tel"
-                          required
-                          value={phone}
-                          onChange={(e) => {
-                            // Strip invalid characters dynamically to prevent any pattern mismatches
-                            const cleaned = e.target.value.replace(/[^\d+ ]/g, "").slice(0, 15);
-                            setPhone(cleaned);
-                            if (orderError) setOrderError(null);
-                          }}
-                          placeholder="9876543210"
-                          style={{
-                            width: "100%",
-                            padding: "12px 14px",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(0,0,0,0.15)",
-                            fontSize: "15px",
-                            outline: "none",
-                            backgroundColor: "#FFFFFF",
-                          }}
-                        />
-                        <span style={{ fontSize: "11px", color: "#777", display: "block", marginTop: "4px" }}>
-                          Used for Shiprocket dispatch alerts and courier delivery OTP.
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Screen 1 Footer Actions */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "18px", borderTop: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap", gap: "12px" }}>
-                    <Link
-                      href="/cart"
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        color: "#555",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        textDecoration: "none",
-                      }}
-                    >
-                      <ArrowLeft size={14} />
-                      <span>Return to Bag</span>
-                    </Link>
-
+                  {!user ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!user) {
-                          setShowAuthModal(true);
-                          return;
-                        }
-                        goToStep(2);
-                      }}
+                      onClick={() => setShowAuthModal(true)}
                       style={{
-                        padding: "13px 28px",
-                        borderRadius: "9999px",
-                        backgroundColor: "#111110",
+                        background: "#111110",
                         color: "#FFFFFF",
-                        fontSize: "13.5px",
-                        fontWeight: 700,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "8px",
                         border: "none",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      <span>Continue to Shipping Address</span>
-                      <ArrowRight size={15} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ─── SCREEN 2: SHIPPING ADDRESS ─── */}
-              {currentStep === 2 && (
-                <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  {/* Personal info summary strip */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
-                      backgroundColor: "#F9F8F5",
-                      border: "1px solid rgba(0,0,0,0.06)",
-                      fontSize: "12.5px",
-                      color: "#444",
-                    }}
-                  >
-                    <div>
-                      <span style={{ fontWeight: 700, color: "#111110" }}>Contact: </span>
-                      <span>{firstName} {lastName} • {phone} • {email}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => goToStep(1)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#111110",
                         fontSize: "12px",
                         fontWeight: 700,
-                        textDecoration: "underline",
                         cursor: "pointer",
-                      }}
-                    >
-                      Edit
-                    </button>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "16px" }}>
-                    <div>
-                      <h2 style={{ fontSize: "18px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: "0 0 4px 0" }}>
-                        2. Shipping Address
-                      </h2>
-                      <p style={{ fontSize: "13px", color: "#666", margin: 0, lineHeight: 1.4 }}>
-                        Free insured domestic courier delivery across India (3-5 business days).
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={fillFromCurrentLocation}
-                      disabled={locationLoading}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                        minHeight: "36px",
                         padding: "6px 14px",
                         borderRadius: "9999px",
-                        border: "1px solid rgba(17,17,16,0.16)",
-                        backgroundColor: locationLoading ? "#F5F3ED" : "#FFFFFF",
-                        color: "#111110",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        cursor: locationLoading ? "wait" : "pointer",
-                        transition: "all 0.2s ease",
                       }}
                     >
-                      {locationLoading ? (
-                        <>
-                          <Loader2 size={13} className="animate-spin" />
-                          <span>Detecting…</span>
-                        </>
-                      ) : (
-                        <>
-                          <LocateFixed size={13} />
-                          <span>Use my location</span>
-                        </>
-                      )}
+                      Sign In / Register
                     </button>
-                  </div>
-
-                  {locationMessage && (
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        backgroundColor: locationMessage.includes("auto-filled") ? "rgba(43,147,72,0.08)" : "rgba(180,83,9,0.08)",
-                        color: locationMessage.includes("auto-filled") ? "#2B9348" : "#B45309",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <MapPin size={13} style={{ flexShrink: 0 }} />
-                      <span>{locationMessage}</span>
-                    </div>
+                  ) : (
+                    <span style={{ fontSize: "12px", color: "#2B9348", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", backgroundColor: "#DCFCE7", padding: "4px 10px", borderRadius: "9999px" }}>
+                      <CheckCircle2 size={13} /> Signed in as {user.displayName || user.email}
+                    </span>
                   )}
+                </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div className="responsive-form-grid-2">
                     <div>
                       <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                        Street Address *
+                        First Name *
                       </label>
                       <input
                         type="text"
                         required
-                        value={street}
+                        value={firstName}
                         onChange={(e) => {
-                          setStreet(e.target.value);
+                          setFirstName(e.target.value);
                           if (orderError) setOrderError(null);
                         }}
-                        placeholder="House / Flat #, Building Name, Street, Landmark"
+                        placeholder="Rahul"
+                        style={{
+                          width: "100%",
+                          padding: "12px 14px",
+                          borderRadius: "8px",
+                          border: "1px solid rgba(0,0,0,0.15)",
+                          fontSize: "15px",
+                          outline: "none",
+                          backgroundColor: "#FFFFFF",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        Last Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={lastName}
+                        onChange={(e) => {
+                          setLastName(e.target.value);
+                          if (orderError) setOrderError(null);
+                        }}
+                        placeholder="Sharma"
+                        style={{
+                          width: "100%",
+                          padding: "12px 14px",
+                          borderRadius: "8px",
+                          border: "1px solid rgba(0,0,0,0.15)",
+                          fontSize: "15px",
+                          outline: "none",
+                          backgroundColor: "#FFFFFF",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="responsive-form-grid-2">
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (orderError) setOrderError(null);
+                        }}
+                        placeholder="rahul@example.com"
+                        style={{
+                          width: "100%",
+                          padding: "12px 14px",
+                          borderRadius: "8px",
+                          border: "1px solid rgba(0,0,0,0.15)",
+                          fontSize: "15px",
+                          outline: "none",
+                          backgroundColor: "#FFFFFF",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        Mobile Phone (10 Digits) *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setPhone(cleaned);
+                          if (orderError) setOrderError(null);
+                        }}
+                        placeholder="9876543210"
+                        maxLength={10}
+                        style={{
+                          width: "100%",
+                          padding: "12px 14px",
+                          borderRadius: "8px",
+                          border: "1px solid rgba(0,0,0,0.15)",
+                          fontSize: "15px",
+                          outline: "none",
+                          backgroundColor: "#FFFFFF",
+                        }}
+                      />
+                      <span style={{ fontSize: "11px", color: "#777", display: "block", marginTop: "4px" }}>
+                        For Shiprocket courier delivery updates &amp; delivery OTP.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ─── CARD 2: SHIPPING ADDRESS ─── */}
+              <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: "14px" }}>
+                  <div>
+                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: "0 0 4px 0", letterSpacing: "0.03em" }}>
+                      2. Shipping Address
+                    </h2>
+                    <p style={{ fontSize: "12.5px", color: "#666", margin: 0, lineHeight: 1.4 }}>
+                      Free insured express delivery across all serviceable PIN codes in India.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fillFromCurrentLocation}
+                    disabled={locationLoading}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      minHeight: "34px",
+                      padding: "6px 14px",
+                      borderRadius: "9999px",
+                      border: "1px solid rgba(17,17,16,0.16)",
+                      backgroundColor: locationLoading ? "#F5F3ED" : "#FFFFFF",
+                      color: "#111110",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: locationLoading ? "wait" : "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {locationLoading ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Detecting…</span>
+                      </>
+                    ) : (
+                      <>
+                        <LocateFixed size={13} />
+                        <span>Use my location</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {locationMessage && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      backgroundColor: locationMessage.includes("auto-filled") ? "rgba(43,147,72,0.08)" : "rgba(180,83,9,0.08)",
+                      color: locationMessage.includes("auto-filled") ? "#2B9348" : "#B45309",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <MapPin size={13} style={{ flexShrink: 0 }} />
+                    <span>{locationMessage}</span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                      Street Address / House / Building *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={street}
+                      onChange={(e) => {
+                        setStreet(e.target.value);
+                        if (orderError) setOrderError(null);
+                      }}
+                      placeholder="House / Flat #, Building Name, Street, Landmark"
+                      style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                    />
+                  </div>
+
+                  <div className="responsive-form-grid-2">
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        Apartment, Suite, Unit (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={apartment}
+                        onChange={(e) => setApartment(e.target.value)}
+                        placeholder="Flat 402, Wing B"
+                        style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={city}
+                        onChange={(e) => {
+                          setCity(e.target.value);
+                          if (orderError) setOrderError(null);
+                        }}
+                        placeholder="Mumbai"
+                        style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="responsive-form-grid-3">
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        State *
+                      </label>
+                      <select
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        style={{ width: "100%", padding: "12px 10px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
+                      >
+                        {INDIAN_STATES.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        PIN Code *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={postalCode}
+                        onChange={(e) => {
+                          const pinClean = e.target.value.replace(/\D/g, "").slice(0, 6);
+                          setPostalCode(pinClean);
+                          if (orderError) setOrderError(null);
+                        }}
+                        placeholder="400050"
+                        maxLength={6}
                         style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
                       />
                     </div>
 
-                    <div className="responsive-form-grid-2">
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          Apartment, suite, unit (optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={apartment}
-                          onChange={(e) => setApartment(e.target.value)}
-                          placeholder="Flat 402, Wing B"
-                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          City *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={city}
-                          onChange={(e) => {
-                            setCity(e.target.value);
-                            if (orderError) setOrderError(null);
-                          }}
-                          placeholder="Mumbai"
-                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
-                        />
-                      </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
+                        Country
+                      </label>
+                      <input
+                        type="text"
+                        disabled
+                        value="India"
+                        style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.1)", fontSize: "15px", backgroundColor: "#F7F5F0", color: "#555" }}
+                      />
                     </div>
-
-                    <div className="responsive-form-grid-3">
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          State *
-                        </label>
-                        <select
-                          value={state}
-                          onChange={(e) => setState(e.target.value)}
-                          style={{ width: "100%", padding: "12px 10px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
-                        >
-                          {INDIAN_STATES.map((st) => (
-                            <option key={st} value={st}>
-                              {st}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          PIN Code *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={postalCode}
-                          onChange={(e) => {
-                            // Restrict to 6 digits cleanly
-                            const pinClean = e.target.value.replace(/\D/g, "").slice(0, 6);
-                            setPostalCode(pinClean);
-                            if (orderError) setOrderError(null);
-                          }}
-                          placeholder="400050"
-                          maxLength={6}
-                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.15)", fontSize: "15px", outline: "none", backgroundColor: "#FFFFFF" }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, textTransform: "uppercase", color: "#444", marginBottom: "6px" }}>
-                          Country
-                        </label>
-                        <input
-                          type="text"
-                          disabled
-                          value="India"
-                          style={{ width: "100%", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.1)", fontSize: "15px", backgroundColor: "#F7F5F0", color: "#555" }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Screen 2 Footer Actions */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "18px", borderTop: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap", gap: "12px" }}>
-                    <button
-                      type="button"
-                      onClick={() => goToStep(1)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#555",
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        cursor: "pointer",
-                        padding: "8px 0",
-                      }}
-                    >
-                      <ArrowLeft size={14} />
-                      <span>Back to Personal Details</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => goToStep(3)}
-                      style={{
-                        padding: "13px 28px",
-                        borderRadius: "9999px",
-                        backgroundColor: "#111110",
-                        color: "#FFFFFF",
-                        fontSize: "13.5px",
-                        fontWeight: 700,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        border: "none",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      <span>Continue to Payment & Review</span>
-                      <ArrowRight size={15} />
-                    </button>
                   </div>
                 </div>
-              )}
 
-              {/* ─── SCREEN 3: PAYMENT & ORDER REVIEW ─── */}
-              {currentStep === 3 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  {/* Order Details Review Recap Card */}
-                  <div className="checkout-card" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: 0, paddingBottom: "10px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-                      Review Delivery Details
-                    </h2>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#2B9348", fontWeight: 600, padding: "8px 12px", borderRadius: "6px", backgroundColor: "rgba(43,147,72,0.08)", marginTop: "4px" }}>
+                  <Truck size={14} />
+                  <span>Free Insured Express Delivery across India (3-5 Business Days)</span>
+                </div>
+              </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" }}>
-                      {/* Customer Card */}
-                      <div style={{ padding: "14px", borderRadius: "10px", backgroundColor: "#F9F8F5", border: "1px solid rgba(0,0,0,0.06)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#888", letterSpacing: "0.06em" }}>
-                            Recipient Contact
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => goToStep(1)}
-                            style={{ background: "none", border: "none", color: "#111110", fontSize: "12px", fontWeight: 700, textDecoration: "underline", cursor: "pointer", display: "flex", alignItems: "center", gap: "3px" }}
-                          >
-                            <Edit3 size={11} />
-                            <span>Edit</span>
-                          </button>
-                        </div>
-                        <div style={{ fontSize: "14px", fontWeight: 700, color: "#111110", marginBottom: "4px" }}>
-                          {firstName} {lastName}
-                        </div>
-                        <div style={{ fontSize: "12.5px", color: "#555", lineHeight: 1.4 }}>
-                          {email}<br />
-                          {phone}
-                        </div>
-                      </div>
+              {/* ─── CARD 3: PAYMENT VIA RAZORPAY & DIRECT PAY CTA ─── */}
+              <div className="checkout-card" id="payment-section" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div>
+                  <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", margin: "0 0 4px 0", letterSpacing: "0.03em" }}>
+                    3. Payment Method
+                  </h2>
+                  <p style={{ fontSize: "12.5px", color: "#666", margin: 0, lineHeight: 1.4 }}>
+                    Official Razorpay live payment gateway. Pay securely via UPI, Cards, NetBanking, or Wallets.
+                  </p>
+                </div>
 
-                      {/* Address Card */}
-                      <div style={{ padding: "14px", borderRadius: "10px", backgroundColor: "#F9F8F5", border: "1px solid rgba(0,0,0,0.06)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                          <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#888", letterSpacing: "0.06em" }}>
-                            Delivery Destination
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => goToStep(2)}
-                            style={{ background: "none", border: "none", color: "#111110", fontSize: "12px", fontWeight: 700, textDecoration: "underline", cursor: "pointer", display: "flex", alignItems: "center", gap: "3px" }}
-                          >
-                            <Edit3 size={11} />
-                            <span>Edit</span>
-                          </button>
-                        </div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#111110", marginBottom: "2px" }}>
-                          {street}
-                        </div>
-                        <div style={{ fontSize: "12.5px", color: "#555", lineHeight: 1.4 }}>
-                          {apartment ? `${apartment}, ` : ""}{city}, {state} - {postalCode}<br />
-                          India
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#2B9348", fontWeight: 600, padding: "8px 12px", borderRadius: "6px", backgroundColor: "rgba(43,147,72,0.08)" }}>
-                      <Truck size={14} />
-                      <span>Free Insured Express Logistics (3-5 Business Days Delivery)</span>
-                    </div>
-                  </div>
-
-                  {/* Payment Gateway Option Card */}
-                  <div className="checkout-card" id="payment-section">
-                    <h2 style={{ fontSize: "16px", fontWeight: 800, textTransform: "uppercase", color: "#111110", marginBottom: "18px" }}>
-                      3. Select Payment Gateway
-                    </h2>
-
+                {/* Razorpay Gateway Card Box */}
+                <div
+                  style={{
+                    borderRadius: "12px",
+                    border: "2px solid #111110",
+                    backgroundColor: "#FAF9F6",
+                    overflow: "hidden",
+                    padding: "18px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
                     <div
                       style={{
-                        borderRadius: "12px",
-                        border: "2px solid #111110",
-                        backgroundColor: "#FAF9F6",
-                        overflow: "hidden",
-                        padding: "20px",
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "10px",
+                        backgroundColor: "#111110",
+                        color: "#FFFFFF",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", gap: "14px" }}>
-                          <div
-                            style={{
-                              width: "42px",
-                              height: "42px",
-                              borderRadius: "10px",
-                              backgroundColor: "#111110",
-                              color: "#FFFFFF",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <ShieldCheck size={24} />
-                          </div>
-                          <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                              <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
-                                Razorpay Standard Checkout
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  fontWeight: 700,
-                                  color: "#2B9348",
-                                  backgroundColor: "#DCFCE7",
-                                  padding: "2px 8px",
-                                  borderRadius: "4px",
-                                }}
-                              >
-                                100% Secure &amp; Verified
-                              </span>
-                            </div>
-                            <p style={{ fontSize: "13px", color: "#666", marginTop: "6px", marginBottom: "12px", lineHeight: "1.5" }}>
-                              Pay instantly with UPI (Google Pay, PhonePe, Paytm, BHIM, Cred), Credit/Debit Cards (Visa, Mastercard, RuPay), NetBanking, and Wallets.
-                            </p>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                                UPI / QR
-                              </span>
-                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                                Credit &amp; Debit Cards
-                              </span>
-                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                                NetBanking (50+ Banks)
-                              </span>
-                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#555", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "4px 8px", borderRadius: "6px" }}>
-                                Wallets
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#666" }}>
-                        <Lock size={13} color="#2B9348" />
-                        <span>Instant order synchronization & confirmation with express dispatch upon payment completion.</span>
-                      </div>
+                      <ShieldCheck size={22} />
                     </div>
-
-                    {/* Step 3 Footer Actions */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "18px", paddingTop: "18px", borderTop: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap", gap: "12px" }}>
-                      <button
-                        type="button"
-                        onClick={() => goToStep(2)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#555",
-                          fontSize: "13px",
-                          fontWeight: 600,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          cursor: "pointer",
-                          padding: "8px 0",
-                        }}
-                      >
-                        <ArrowLeft size={14} />
-                        <span>Back to Shipping Address</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleRazorpayCheckout}
-                        disabled={razorpayLoading}
-                        style={{
-                          padding: "14px 32px",
-                          borderRadius: "9999px",
-                          backgroundColor: "#111110",
-                          color: "#FFFFFF",
-                          fontSize: "14px",
-                          fontWeight: 700,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          border: "none",
-                          cursor: razorpayLoading ? "not-allowed" : "pointer",
-                          opacity: razorpayLoading ? 0.7 : 1,
-                          boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        {razorpayLoading ? (
-                          <>
-                            <Loader2 size={16} className="animate-spin" />
-                            <span>Opening Payment Gateway...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Lock size={14} />
-                            <span>Pay ₹{finalTotal.toLocaleString("en-IN")} via Razorpay</span>
-                            <ArrowRight size={15} />
-                          </>
-                        )}
-                      </button>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
+                          Razorpay Standard Checkout
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#2B9348",
+                            backgroundColor: "#DCFCE7",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                          }}
+                        >
+                          100% Secure &amp; Verified
+                        </span>
+                      </div>
+                      <p style={{ fontSize: "12.5px", color: "#666", marginTop: "4px", marginBottom: "10px", lineHeight: "1.4" }}>
+                        Pay instantly with Google Pay, PhonePe, Paytm, BHIM, Cred, Visa, Mastercard, RuPay, NetBanking, and Wallets.
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "#444", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "3px 8px", borderRadius: "5px" }}>
+                          UPI / QR
+                        </span>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "#444", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "3px 8px", borderRadius: "5px" }}>
+                          Cards (Debit / Credit)
+                        </span>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "#444", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "3px 8px", borderRadius: "5px" }}>
+                          NetBanking (50+ Banks)
+                        </span>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "#444", backgroundColor: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", padding: "3px 8px", borderRadius: "5px" }}>
+                          Wallets
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              )}
+
+                {/* Error Banner if any */}
+                {orderError && (
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: "8px",
+                      backgroundColor: "#FEF2F2",
+                      border: "1px solid #FECACA",
+                      color: "#991B1B",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "8px",
+                    }}
+                  >
+                    <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+                    <div style={{ flex: 1 }}>
+                      <div>{orderError}</div>
+                      {failedOrderId && (
+                        <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed rgba(220, 38, 38, 0.2)", fontSize: "12px", color: "#7F1D1D" }}>
+                          Order #{failedOrderId} failed. You can retry safely.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* THE SINGLE, DIRECT PAY BUTTON */}
+                <button
+                  type="button"
+                  onClick={handleRazorpayCheckout}
+                  disabled={razorpayLoading}
+                  style={{
+                    width: "100%",
+                    padding: "16px 24px",
+                    borderRadius: "9999px",
+                    backgroundColor: "#111110",
+                    color: "#FFFFFF",
+                    fontSize: "15px",
+                    fontWeight: 800,
+                    letterSpacing: "0.02em",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "10px",
+                    border: "none",
+                    cursor: razorpayLoading ? "not-allowed" : "pointer",
+                    opacity: razorpayLoading ? 0.75 : 1,
+                    boxShadow: "0 8px 24px rgba(17,17,16,0.18)",
+                    transition: "all 0.2s ease",
+                    marginTop: "6px",
+                  }}
+                >
+                  {razorpayLoading ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Opening Razorpay Gateway...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={16} />
+                      <span>Pay ₹{finalTotal.toLocaleString("en-IN")} via Razorpay</span>
+                    </>
+                  )}
+                </button>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11.5px", color: "#8E8880", textAlign: "center" }}>
+                  <Lock size={12} color="#2B9348" />
+                  <span>256-Bit SSL Encrypted • Instant Order Confirmation • 7-Day Exchange Guarantee</span>
+                </div>
+              </div>
             </div>
 
-            {/* Right: Sticky Order Summary */}
+            {/* Right Column: Sticky Order Summary */}
             <div style={{ position: "sticky", top: "90px" }}>
               <div
                 className="checkout-card"
@@ -1281,8 +920,8 @@ export default function CheckoutPage() {
                   boxShadow: "0 6px 24px rgba(0,0,0,0.04)",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-                  <h3 style={{ fontSize: "16px", fontWeight: 900, textTransform: "uppercase", color: "#111110", margin: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <h3 style={{ fontSize: "15px", fontWeight: 900, textTransform: "uppercase", color: "#111110", margin: 0 }}>
                     Order Summary ({cart.length})
                   </h3>
                   <Link href="/cart" style={{ fontSize: "12px", color: "#111110", textDecoration: "underline" }}>
@@ -1291,14 +930,14 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Line Items List */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px", maxHeight: "260px", overflowY: "auto", marginBottom: "20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "280px", overflowY: "auto", marginBottom: "16px" }}>
                   {cart.map((item, idx) => (
                     <div key={idx} style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                       <div
                         style={{
                           position: "relative",
-                          width: "52px",
-                          height: "64px",
+                          width: "48px",
+                          height: "60px",
                           borderRadius: "6px",
                           overflow: "hidden",
                           backgroundColor: "#EAE7DF",
@@ -1344,7 +983,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Cost Calculations */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "16px", marginBottom: "20px", fontSize: "13px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "14px", marginBottom: "16px", fontSize: "13px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
                     <span>Subtotal</span>
                     <span style={{ fontWeight: 600, color: "#111110" }}>₹{cartSubtotal.toLocaleString("en-IN")}</span>
@@ -1363,7 +1002,6 @@ export default function CheckoutPage() {
                       FREE
                     </span>
                   </div>
-
                 </div>
 
                 {/* Final Total */}
@@ -1372,88 +1010,46 @@ export default function CheckoutPage() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "baseline",
-                    borderTop: "1px solid var(--border-light)",
-                    paddingTop: "16px",
-                    marginBottom: "24px",
+                    borderTop: "1px solid rgba(0,0,0,0.1)",
+                    paddingTop: "14px",
+                    marginBottom: "18px",
                   }}
                 >
-                  <span style={{ fontSize: "15px", fontWeight: 800, color: "#111110" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#111110" }}>
                     Total Due
                   </span>
-                  <span style={{ fontSize: "24px", fontWeight: 900, color: "#111110" }}>
+                  <span style={{ fontSize: "22px", fontWeight: 900, color: "#111110" }}>
                     ₹{finalTotal.toLocaleString("en-IN")}
                   </span>
                 </div>
 
-                {/* Security Guarantee Box (Action buttons are cleanly displayed in the active step container) */}
+                {/* Security Guarantee Box */}
                 <div
                   style={{
-                    padding: "16px",
-                    borderRadius: "12px",
+                    padding: "14px",
+                    borderRadius: "10px",
                     backgroundColor: "#FAF9F6",
                     border: "1px solid rgba(0,0,0,0.06)",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "8px",
+                    gap: "6px",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "#2B9348", fontWeight: 700 }}>
-                    <ShieldCheck size={16} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#2B9348", fontWeight: 700 }}>
+                    <ShieldCheck size={15} />
                     <span>NXTIVE Guaranteed Protection</span>
                   </div>
-                  <div style={{ fontSize: "11.5px", color: "#666", lineHeight: 1.45 }}>
-                    Encrypted Razorpay checkout. Supports UPI, credit/debit cards &amp; NetBanking. Includes free insured courier delivery across India.
+                  <div style={{ fontSize: "11.5px", color: "#666", lineHeight: 1.4 }}>
+                    Live Razorpay encrypted checkout. Supports UPI, cards &amp; NetBanking. Free insured express dispatch across India.
                   </div>
                 </div>
-
-                {/* Trust Badge */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "12px" }}>
-                  <Lock size={12} color="#2B9348" />
-                  <span style={{ fontSize: "11px", color: "#8E8880" }}>
-                    Verified NXTIVE Gateway & Secure Checkout
-                  </span>
-                </div>
-
-                <p style={{ fontSize: "11px", color: "#8E8880", textAlign: "center", marginTop: "10px", lineHeight: 1.4 }}>
-                  By completing your order, you agree to NXTIVE Terms of Service & 7-Day Exchange Policy.
-                </p>
-
-                {orderError && (
-                  <div style={{
-                    marginTop: "12px",
-                    padding: "14px 16px",
-                    borderRadius: "8px",
-                    backgroundColor: "#FEF2F2",
-                    border: "1px solid #FECACA",
-                    color: "#991B1B",
-                    fontSize: "12.5px",
-                    fontWeight: 600,
-                  }}>
-                    <div>{orderError}</div>
-                    {failedOrderId && (
-                      <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed rgba(220, 38, 38, 0.2)", fontSize: "11.5px", color: "#7F1D1D", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
-                        <span>Order #{failedOrderId} logged as failed.</span>
-                        <Link
-                          href="/orders"
-                          style={{
-                            color: "#991B1B",
-                            fontWeight: 700,
-                            textDecoration: "underline",
-                          }}
-                        >
-                          View in Order History →
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ─── Sign-In Modal Popup (Required Before Placing Order) ─── */}
+      {/* ─── Sign-In Modal Popup (For Guest Checkout) ─── */}
       {showAuthModal && (
         <div
           style={{
@@ -1473,9 +1069,9 @@ export default function CheckoutPage() {
             style={{
               backgroundColor: "#FFFFFF",
               borderRadius: "16px",
-              maxWidth: "430px",
+              maxWidth: "420px",
               width: "100%",
-              padding: "32px",
+              padding: "28px",
               boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
               position: "relative",
             }}
@@ -1487,8 +1083,8 @@ export default function CheckoutPage() {
               onClick={() => setShowAuthModal(false)}
               style={{
                 position: "absolute",
-                top: "18px",
-                right: "18px",
+                top: "16px",
+                right: "16px",
                 background: "none",
                 border: "none",
                 color: "#666",
@@ -1500,14 +1096,14 @@ export default function CheckoutPage() {
             </button>
 
             {/* Header */}
-            <div style={{ textAlign: "center", marginBottom: "22px" }}>
-              <span style={{ fontSize: "10.5px", fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#936037", display: "block", marginBottom: "6px" }}>
+            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <span style={{ fontSize: "10.5px", fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#936037", display: "block", marginBottom: "4px" }}>
                 NXTIVE Client Access
               </span>
-              <h3 style={{ fontSize: "22px", fontWeight: 900, color: "#111110", marginBottom: "6px" }}>
+              <h3 style={{ fontSize: "20px", fontWeight: 900, color: "#111110", marginBottom: "6px" }}>
                 {authMode === "login" ? "Sign In to Complete Order" : "Create Your Account"}
               </h3>
-              <p style={{ fontSize: "12.5px", color: "#6A645C", lineHeight: 1.45 }}>
+              <p style={{ fontSize: "12.5px", color: "#6A645C", lineHeight: 1.4 }}>
                 {authMode === "login"
                   ? "Access your live order tracking, priority dispatch, and customer guarantees."
                   : "Join NXTIVE in one click to manage orders and fast-track dispatch."}
@@ -1533,7 +1129,7 @@ export default function CheckoutPage() {
                 justifyContent: "center",
                 gap: "10px",
                 cursor: authGoogleLoading ? "not-allowed" : "pointer",
-                marginBottom: "18px",
+                marginBottom: "16px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
               }}
             >
@@ -1546,7 +1142,7 @@ export default function CheckoutPage() {
               <span>{authGoogleLoading ? "Signing in..." : "Continue with Google"}</span>
             </button>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
               <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(0,0,0,0.1)" }} />
               <span style={{ fontSize: "11px", color: "#8E8880", textTransform: "uppercase", letterSpacing: "0.08em" }}>or email</span>
               <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(0,0,0,0.1)" }} />
@@ -1657,7 +1253,7 @@ export default function CheckoutPage() {
             </form>
 
             {/* Toggle Mode */}
-            <div style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: "#666" }}>
+            <div style={{ textAlign: "center", marginTop: "14px", fontSize: "12px", color: "#666" }}>
               {authMode === "login" ? (
                 <>
                   Don't have an account?{" "}
@@ -1694,44 +1290,50 @@ export default function CheckoutPage() {
         .animate-spin {
           animation: spin 1s linear infinite;
         }
+        .checkout-grid {
+          display: grid;
+          grid-template-columns: 1fr 380px;
+          gap: 28px;
+          align-items: start;
+        }
+        .checkout-card {
+          background-color: #FFFFFF;
+          border-radius: 14px;
+          padding: 24px;
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+        }
+        .responsive-form-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        .responsive-form-grid-3 {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr 1fr;
+          gap: 14px;
+        }
         @media (max-width: 900px) {
           .checkout-grid {
             grid-template-columns: 1fr !important;
-            gap: 24px !important;
+            gap: 20px !important;
+          }
+          .checkout-form-shell {
+            padding: 0 !important;
           }
         }
         @media (max-width: 640px) {
-          .stepper-label {
-            display: none !important;
-          }
-          .checkout-stepper-box {
-            padding: 12px 14px !important;
-          }
-          .stepper-step-btn {
-            padding: 2px !important;
-            gap: 0 !important;
-          }
-          .stepper-mobile-label {
-            display: block !important;
-            text-align: center;
-            font-size: 12.5px;
-            font-weight: 700;
-            color: #111110;
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid rgba(0, 0, 0, 0.06);
-          }
           .checkout-card {
-            padding: 18px 14px !important;
+            padding: 16px 14px !important;
             border-radius: 12px !important;
+          }
+          .responsive-form-grid-2,
+          .responsive-form-grid-3 {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
           }
           input, select, textarea {
             font-size: 16px !important;
-          }
-        }
-        @media (min-width: 641px) {
-          .stepper-mobile-label {
-            display: none !important;
           }
         }
       `}</style>

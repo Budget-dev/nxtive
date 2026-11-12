@@ -78,6 +78,8 @@ export interface RazorpayCheckoutInput {
   shippingAddress: ShippingAddress;
   deliveryMethod: string;
   couponCode?: string;
+  totalAmount?: number;
+  discountAmount?: number;
   userId: string;
   idToken?: string;
 }
@@ -167,30 +169,44 @@ function loadRazorpayScript(): Promise<boolean> {
       resolve(true);
       return;
     }
-    const existing = document.getElementById("razorpay-checkout-script") as HTMLScriptElement | null;
-    if (existing) {
-      if (window.Razorpay) {
-        resolve(true);
-        return;
-      }
-      existing.addEventListener("load", () => resolve(true), { once: true });
-      existing.addEventListener("error", () => resolve(false), { once: true });
-      setTimeout(() => resolve(!!window.Razorpay), 1200);
-      return;
-    }
-    try {
-      const script = document.createElement("script");
+    let script = document.getElementById("razorpay-checkout-script") as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement("script");
       script.id = "razorpay-checkout-script";
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.async = true;
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
       document.body.appendChild(script);
-      setTimeout(() => resolve(!!window.Razorpay), 3000);
-    } catch (e) {
-      console.warn("[Razorpay] Script injection failed:", e);
-      resolve(false);
     }
+
+    const checkInterval = setInterval(() => {
+      if (window.Razorpay) {
+        clearInterval(checkInterval);
+        resolve(true);
+      }
+    }, 100);
+
+    script.addEventListener(
+      "load",
+      () => {
+        clearInterval(checkInterval);
+        resolve(true);
+      },
+      { once: true }
+    );
+
+    script.addEventListener(
+      "error",
+      () => {
+        clearInterval(checkInterval);
+        resolve(false);
+      },
+      { once: true }
+    );
+
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      resolve(!!window.Razorpay);
+    }, 4000);
   });
 }
 
@@ -360,14 +376,16 @@ export function useRazorpayCheckout() {
         let razorpayOrderId = createData?.razorpayOrderId;
         let amount = createData?.amount;
         let currency = createData?.currency || "INR";
-        let keyId = createData?.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TyyzoGmczKwh0Y";
+        let keyId = createData?.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_TzBTAqPKFWxzK4";
 
         if (!orderId) {
           // If server order creation returned non-JSON/404 (e.g. Firebase static hosting),
           // synthesize a client order and persist directly into Firestore.
           const fallbackOrderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-          const itemsTotal = input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
-          const finalAmountInPaise = Math.round(itemsTotal * 100);
+          const itemsTotal = input.totalAmount !== undefined
+            ? input.totalAmount
+            : input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+          const finalAmountInPaise = Math.max(100, Math.round(itemsTotal * 100));
 
           try {
             await setDoc(doc(db, "orders", fallbackOrderId), {
@@ -382,9 +400,9 @@ export function useRazorpayCheckout() {
               amount: itemsTotal,
               total: itemsTotal,
               totalAmount: itemsTotal,
-              subtotal: itemsTotal,
+              subtotal: input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0),
               shipping: 0,
-              discount: 0,
+              discount: input.discountAmount || 0,
               status: "created",
               paymentStatus: "created",
               paymentMethod: "Razorpay",
@@ -426,17 +444,27 @@ export function useRazorpayCheckout() {
         return new Promise<RazorpayCheckoutResult>((resolve) => {
           let hasHandledCallback = false;
 
+          const prefillData: Record<string, string> = {};
+          if (cleanName) {
+            prefillData.name = cleanName;
+          }
+          if (cleanEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+            prefillData.email = cleanEmail;
+          }
+          if (cleanPhone && /^[6-9]\d{9}$/.test(cleanPhone)) {
+            prefillData.contact = cleanPhone;
+          }
+
+          const finalAmountPaise = Math.max(100, Math.round(Number(amount || (input.totalAmount ? input.totalAmount * 100 : 100))));
+
           const options: any = {
             key: keyId,
-            amount: Math.round(Number(amount)),
+            amount: finalAmountPaise,
             currency: currency || "INR",
             name: "NXTIVE",
-            description: `Order ${orderId}`,
-            prefill: {
-              ...(cleanName ? { name: cleanName } : {}),
-              ...(cleanEmail ? { email: cleanEmail } : {}),
-              ...(cleanPhone && cleanPhone.length === 10 ? { contact: cleanPhone } : {}),
-            },
+            description: `Order #${orderId}`,
+            ...(razorpayOrderId && razorpayOrderId.startsWith("order_") ? { order_id: razorpayOrderId } : {}),
+            prefill: prefillData,
             theme: {
               color: "#111110",
             },
