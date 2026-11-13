@@ -88,14 +88,25 @@ export async function POST(req: NextRequest | Request) {
     }
 
     // 3. Idempotency Check: If already processed and marked paid, return success immediately
-    if (existingOrderData.paymentStatus === "paid" || existingOrderData.status === "paid") {
+    const isAlreadyPaid =
+      existingOrderData.paymentStatus === "paid" ||
+      existingOrderData.status === "paid" ||
+      existingOrderData.paymentStatus === "PAID" ||
+      existingOrderData.paymentStatus === "PARTIALLY_PAID" ||
+      existingOrderData.orderStatus === "CONFIRMED";
+
+    if (isAlreadyPaid) {
       console.info(`[razorpay-verify-payment] Order ${targetOrderId} already confirmed as paid. Returning idempotent response.`);
       return NextResponse.json({
         success: true,
         orderId: targetOrderId,
         orderNumber: existingOrderData.orderNumber,
-        status: "paid",
-        paymentStatus: "paid",
+        status: existingOrderData.status || "paid",
+        orderStatus: existingOrderData.orderStatus || "CONFIRMED",
+        paymentStatus: existingOrderData.paymentStatus || "PAID",
+        paymentMethod: existingOrderData.paymentMethod || "ONLINE",
+        amountPaid: existingOrderData.amountPaid,
+        amountDue: existingOrderData.amountDue,
         razorpayPaymentId: existingOrderData.razorpayPaymentId || razorpay_payment_id,
         alreadyProcessed: true,
       });
@@ -170,6 +181,15 @@ export async function POST(req: NextRequest | Request) {
     const now = new Date().toISOString();
     const trackingAWB = `NXT-AWB-${Math.floor(10000000 + Math.random() * 90000000)}`;
 
+    const COD_ADVANCE = Number(process.env.COD_ADVANCE_AMOUNT || 149);
+    const isCOD = existingOrderData?.paymentMethod === "COD";
+    const totalAmount = Number(existingOrderData?.amountTotal || existingOrderData?.total || existingOrderData?.amount || 0);
+    const amountPaid = isCOD ? COD_ADVANCE : totalAmount;
+    const amountDue = isCOD ? Math.max(0, totalAmount - COD_ADVANCE) : 0;
+    const nextPaymentStatus = isCOD ? "PARTIALLY_PAID" : "PAID";
+    const nextOrderStatus = "CONFIRMED";
+    const nextStatus = isCOD ? "confirmed" : "paid";
+
     if (hasAdminCredentials) {
       const orderRef = adminDb.collection("orders").doc(targetOrderId);
       await adminDb.runTransaction(async (transaction) => {
@@ -178,14 +198,23 @@ export async function POST(req: NextRequest | Request) {
           throw new Error("Order document vanished during transaction");
         }
         const currentData = freshSnap.data();
-        if (currentData?.paymentStatus === "paid" || currentData?.status === "paid") {
+        if (
+          currentData?.paymentStatus === "paid" ||
+          currentData?.paymentStatus === "PAID" ||
+          currentData?.paymentStatus === "PARTIALLY_PAID" ||
+          currentData?.orderStatus === "CONFIRMED"
+        ) {
           return; // Already updated in a concurrent request
         }
 
         const history = Array.isArray(currentData?.statusHistory) ? currentData.statusHistory : [];
         transaction.update(orderRef, {
-          status: "paid",
-          paymentStatus: "paid",
+          status: nextStatus,
+          orderStatus: nextOrderStatus,
+          paymentStatus: nextPaymentStatus,
+          amountPaid,
+          amountDue,
+          amountTotal: totalAmount,
           razorpayPaymentId: razorpay_payment_id,
           razorpaySignature: razorpay_signature,
           trackingNumber: currentData?.trackingNumber || trackingAWB,
@@ -194,9 +223,11 @@ export async function POST(req: NextRequest | Request) {
           statusHistory: [
             ...history,
             {
-              status: "paid",
+              status: nextStatus,
               timestamp: now,
-              note: `Payment verified via Razorpay signature (${razorpay_payment_id})`,
+              note: isCOD
+                ? `COD advance ₹${COD_ADVANCE} verified via Razorpay (${razorpay_payment_id}). Balance ₹${amountDue} due on delivery.`
+                : `Payment verified via Razorpay signature (${razorpay_payment_id})`,
             },
           ],
         });
@@ -204,8 +235,12 @@ export async function POST(req: NextRequest | Request) {
     } else {
       // Memory store fallback
       const updatedData: Record<string, any> = {
-        status: "paid",
-        paymentStatus: "paid",
+        status: nextStatus,
+        orderStatus: nextOrderStatus,
+        paymentStatus: nextPaymentStatus,
+        amountPaid,
+        amountDue,
+        amountTotal: totalAmount,
         razorpayPaymentId: razorpay_payment_id,
         razorpaySignature: razorpay_signature,
         trackingNumber: existingOrderData.trackingNumber || trackingAWB,
@@ -214,9 +249,11 @@ export async function POST(req: NextRequest | Request) {
         statusHistory: [
           ...(existingOrderData.statusHistory || []),
           {
-            status: "paid",
+            status: nextStatus,
             timestamp: now,
-            note: `Payment verified via Razorpay signature (${razorpay_payment_id})`,
+            note: isCOD
+              ? `COD advance ₹${COD_ADVANCE} verified via Razorpay (${razorpay_payment_id}). Balance ₹${amountDue} due on delivery.`
+              : `Payment verified via Razorpay signature (${razorpay_payment_id})`,
           },
         ],
       };
@@ -253,8 +290,12 @@ export async function POST(req: NextRequest | Request) {
       success: true,
       orderId: targetOrderId,
       orderNumber: existingOrderData.orderNumber,
-      status: "paid",
-      paymentStatus: "paid",
+      status: nextStatus,
+      orderStatus: nextOrderStatus,
+      paymentStatus: nextPaymentStatus,
+      amountPaid,
+      amountDue,
+      paymentMethod: existingOrderData?.paymentMethod || "ONLINE",
       razorpayPaymentId: razorpay_payment_id,
     });
   } catch (err: any) {

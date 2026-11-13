@@ -1277,7 +1277,7 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
                   backgroundColor: "#FAF9F5",
                   borderRadius: "8px",
                   color: "#746E66",
-                  lineHeight: "1.4",
+                  lineHeight: "1.5",
                 }}
               >
                 Payment Method: <strong>{order.paymentMethod}</strong>
@@ -1285,11 +1285,20 @@ export function OrderDetailClient({ orderId: initialOrderId }: Props = {}) {
                 Status:{" "}
                 <span
                   style={{
-                    color: order.paymentStatus === "Paid" ? "#2B9348" : "#D97706",
+                    color:
+                      order.paymentStatus === "Paid"
+                        ? "#2B9348"
+                        : order.paymentStatus === "Pending COD" || String(order.paymentMethod).includes("COD")
+                        ? "#B45309"
+                        : order.paymentStatus === "Payment Failed"
+                        ? "#DC2626"
+                        : "#D97706",
                     fontWeight: 700,
                   }}
                 >
-                  {order.paymentStatus}
+                  {String(order.paymentMethod).includes("COD")
+                    ? `Partially Paid (COD Due: ₹${Math.max(0, order.total - 149).toLocaleString("en-IN")})`
+                    : order.paymentStatus}
                 </span>
               </div>
             </div>

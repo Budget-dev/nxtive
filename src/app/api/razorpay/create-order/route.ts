@@ -25,6 +25,7 @@ export async function POST(req: NextRequest | Request) {
       deliveryMethod,
       couponCode,
       idempotencyKey,
+      paymentMethod: rawPaymentMethod,
     } = body || {};
 
     // 1. Verify User Authentication via Firebase ID Token if provided
@@ -122,8 +123,14 @@ export async function POST(req: NextRequest | Request) {
       );
     }
 
+    // COD logic: charge only the advance amount for COD orders
+    const COD_ADVANCE = Number(process.env.COD_ADVANCE_AMOUNT || 149);
+    const paymentMethod = rawPaymentMethod === "COD" ? "COD" : "ONLINE";
+    const isCOD = paymentMethod === "COD" && finalAmountRupees > COD_ADVANCE;
+    const razorpayAmountRupees = isCOD ? COD_ADVANCE : finalAmountRupees;
+
     // Convert amount to paise for Razorpay
-    const amountInPaise = Math.round(finalAmountRupees * 100);
+    const amountInPaise = Math.round(razorpayAmountRupees * 100);
     const orderNumber = generateOrderNumber();
     const orderId = `ord-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const receipt = `rcpt_${orderNumber.replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -139,9 +146,14 @@ export async function POST(req: NextRequest | Request) {
       userId: verifiedUserId,
       amount: finalAmountRupees,
       amountPaise: amountInPaise,
+      amountTotal: finalAmountRupees,
+      amountPaid: 0,
+      amountDue: finalAmountRupees,
       currency: currency || "INR",
       status: "created",
-      paymentStatus: "created",
+      paymentStatus: "PENDING",
+      orderStatus: "PENDING_PAYMENT",
+      paymentMethod,
       razorpayOrderId: null as string | null,
       receipt,
       items: resolvedItems,
@@ -159,7 +171,7 @@ export async function POST(req: NextRequest | Request) {
         {
           status: "created",
           timestamp: now,
-          note: "Order initialized, pending Razorpay gateway order generation",
+          note: `Order initialized (${paymentMethod}), pending Razorpay gateway order generation`,
         },
       ],
     };
@@ -246,7 +258,12 @@ export async function POST(req: NextRequest | Request) {
     const updateData = {
       razorpayOrderId,
       status: "pending",
-      paymentStatus: "pending",
+      paymentStatus: "PENDING",
+      orderStatus: "PENDING_PAYMENT",
+      amountPaid: 0,
+      amountDue: finalAmountRupees,
+      amountTotal: finalAmountRupees,
+      paymentMethod,
       updatedAt: new Date().toISOString(),
       statusHistory: [
         ...orderDocData.statusHistory,
@@ -255,7 +272,7 @@ export async function POST(req: NextRequest | Request) {
           timestamp: new Date().toISOString(),
           note: isTestFallback
             ? "Order created with simulated gateway ID (Test Mode)"
-            : `Linked Razorpay Order ID: ${razorpayOrderId}`,
+            : `Linked Razorpay Order ID: ${razorpayOrderId}${isCOD ? ` | COD advance: ₹${COD_ADVANCE}` : ""}`,
         },
       ],
     };
@@ -282,6 +299,10 @@ export async function POST(req: NextRequest | Request) {
       receipt,
       keyId: key_id || "rzp_test_placeholder",
       isTestMode: isTestFallback || key_id?.startsWith("rzp_test_"),
+      paymentMethod,
+      isCOD,
+      codAdvance: isCOD ? COD_ADVANCE : null,
+      amountTotal: finalAmountRupees,
     });
   } catch (err: any) {
     console.error("[razorpay-create-order] Unhandled error:", err);

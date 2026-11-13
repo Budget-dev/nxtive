@@ -1289,36 +1289,124 @@ function AccountContent() {
                           </div>
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          {/* Payment Status Badge */}
                           {(() => {
-                            const isFailed = order.status === "failed" || (order as any).paymentStatus === "failed";
+                            const rawPayStatus = String((order as any).paymentStatus || "").toUpperCase();
+                            const rawMethod = String((order as any).paymentMethod || "").toUpperCase();
+                            const isCOD = rawMethod.includes("COD");
+                            const isPaid = rawPayStatus === "PAID" || order.status === "paid";
+                            const isPartiallyPaid =
+                              rawPayStatus === "PARTIALLY_PAID" ||
+                              (isCOD && (isPaid || order.status === "confirmed" || (order as any).orderStatus === "CONFIRMED"));
+                            const isFailed = rawPayStatus === "FAILED" || order.status === "failed";
+                            const amountDue = (order as any).amountDue ?? Math.max(0, (order.total || 0) - 149);
+
+                            if (isPartiallyPaid) {
+                              return (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    padding: "5px 12px",
+                                    borderRadius: "9999px",
+                                    fontSize: "11.5px",
+                                    fontWeight: 700,
+                                    backgroundColor: "rgba(217, 119, 6, 0.12)",
+                                    color: "#B45309",
+                                    border: "1px solid rgba(217, 119, 6, 0.25)",
+                                  }}
+                                >
+                                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#B45309" }} />
+                                  <span>Partially Paid (COD Due: ₹{amountDue.toLocaleString("en-IN")})</span>
+                                </span>
+                              );
+                            }
+
+                            if (isPaid) {
+                              return (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    padding: "5px 12px",
+                                    borderRadius: "9999px",
+                                    fontSize: "11.5px",
+                                    fontWeight: 700,
+                                    backgroundColor: "rgba(43, 147, 72, 0.1)",
+                                    color: "#2B9348",
+                                  }}
+                                >
+                                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#2B9348" }} />
+                                  <span>Paid</span>
+                                </span>
+                              );
+                            }
+
+                            if (isFailed) {
+                              return (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    padding: "5px 12px",
+                                    borderRadius: "9999px",
+                                    fontSize: "11.5px",
+                                    fontWeight: 700,
+                                    backgroundColor: "rgba(220, 38, 38, 0.1)",
+                                    color: "#DC2626",
+                                  }}
+                                >
+                                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#DC2626" }} />
+                                  <span>Failed</span>
+                                </span>
+                              );
+                            }
+
                             return (
                               <span
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "center",
                                   gap: "6px",
-                                  padding: "5px 14px",
+                                  padding: "5px 12px",
                                   borderRadius: "9999px",
-                                  fontSize: "12px",
+                                  fontSize: "11.5px",
+                                  fontWeight: 700,
+                                  backgroundColor: "rgba(107, 114, 128, 0.1)",
+                                  color: "#4B5563",
+                                }}
+                              >
+                                <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#6B7280" }} />
+                                <span>Pending</span>
+                              </span>
+                            );
+                          })()}
+
+                          {/* Fulfillment / Delivery Badge */}
+                          {(() => {
+                            const isFailed = order.status === "failed" || (order as any).paymentStatus === "failed" || (order as any).paymentStatus === "FAILED";
+                            if (isFailed) return null;
+                            return (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  padding: "5px 12px",
+                                  borderRadius: "9999px",
+                                  fontSize: "11.5px",
                                   fontWeight: 700,
                                   backgroundColor: isDelivered
                                     ? "rgba(43, 147, 72, 0.1)"
-                                    : isFailed
-                                    ? "rgba(220, 38, 38, 0.1)"
-                                    : "rgba(217, 119, 6, 0.1)",
-                                  color: isDelivered ? "#2B9348" : isFailed ? "#DC2626" : "#B45309",
+                                    : "rgba(217, 119, 6, 0.08)",
+                                  color: isDelivered ? "#2B9348" : "#854D0E",
                                 }}
                               >
-                                <span
-                                  style={{
-                                    width: "6px",
-                                    height: "6px",
-                                    borderRadius: "50%",
-                                    backgroundColor: isDelivered ? "#2B9348" : isFailed ? "#DC2626" : "#B45309",
-                                  }}
-                                />
-                                <span>{isFailed ? "Payment Failed" : order.status}</span>
+                                <span>{order.status}</span>
                               </span>
                             );
                           })()}

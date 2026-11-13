@@ -112,6 +112,8 @@ export async function POST(req: NextRequest | Request) {
       return matched ? { id: matched.id, data: matched } : null;
     };
 
+    const COD_ADVANCE = Number(process.env.COD_ADVANCE_AMOUNT || 149);
+
     // 4. Handle Webhook Events
     switch (eventType) {
       case "payment.captured": {
@@ -119,26 +121,47 @@ export async function POST(req: NextRequest | Request) {
         const rzpOrderId = payment.order_id;
         const customOrderId = payment.notes?.orderId;
         const paymentId = payment.id;
+        const noteMethod = payment.notes?.paymentMethod;
 
         const order = await findOrder(rzpOrderId, customOrderId);
         if (order) {
-          // If already paid, do nothing
-          if (order.data?.paymentStatus === "paid" || order.data?.status === "paid") {
+          // If already paid or confirmed, do nothing
+          if (
+            order.data?.paymentStatus === "paid" ||
+            order.data?.paymentStatus === "PAID" ||
+            order.data?.paymentStatus === "PARTIALLY_PAID" ||
+            order.data?.orderStatus === "CONFIRMED"
+          ) {
             break;
           }
 
+          const isCOD = order.data?.paymentMethod === "COD" || noteMethod === "COD";
+          const totalAmount = Number(order.data?.amountTotal || order.data?.total || order.data?.amount || 0);
+          const amountPaid = isCOD ? COD_ADVANCE : totalAmount;
+          const amountDue = isCOD ? Math.max(0, totalAmount - COD_ADVANCE) : 0;
+          const nextPaymentStatus = isCOD ? "PARTIALLY_PAID" : "PAID";
+          const nextOrderStatus = "CONFIRMED";
+          const nextStatus = isCOD ? "confirmed" : "paid";
+
           const update = {
-            status: "paid",
-            paymentStatus: "paid",
+            status: nextStatus,
+            orderStatus: nextOrderStatus,
+            paymentStatus: nextPaymentStatus,
+            paymentMethod: isCOD ? "COD" : (order.data?.paymentMethod || "ONLINE"),
+            amountPaid,
+            amountDue,
+            amountTotal: totalAmount,
             razorpayPaymentId: paymentId,
             paidAt: now,
             updatedAt: now,
             statusHistory: [
               ...(order.data?.statusHistory || []),
               {
-                status: "paid",
+                status: nextStatus,
                 timestamp: now,
-                note: `Payment captured by Razorpay webhook (${paymentId})`,
+                note: isCOD
+                  ? `COD advance ₹${COD_ADVANCE} captured by Razorpay webhook (${paymentId}). Balance ₹${amountDue} due on delivery.`
+                  : `Payment captured by Razorpay webhook (${paymentId})`,
               },
             ],
           };
@@ -148,7 +171,7 @@ export async function POST(req: NextRequest | Request) {
           } else {
             await storeUpdateDocument("orders", order.id, update);
           }
-          console.info(`[razorpay-webhook] Order ${order.id} marked as paid via payment.captured`);
+          console.info(`[razorpay-webhook] Order ${order.id} confirmed via payment.captured (${nextPaymentStatus})`);
         }
         break;
       }
@@ -157,24 +180,45 @@ export async function POST(req: NextRequest | Request) {
         const rzpOrder = payload.order?.entity || {};
         const rzpOrderId = rzpOrder.id;
         const customOrderId = rzpOrder.notes?.orderId;
+        const noteMethod = rzpOrder.notes?.paymentMethod;
 
         const order = await findOrder(rzpOrderId, customOrderId);
         if (order) {
-          if (order.data?.paymentStatus === "paid" || order.data?.status === "paid") {
+          if (
+            order.data?.paymentStatus === "paid" ||
+            order.data?.paymentStatus === "PAID" ||
+            order.data?.paymentStatus === "PARTIALLY_PAID" ||
+            order.data?.orderStatus === "CONFIRMED"
+          ) {
             break;
           }
 
+          const isCOD = order.data?.paymentMethod === "COD" || noteMethod === "COD";
+          const totalAmount = Number(order.data?.amountTotal || order.data?.total || order.data?.amount || 0);
+          const amountPaid = isCOD ? COD_ADVANCE : totalAmount;
+          const amountDue = isCOD ? Math.max(0, totalAmount - COD_ADVANCE) : 0;
+          const nextPaymentStatus = isCOD ? "PARTIALLY_PAID" : "PAID";
+          const nextOrderStatus = "CONFIRMED";
+          const nextStatus = isCOD ? "confirmed" : "paid";
+
           const update = {
-            status: "paid",
-            paymentStatus: "paid",
+            status: nextStatus,
+            orderStatus: nextOrderStatus,
+            paymentStatus: nextPaymentStatus,
+            paymentMethod: isCOD ? "COD" : (order.data?.paymentMethod || "ONLINE"),
+            amountPaid,
+            amountDue,
+            amountTotal: totalAmount,
             paidAt: now,
             updatedAt: now,
             statusHistory: [
               ...(order.data?.statusHistory || []),
               {
-                status: "paid",
+                status: nextStatus,
                 timestamp: now,
-                note: `Order paid confirmed by Razorpay webhook (${rzpOrderId})`,
+                note: isCOD
+                  ? `COD order confirmed by Razorpay webhook (${rzpOrderId})`
+                  : `Order paid confirmed by Razorpay webhook (${rzpOrderId})`,
               },
             ],
           };
@@ -184,7 +228,7 @@ export async function POST(req: NextRequest | Request) {
           } else {
             await storeUpdateDocument("orders", order.id, update);
           }
-          console.info(`[razorpay-webhook] Order ${order.id} marked as paid via order.paid`);
+          console.info(`[razorpay-webhook] Order ${order.id} confirmed via order.paid (${nextPaymentStatus})`);
         }
         break;
       }
@@ -198,14 +242,19 @@ export async function POST(req: NextRequest | Request) {
 
         const order = await findOrder(rzpOrderId, customOrderId);
         if (order) {
-          // Don't overwrite if order was already successfully paid
-          if (order.data?.paymentStatus === "paid") {
+          // Don't overwrite if order was already successfully confirmed/paid
+          if (
+            order.data?.paymentStatus === "paid" ||
+            order.data?.paymentStatus === "PAID" ||
+            order.data?.paymentStatus === "PARTIALLY_PAID" ||
+            order.data?.orderStatus === "CONFIRMED"
+          ) {
             break;
           }
 
           const update = {
             status: "failed",
-            paymentStatus: "failed",
+            paymentStatus: "FAILED",
             errorCode,
             errorDescription: errorDesc,
             updatedAt: now,

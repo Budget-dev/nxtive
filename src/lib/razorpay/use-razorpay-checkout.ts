@@ -82,6 +82,7 @@ export interface RazorpayCheckoutInput {
   discountAmount?: number;
   userId: string;
   idToken?: string;
+  paymentMethod?: "ONLINE" | "COD";
 }
 
 export type CheckoutStatus =
@@ -91,7 +92,8 @@ export type CheckoutStatus =
   | "verifying"
   | "confirming_with_webhook"
   | "success"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export interface RazorpayCheckoutResult {
   success: boolean;
@@ -101,6 +103,9 @@ export interface RazorpayCheckoutResult {
   error?: string;
   mappedError?: MappedPaymentError;
   status: CheckoutStatus;
+  paymentMethod?: "ONLINE" | "COD";
+  amountPaid?: number;
+  amountDue?: number;
 }
 
 // Safe JSON fetcher that avoids crashing on HTML or malformed responses
@@ -219,6 +224,10 @@ export function useRazorpayCheckout() {
   const [confirmingMessage, setConfirmingMessage] = useState<string | null>(null);
 
   const activeListenerUnsubRef = useRef<(() => void) | null>(null);
+  // Re-entry guard: prevent double click / duplicate payment initiation
+  const inProgressRef = useRef(false);
+  // Pending order ref: reuse existing pending order on retry (valid for 30 minutes)
+  const pendingOrderRef = useRef<{ orderId: string; razorpayOrderId?: string; amount?: number; currency?: string; keyId?: string; paymentMethod?: "ONLINE" | "COD"; createdAt?: number } | null>(null);
 
   const cleanupListener = () => {
     if (activeListenerUnsubRef.current) {
@@ -335,6 +344,13 @@ export function useRazorpayCheckout() {
    */
   const initiatePayment = useCallback(
     async (input: RazorpayCheckoutInput): Promise<RazorpayCheckoutResult> => {
+      // Re-entry guard: prevent double clicks / duplicate payment initiation
+      if (inProgressRef.current) {
+        console.warn("[Razorpay] Payment already in progress, ignoring duplicate call");
+        return { success: false, status: "creating_order", error: "Payment already in progress." };
+      }
+      inProgressRef.current = true;
+
       cleanupListener();
       setLoading(true);
       setError(null);
@@ -342,87 +358,136 @@ export function useRazorpayCheckout() {
       setConfirmingMessage(null);
       setStatus("creating_order");
 
+      const paymentMethod = input.paymentMethod || "ONLINE";
+      // COD advance amount — matches server constant COD_ADVANCE_AMOUNT
+      const COD_ADVANCE = Number(process.env.NEXT_PUBLIC_COD_ADVANCE_AMOUNT || 149);
+
       try {
-        // Step 1: Fast server order creation attempt (1.2s timeout so client never hangs)
-        let createData: any = null;
-        const requestPayload = {
-          items: input.items,
-          shippingAddress: input.shippingAddress,
-          deliveryMethod: input.deliveryMethod,
-          couponCode: input.couponCode,
-          userId: input.userId,
-          idToken: input.idToken,
-        };
-        const requestHeaders: Record<string, string> = {
-          "Content-Type": "application/json",
-          ...(input.idToken ? { Authorization: `Bearer ${input.idToken}` } : {}),
-        };
+        let orderId: string | undefined;
+        let razorpayOrderId: string | undefined;
+        let amount: number | undefined;
+        let currency: string = "INR";
+        let keyId: string = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_TzBTAqPKFWxzK4";
 
-        try {
-          const createController = new AbortController();
-          const createTimeoutId = setTimeout(() => createController.abort(), 1200);
-          createData = await safeJsonFetch("/api/razorpay/create-order", {
-            method: "POST",
-            headers: requestHeaders,
-            signal: createController.signal,
-            body: JSON.stringify(requestPayload),
-          });
-          clearTimeout(createTimeoutId);
-        } catch {
-          createData = null;
+        // Reuse existing pending order on retry within 30 minutes instead of creating duplicate orders
+        const isPendingOrderValid =
+          pendingOrderRef.current &&
+          pendingOrderRef.current.paymentMethod === paymentMethod &&
+          pendingOrderRef.current.orderId &&
+          Date.now() - (pendingOrderRef.current.createdAt || 0) < 30 * 60 * 1000;
+
+        if (isPendingOrderValid && pendingOrderRef.current) {
+          orderId = pendingOrderRef.current.orderId;
+          razorpayOrderId = pendingOrderRef.current.razorpayOrderId;
+          amount = pendingOrderRef.current.amount;
+          currency = pendingOrderRef.current.currency || "INR";
+          keyId = pendingOrderRef.current.keyId || keyId;
+          console.info(`[Razorpay] Reusing existing pending order #${orderId} on retry`);
         }
-
-        let orderId = createData?.orderId;
-        let razorpayOrderId = createData?.razorpayOrderId;
-        let amount = createData?.amount;
-        let currency = createData?.currency || "INR";
-        let keyId = createData?.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_TzBTAqPKFWxzK4";
 
         if (!orderId) {
-          // Synthesize client order identifier
-          const fallbackOrderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-          const itemsTotal = input.totalAmount !== undefined
-            ? input.totalAmount
-            : input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
-          const finalAmountInPaise = Math.max(100, Math.round(itemsTotal * 100));
-
-          orderId = fallbackOrderId;
-          amount = finalAmountInPaise;
-          currency = "INR";
+          // Step 1: Fast server order creation attempt (1.2s timeout so client never hangs)
+          let createData: any = null;
+          const requestPayload = {
+            items: input.items,
+            shippingAddress: input.shippingAddress,
+            deliveryMethod: input.deliveryMethod,
+            couponCode: input.couponCode,
+            userId: input.userId,
+            idToken: input.idToken,
+            paymentMethod,
+          };
+          const requestHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+            ...(input.idToken ? { Authorization: `Bearer ${input.idToken}` } : {}),
+          };
 
           try {
-            await setDoc(doc(db, "orders", fallbackOrderId), {
-              id: fallbackOrderId,
-              orderNumber: fallbackOrderId,
-              userId: input.userId,
-              customerEmail: input.shippingAddress.email || "",
-              items: input.items,
-              shippingAddress: input.shippingAddress,
-              deliveryMethod: input.deliveryMethod || "standard",
-              couponCode: input.couponCode || null,
-              amount: itemsTotal,
-              total: itemsTotal,
-              totalAmount: itemsTotal,
-              subtotal: input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0),
-              shipping: 0,
-              discount: input.discountAmount || 0,
-              status: "created",
-              paymentStatus: "created",
-              paymentMethod: "Razorpay",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              statusHistory: [
-                {
-                  status: "created",
-                  timestamp: new Date().toISOString(),
-                  note: "Order created, awaiting Razorpay checkout",
-                },
-              ],
+            const createController = new AbortController();
+            const createTimeoutId = setTimeout(() => createController.abort(), 1200);
+            createData = await safeJsonFetch("/api/payment/create-order", {
+              method: "POST",
+              headers: requestHeaders,
+              signal: createController.signal,
+              body: JSON.stringify(requestPayload),
             });
-          } catch (dbErr) {
-            console.warn("[Razorpay] Initial order pre-record notice:", dbErr);
+            clearTimeout(createTimeoutId);
+          } catch {
+            createData = null;
+          }
+
+          if (!createData?.orderId) {
+            try {
+              createData = await safeJsonFetch("/api/razorpay/create-order", {
+                method: "POST",
+                headers: requestHeaders,
+                body: JSON.stringify(requestPayload),
+              });
+            } catch {}
+          }
+
+          orderId = createData?.orderId;
+          razorpayOrderId = createData?.razorpayOrderId;
+          amount = createData?.amount;
+          currency = createData?.currency || "INR";
+          keyId = createData?.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_TzBTAqPKFWxzK4";
+
+          if (!orderId) {
+            // Synthesize client order identifier
+            const fallbackOrderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+            const itemsTotal = input.totalAmount !== undefined
+              ? input.totalAmount
+              : input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+
+            // For COD: charge only advance; for ONLINE: charge full amount
+            const isCOD = paymentMethod === "COD" && itemsTotal > COD_ADVANCE;
+            const chargeAmount = isCOD ? COD_ADVANCE : itemsTotal;
+            const finalAmountInPaise = Math.max(100, Math.round(chargeAmount * 100));
+
+            orderId = fallbackOrderId;
+            amount = finalAmountInPaise;
+            currency = "INR";
+
+            try {
+              await setDoc(doc(db, "orders", fallbackOrderId), {
+                id: fallbackOrderId,
+                orderNumber: fallbackOrderId,
+                userId: input.userId,
+                customerEmail: input.shippingAddress.email || "",
+                items: input.items,
+                shippingAddress: input.shippingAddress,
+                deliveryMethod: input.deliveryMethod || "standard",
+                couponCode: input.couponCode || null,
+                amount: itemsTotal,
+                total: itemsTotal,
+                totalAmount: itemsTotal,
+                subtotal: input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0),
+                shipping: 0,
+                discount: input.discountAmount || 0,
+                status: "created",
+                paymentStatus: "PENDING",
+                orderStatus: "PENDING_PAYMENT",
+                paymentMethod: isCOD ? "COD" : "ONLINE",
+                amountPaid: 0,
+                amountDue: itemsTotal,
+                amountTotal: itemsTotal,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                statusHistory: [
+                  {
+                    status: "created",
+                    timestamp: new Date().toISOString(),
+                    note: `Order created (${isCOD ? "COD" : "ONLINE"}), awaiting Razorpay checkout`,
+                  },
+                ],
+              });
+            } catch (dbErr) {
+              console.warn("[Razorpay] Initial order pre-record notice:", dbErr);
+            }
           }
         }
+
+        pendingOrderRef.current = { orderId: orderId!, razorpayOrderId, amount, currency, keyId, paymentMethod, createdAt: Date.now() };
 
         setCurrentOrderId(orderId);
 
@@ -501,9 +566,17 @@ export function useRazorpayCheckout() {
 
                 clearTimeout(timeoutId);
 
-                // Update order in Firestore to paid with full customer and order details
+                // Update order in Firestore with full customer, payment and COD details
                 try {
-                  const finalTotalRupees = finalAmountPaise / 100;
+                  const isCOD = paymentMethod === "COD";
+                  const fullOrderTotalRupees = input.totalAmount !== undefined
+                    ? input.totalAmount
+                    : input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+                  const amountPaidRupees = isCOD ? COD_ADVANCE : fullOrderTotalRupees;
+                  const amountDueRupees = isCOD ? Math.max(0, fullOrderTotalRupees - COD_ADVANCE) : 0;
+                  const nextPaymentStatus = isCOD ? "PARTIALLY_PAID" : "PAID";
+                  const nextStatus = isCOD ? "confirmed" : "paid";
+
                   await setDoc(
                     doc(db, "orders", orderId),
                     {
@@ -517,24 +590,31 @@ export function useRazorpayCheckout() {
                       shippingAddress: input.shippingAddress,
                       deliveryMethod: input.deliveryMethod || "standard",
                       couponCode: input.couponCode || null,
-                      amount: finalTotalRupees,
-                      total: finalTotalRupees,
-                      totalAmount: finalTotalRupees,
+                      amount: fullOrderTotalRupees,
+                      total: fullOrderTotalRupees,
+                      totalAmount: fullOrderTotalRupees,
+                      amountTotal: fullOrderTotalRupees,
+                      amountPaid: amountPaidRupees,
+                      amountDue: amountDueRupees,
                       subtotal: input.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0),
                       shipping: 0,
                       discount: input.discountAmount || 0,
-                      status: "paid",
-                      paymentStatus: "paid",
-                      paymentMethod: "Razorpay",
+                      status: nextStatus,
+                      orderStatus: "CONFIRMED",
+                      paymentStatus: nextPaymentStatus,
+                      paymentMethod: isCOD ? "COD" : "ONLINE",
                       paymentId: response.razorpay_payment_id,
                       razorpayPaymentId: response.razorpay_payment_id,
                       ...(response.razorpay_order_id ? { razorpayOrderId: response.razorpay_order_id } : {}),
                       ...(response.razorpay_signature ? { razorpaySignature: response.razorpay_signature } : {}),
+                      paidAt: new Date().toISOString(),
                       updatedAt: new Date().toISOString(),
                       statusHistory: arrayUnion({
-                        status: "paid",
+                        status: nextStatus,
                         timestamp: new Date().toISOString(),
-                        note: `Razorpay payment completed successfully (${response.razorpay_payment_id})`,
+                        note: isCOD
+                          ? `COD advance ₹${COD_ADVANCE} paid via Razorpay (${response.razorpay_payment_id}). Balance ₹${amountDueRupees} due on delivery.`
+                          : `Razorpay payment completed successfully (${response.razorpay_payment_id})`,
                       }),
                     },
                     { merge: true }
@@ -545,12 +625,17 @@ export function useRazorpayCheckout() {
 
                 setStatus("success");
                 setLoading(false);
+                inProgressRef.current = false;
+                pendingOrderRef.current = null;
                 resolve({
                   success: true,
                   orderId,
                   razorpayOrderId: response.razorpay_order_id,
                   paymentId: response.razorpay_payment_id,
                   status: "success",
+                  paymentMethod,
+                  amountPaid: paymentMethod === "COD" ? COD_ADVANCE : (input.totalAmount || 0),
+                  amountDue: paymentMethod === "COD" ? Math.max(0, (input.totalAmount || 0) - COD_ADVANCE) : 0,
                 });
               } catch (verifyErr: any) {
                 clearTimeout(timeoutId);
@@ -564,31 +649,26 @@ export function useRazorpayCheckout() {
               }
             },
             modal: {
-              // 2c. Modal dismissed / user cancels / network drops before callback
-              ondismiss: async () => {
+              // 2c. Modal dismissed / user cancels — reset to idle, don't mark order failed
+              ondismiss: () => {
                 if (hasHandledCallback) return;
-                console.info("[Payment] Checkout modal dismissed. Checking pending status via webhook...");
-
-                // Treat as "pending" — check if webhook processed payment before user closed
-                const webhookRes = await waitForWebhookResolution(orderId, 8000);
-                if (webhookRes.success) {
-                  setLoading(false);
-                  resolve(webhookRes);
-                } else {
-                  const mapped = getRazorpayUserErrorMessage("PAYMENT_CANCELLED", "Checkout was closed.", "cancelled");
-                  recordPaymentFailure(orderId, "PAYMENT_CANCELLED", "Customer closed payment modal without completing transaction.");
-                  setStatus("failed");
-                  setError(mapped.userMessage);
-                  setMappedError(mapped);
-                  setLoading(false);
-                  resolve({
-                    success: false,
-                    orderId,
-                    error: mapped.userMessage,
-                    mappedError: mapped,
-                    status: "failed",
-                  });
-                }
+                console.info("[Payment] Checkout modal dismissed by user.");
+                // Immediately reset state so button re-enables
+                setStatus("cancelled");
+                setLoading(false);
+                inProgressRef.current = false;
+                // Keep the pending order in pendingOrderRef for retry
+                pendingOrderRef.current = { orderId, razorpayOrderId, amount, currency, keyId, paymentMethod };
+                // Brief cancelled state then back to idle
+                setTimeout(() => {
+                  setStatus("idle");
+                }, 1500);
+                resolve({
+                  success: false,
+                  orderId,
+                  status: "cancelled",
+                  paymentMethod,
+                });
               },
               escape: true,
               confirm_close: true,
@@ -644,6 +724,7 @@ export function useRazorpayCheckout() {
               setError(mapped.userMessage);
               setMappedError(mapped);
               setLoading(false);
+              inProgressRef.current = false;
               resolve({
                 success: false,
                 orderId,
@@ -695,6 +776,7 @@ export function useRazorpayCheckout() {
         setError(mapped.userMessage);
         setMappedError(mapped);
         setLoading(false);
+        inProgressRef.current = false;
         return {
           success: false,
           error: mapped.userMessage,
@@ -714,12 +796,15 @@ export function useRazorpayCheckout() {
     setMappedError(null);
     setConfirmingMessage(null);
     setCurrentOrderId(null);
+    inProgressRef.current = false;
+    pendingOrderRef.current = null;
   }, []);
 
   return {
     initiatePayment,
     reset,
     status,
+    paymentState: status,
     loading,
     error,
     mappedError,

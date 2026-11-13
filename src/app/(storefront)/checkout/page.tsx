@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   AlertCircle,
   CreditCard,
+  Package,
 } from "lucide-react";
 import { useStore } from "@/components/store-context";
 import { useAuth } from "@/features/auth";
@@ -81,11 +82,28 @@ export default function CheckoutPage() {
   const [state, setState] = useState("Maharashtra");
   const [postalCode, setPostalCode] = useState("");
 
-  const { initiatePayment, loading: razorpayLoading, error: razorpayError } = useRazorpayCheckout();
+  const {
+    initiatePayment,
+    loading: razorpayLoading,
+    error: razorpayError,
+    paymentState,
+    status: paymentStatus,
+    reset: resetPayment,
+  } = useRazorpayCheckout();
   const [orderError, setOrderError] = useState<string | null>(null);
   const [failedOrderId, setFailedOrderId] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"ONLINE" | "COD">("ONLINE");
+  const [cancelledToast, setCancelledToast] = useState(false);
+
+  // Free standard shipping across India
+  const deliveryCost = 0;
+  const finalTotal = Math.max(0, cartSubtotal - discountAmount + deliveryCost);
+
+  // COD advance amount (must match server COD_ADVANCE_AMOUNT)
+  const COD_ADVANCE = 149;
+  const showCOD = finalTotal > COD_ADVANCE;
 
   // Auth popup modal states
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -96,10 +114,6 @@ export default function CheckoutPage() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authGoogleLoading, setAuthGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-
-  // Free standard shipping across India
-  const deliveryCost = 0;
-  const finalTotal = Math.max(0, cartSubtotal - discountAmount + deliveryCost);
 
   // Auto-fill user email and name from sign in / sign up
   useEffect(() => {
@@ -339,13 +353,25 @@ export default function CheckoutPage() {
       discountAmount: discountAmount,
       userId: effectiveUserId,
       idToken,
+      paymentMethod,
     });
 
     if (res.success && res.orderId) {
       setIsOrderPlaced(true);
       clearCart();
       router.replace(
-        `/checkout/success?orderId=${res.orderId}&paymentId=${encodeURIComponent(res.paymentId || "")}&method=razorpay`
+        `/order/success?orderId=${res.orderId}&paymentId=${encodeURIComponent(res.paymentId || "")}&method=${paymentMethod.toLowerCase()}`
+      );
+    } else if (res.status === "cancelled") {
+      // User closed the modal — show toast, re-enable button
+      setCancelledToast(true);
+      setTimeout(() => setCancelledToast(false), 4000);
+    } else if (res.status === "failed" && res.orderId) {
+      // Payment failed at gateway or verification — redirect to failed page without clearing cart
+      setOrderError(res.error || "Payment was declined or failed.");
+      setFailedOrderId(res.orderId);
+      router.push(
+        `/order/failed?orderId=${res.orderId}&error=${encodeURIComponent(res.error || "Payment was declined or failed.")}`
       );
     } else if (res.error) {
       setOrderError(res.error);
@@ -785,6 +811,99 @@ export default function CheckoutPage() {
                   </p>
                 </div>
 
+                {/* Payment Method Selector */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {/* Online Payment Option */}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      padding: "14px 16px",
+                      borderRadius: "10px",
+                      border: `2px solid ${paymentMethod === "ONLINE" ? "#111110" : "rgba(0,0,0,0.12)"}`,
+                      backgroundColor: paymentMethod === "ONLINE" ? "#FAF9F6" : "#FFFFFF",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="ONLINE"
+                      checked={paymentMethod === "ONLINE"}
+                      onChange={() => setPaymentMethod("ONLINE")}
+                      style={{ marginTop: "2px", accentColor: "#111110" }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <CreditCard size={16} color="#111110" />
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#111110" }}>Pay Online (Full Amount)</span>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#2B9348", backgroundColor: "#DCFCE7", padding: "2px 8px", borderRadius: "4px" }}>
+                          Recommended
+                        </span>
+                      </div>
+                      <p style={{ fontSize: "12px", color: "#666", margin: "4px 0 0 0" }}>
+                        UPI, Cards, NetBanking, Wallets — Pay ₹{finalTotal.toLocaleString("en-IN")} now via Razorpay
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* COD Option — only shown if total > 149 */}
+                  {showCOD && (
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "12px",
+                        padding: "14px 16px",
+                        borderRadius: "10px",
+                        border: `2px solid ${paymentMethod === "COD" ? "#111110" : "rgba(0,0,0,0.12)"}`,
+                        backgroundColor: paymentMethod === "COD" ? "#FAF9F6" : "#FFFFFF",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="COD"
+                        checked={paymentMethod === "COD"}
+                        onChange={() => setPaymentMethod("COD")}
+                        style={{ marginTop: "2px", accentColor: "#111110" }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <Truck size={16} color="#111110" />
+                          <span style={{ fontSize: "14px", fontWeight: 800, color: "#111110" }}>Cash on Delivery</span>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "#B45309", backgroundColor: "#FEF3C7", padding: "2px 8px", borderRadius: "4px" }}>
+                            Pay ₹{COD_ADVANCE} now
+                          </span>
+                        </div>
+                        <p style={{ fontSize: "12px", color: "#666", margin: "4px 0 0 0" }}>
+                          Pay a ₹{COD_ADVANCE} advance online to confirm your order. Remaining ₹{(finalTotal - COD_ADVANCE).toLocaleString("en-IN")} collected on delivery.
+                        </p>
+                        {paymentMethod === "COD" && (
+                          <div style={{ marginTop: "10px", padding: "10px 12px", borderRadius: "8px", backgroundColor: "#FFF7ED", border: "1px solid #FED7AA", fontSize: "12px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                              <span style={{ color: "#666" }}>Order Total</span>
+                              <span style={{ fontWeight: 700, color: "#111110" }}>₹{finalTotal.toLocaleString("en-IN")}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                              <span style={{ color: "#666" }}>Pay Now (Advance)</span>
+                              <span style={{ fontWeight: 700, color: "#2B9348" }}>₹{COD_ADVANCE}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed rgba(0,0,0,0.1)", paddingTop: "6px", marginTop: "4px" }}>
+                              <span style={{ color: "#666" }}>Pay on Delivery</span>
+                              <span style={{ fontWeight: 800, color: "#B45309" }}>₹{(finalTotal - COD_ADVANCE).toLocaleString("en-IN")}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  )}
+                </div>
+
                 {/* Razorpay Gateway Card Box */}
                 <div
                   style={{
@@ -850,31 +969,72 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Error Banner if any */}
-                {orderError && (
+                {/* Cancelled toast */}
+                {cancelledToast && (
                   <div
                     style={{
                       padding: "12px 14px",
                       borderRadius: "8px",
+                      backgroundColor: "#F0FDF4",
+                      border: "1px solid #BBF7D0",
+                      color: "#15803D",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+                    <span>Payment cancelled. You can try again.</span>
+                  </div>
+                )}
+
+                {/* Error Banner if any */}
+                {orderError && (
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      borderRadius: "10px",
                       backgroundColor: "#FEF2F2",
                       border: "1px solid #FECACA",
                       color: "#991B1B",
                       fontSize: "13px",
                       fontWeight: 600,
                       display: "flex",
-                      alignItems: "flex-start",
-                      gap: "8px",
+                      flexDirection: "column",
+                      gap: "10px",
                     }}
                   >
-                    <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
-                    <div style={{ flex: 1 }}>
-                      <div>{orderError}</div>
-                      {failedOrderId && (
-                        <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed rgba(220, 38, 38, 0.2)", fontSize: "12px", color: "#7F1D1D" }}>
-                          Order #{failedOrderId} failed. You can retry safely.
-                        </div>
-                      )}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                      <AlertCircle size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, marginBottom: "2px" }}>Payment Notice</div>
+                        <div style={{ fontSize: "12.5px", color: "#7F1D1D", fontWeight: 500 }}>{orderError}</div>
+                        {failedOrderId && (
+                          <div style={{ marginTop: "4px", fontSize: "11.5px", color: "#991B1B" }}>
+                            Order #{failedOrderId}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleRazorpayCheckout}
+                      style={{
+                        alignSelf: "flex-start",
+                        padding: "7px 16px",
+                        backgroundColor: "#991B1B",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: "9999px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Retry Payment
+                    </button>
                   </div>
                 )}
 
@@ -882,7 +1042,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   onClick={handleRazorpayCheckout}
-                  disabled={razorpayLoading}
+                  disabled={paymentState === "creating_order" || paymentState === "verifying"}
                   style={{
                     width: "100%",
                     padding: "16px 24px",
@@ -897,17 +1057,27 @@ export default function CheckoutPage() {
                     justifyContent: "center",
                     gap: "10px",
                     border: "none",
-                    cursor: razorpayLoading ? "not-allowed" : "pointer",
-                    opacity: razorpayLoading ? 0.75 : 1,
+                    cursor: (paymentState === "creating_order" || paymentState === "verifying") ? "not-allowed" : "pointer",
+                    opacity: (paymentState === "creating_order" || paymentState === "verifying") ? 0.75 : 1,
                     boxShadow: "0 8px 24px rgba(17,17,16,0.18)",
                     transition: "all 0.2s ease",
                     marginTop: "6px",
                   }}
                 >
-                  {razorpayLoading ? (
+                  {paymentState === "creating_order" ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
                       <span>Opening Razorpay Gateway...</span>
+                    </>
+                  ) : paymentState === "verifying" ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Verifying Payment...</span>
+                    </>
+                  ) : paymentMethod === "COD" ? (
+                    <>
+                      <Lock size={16} />
+                      <span>Pay ₹{COD_ADVANCE} Advance (COD)</span>
                     </>
                   ) : (
                     <>
